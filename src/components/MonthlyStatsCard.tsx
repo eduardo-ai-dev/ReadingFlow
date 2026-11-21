@@ -52,9 +52,9 @@ export function MonthlyStatsCard({
               <dd className="mt-1 font-serif text-2xl font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)]">
                 {formatNumberPtBr(monthly.pagesRead)}
               </dd>
-              <p className="rf-type-caption mt-0.5">
+              <dd className="rf-type-caption mt-0.5">
                 lidas em {monthly.monthNameLower}
-              </p>
+              </dd>
             </div>
 
             <div className="rf-monthly-cell">
@@ -64,9 +64,9 @@ export function MonthlyStatsCard({
               <dd className="mt-1 font-serif text-2xl font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)]">
                 {monthly.audioHours}h
               </dd>
-              <p className="rf-type-caption mt-0.5">
+              <dd className="rf-type-caption mt-0.5">
                 ouvidas em {monthly.monthNameLower}
-              </p>
+              </dd>
             </div>
 
             <div className="rf-monthly-cell rf-monthly-cell-pace">
@@ -76,9 +76,9 @@ export function MonthlyStatsCard({
               <dd className="mt-1 font-serif text-2xl font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)]">
                 {formatNumberPtBr(monthly.booksFinished)}
               </dd>
-              <p className="rf-type-caption mt-0.5">
+              <dd className="rf-type-caption mt-0.5">
                 finalizadas em {monthly.monthNameLower}
-              </p>
+              </dd>
             </div>
           </dl>
 

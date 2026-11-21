@@ -132,7 +132,7 @@ export const ReadingStreakCard = memo(function ReadingStreakCard({
                 variant: "subtle",
                 size: "sm",
                 className:
-                  "!min-h-[36px] !w-9 !px-0 border-[var(--rf-border-default)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-heading)] hover:border-[var(--rf-border-accent)]",
+                  "!min-h-[44px] !w-11 lg:!min-h-[36px] lg:!w-9 !px-0 border-[var(--rf-border-default)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-heading)] hover:border-[var(--rf-border-accent)]",
               })}
             >
               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -147,7 +147,7 @@ export const ReadingStreakCard = memo(function ReadingStreakCard({
                 variant: "subtle",
                 size: "sm",
                 className:
-                  "!min-h-[36px] !w-9 !px-0 border-[var(--rf-border-default)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-heading)] hover:border-[var(--rf-border-accent)]",
+                  "!min-h-[44px] !w-11 lg:!min-h-[36px] lg:!w-9 !px-0 border-[var(--rf-border-default)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-heading)] hover:border-[var(--rf-border-accent)]",
               })}
             >
               <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -180,13 +180,16 @@ export const ReadingStreakCard = memo(function ReadingStreakCard({
         </div>
 
         {/* Grade mensal (5 níveis por quantis) */}
-        <div
-          role="grid"
+        <ul
           aria-label={`Calendário de leitura de ${grid.monthYearLabel}`}
           className="mt-1.5 grid grid-cols-7 gap-1.5"
         >
           {Array.from({ length: grid.leadingEmptyDays }).map((_, idx) => (
-            <span key={`empty-${idx}`} aria-hidden="true" className="h-8" />
+            <li
+              key={`empty-${idx}`}
+              aria-hidden="true"
+              className="h-11 lg:h-8"
+            />
           ))}
 
           {grid.days.map((day) => {
@@ -196,7 +199,7 @@ export const ReadingStreakCard = memo(function ReadingStreakCard({
             const isToday = day.ymd === calendar.todayYmd;
             const levelClass = LEVEL_SWATCH_CLASSES[day.level];
 
-            const sharedClass = `flex h-8 w-full items-center justify-center rounded-[var(--rf-radius-sm)] font-sans text-[13px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums] transition-colors ${levelClass} ${
+            const sharedClass = `flex h-11 lg:h-8 w-full items-center justify-center rounded-[var(--rf-radius-sm)] font-sans text-[13px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums] transition-colors ${levelClass} ${
               isToday && !isSelected
                 ? "outline outline-1 outline-[var(--rf-text-accent-secondary)] outline-offset-1"
                 : ""
@@ -204,55 +207,57 @@ export const ReadingStreakCard = memo(function ReadingStreakCard({
 
             if (hasSessions) {
               return (
-                <button
-                  key={day.ymd}
-                  type="button"
-                  role="gridcell"
-                  title={tooltip}
-                  aria-label={`${tooltip}. Clique para ver sessões`}
-                  aria-expanded={isSelected}
-                  aria-controls={
-                    isSelected ? "calendario-sessoes-dia" : undefined
-                  }
-                  onClick={() =>
-                    setSelectedDayYmd((prev) =>
-                      prev === day.ymd ? null : day.ymd
-                    )
-                  }
-                  onMouseEnter={() =>
-                    setHintText(`${tooltip} · Clique para abrir sessões`)
-                  }
-                  onMouseLeave={() => setHintText(defaultHintText)}
-                  onFocus={() =>
-                    setHintText(`${tooltip} · Clique para abrir sessões`)
-                  }
-                  onBlur={() => setHintText(defaultHintText)}
-                  className={`rf-icon-btn cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--rf-focus-ring-color)] focus-visible:outline-offset-2 ${sharedClass} ${
-                    isSelected
-                      ? "outline-2 outline-[var(--rf-text-primary)] outline-offset-1"
-                      : "hover:brightness-95"
-                  }`}
-                >
-                  {day.dayOfMonth}
-                </button>
+                <li key={day.ymd}>
+                  <button
+                    type="button"
+                    title={tooltip}
+                    aria-label={`${tooltip}. Toque para ver sessões`}
+                    aria-expanded={isSelected}
+                    aria-controls={
+                      isSelected ? "calendario-sessoes-dia" : undefined
+                    }
+                    onClick={() => {
+                      setHintText(tooltip);
+                      setSelectedDayYmd((prev) =>
+                        prev === day.ymd ? null : day.ymd
+                      );
+                    }}
+                    onMouseEnter={() =>
+                      setHintText(`${tooltip} · Clique para abrir sessões`)
+                    }
+                    onMouseLeave={() => setHintText(defaultHintText)}
+                    onFocus={() =>
+                      setHintText(`${tooltip} · Clique para abrir sessões`)
+                    }
+                    onBlur={() => setHintText(defaultHintText)}
+                    className={`rf-icon-btn cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--rf-focus-ring-color)] focus-visible:outline-offset-2 ${sharedClass} ${
+                      isSelected
+                        ? "outline-2 outline-[var(--rf-text-primary)] outline-offset-1"
+                        : "hover:brightness-95"
+                    }`}
+                  >
+                    {day.dayOfMonth}
+                  </button>
+                </li>
               );
             }
 
             return (
-              <div
-                key={day.ymd}
-                role="gridcell"
-                title={tooltip}
-                aria-label={tooltip}
-                onMouseEnter={() => setHintText(tooltip)}
-                onMouseLeave={() => setHintText(defaultHintText)}
-                className={sharedClass}
-              >
-                {day.dayOfMonth}
-              </div>
+              <li key={day.ymd}>
+                <div
+                  title={tooltip}
+                  onMouseEnter={() => setHintText(tooltip)}
+                  onMouseLeave={() => setHintText(defaultHintText)}
+                  onClick={() => setHintText(tooltip)}
+                  className={sharedClass}
+                >
+                  <span className="sr-only">{tooltip}</span>
+                  <span aria-hidden="true">{day.dayOfMonth}</span>
+                </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
 
         {/* Tooltip contextual inline (atualizado via ref sem re-renderizar o calendário) */}
         <div
@@ -270,6 +275,7 @@ export const ReadingStreakCard = memo(function ReadingStreakCard({
             Quantis no mês
           </span>
           <div
+            role="group"
             className="flex items-center gap-1.5 font-sans text-[13px] text-[var(--rf-text-secondary)]"
             aria-label="Legenda de 5 níveis de intensidade por quantis"
           >
@@ -277,6 +283,7 @@ export const ReadingStreakCard = memo(function ReadingStreakCard({
             {grid.quantiles.legend.map((step) => (
               <span
                 key={step.level}
+                role="img"
                 title={`${step.label}: ${step.rangeText}`}
                 aria-label={`${step.label}: ${step.rangeText}`}
                 className={`inline-block h-3.5 w-3.5 rounded-[var(--rf-radius-xs)] ${LEVEL_SWATCH_CLASSES[step.level]}`}
@@ -305,7 +312,7 @@ export const ReadingStreakCard = memo(function ReadingStreakCard({
                   variant: "subtle",
                   size: "sm",
                   className:
-                    "!min-h-[30px] !w-7 !px-0 text-[var(--rf-text-secondary)]",
+                    "!min-h-[44px] !w-11 lg:!min-h-[30px] lg:!w-7 !px-0 text-[var(--rf-text-secondary)]",
                 })}
               >
                 <X className="h-3.5 w-3.5" aria-hidden="true" />

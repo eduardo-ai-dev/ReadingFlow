@@ -188,7 +188,9 @@ export default async function DashboardPage() {
               <dd className="rf-type-kpi mt-1.5">
                 {formatNumberPtBr(stats.uniqueOwnedWorks)}
               </dd>
-              <p className="rf-type-caption mt-1">Volumes únicos catalogados</p>
+              <dd className="rf-type-caption mt-1">
+                Volumes únicos catalogados
+              </dd>
             </div>
 
             <div className="py-3 pl-3 md:border-r md:border-[var(--rf-divider)] md:px-5">
@@ -198,7 +200,9 @@ export default async function DashboardPage() {
               <dd className="rf-type-kpi mt-1.5">
                 {formatNumberPtBr(stats.finishedReadingsCount)}
               </dd>
-              <p className="rf-type-caption mt-1">Concluídos em {statsYear}</p>
+              <dd className="rf-type-caption mt-1">
+                Concluídos em {statsYear}
+              </dd>
             </div>
 
             <div className="py-3 pr-3 md:border-r md:border-[var(--rf-divider)] md:px-5">
@@ -208,11 +212,12 @@ export default async function DashboardPage() {
               <dd className="rf-type-kpi mt-1.5">
                 {formatNumberPtBr(stats.pagesRead)}
               </dd>
-              <MetricFormulaHint
-                basisLabel={`total em ${statsYear}`}
-                formula={`Soma das páginas lidas em obras concluídas e em andamento no ano de ${statsYear} (físico e digital).`}
-                className="mt-1"
-              />
+              <dd className="mt-1">
+                <MetricFormulaHint
+                  basisLabel={`total em ${statsYear}`}
+                  formula={`Soma das páginas lidas em obras concluídas e em andamento no ano de ${statsYear} (físico e digital).`}
+                />
+              </dd>
             </div>
 
             <div className="py-3 pl-3 md:pl-5">
@@ -225,9 +230,9 @@ export default async function DashboardPage() {
                   h
                 </span>
               </dd>
-              <p className="rf-type-caption mt-1">
+              <dd className="rf-type-caption mt-1">
                 Tempo ouvido em {statsYear}
-              </p>
+              </dd>
             </div>
           </dl>
         )}
@@ -325,68 +330,66 @@ export default async function DashboardPage() {
                   ) : (
                     <dl className="mt-1.5 divide-y divide-[var(--rf-divider)]">
                       {/* Ritmo diário nos dias ativos (única ocorrência na tela) */}
-                      <div className="py-2.5 first:pt-1.5">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <dt className="rf-type-label text-[var(--rf-text-secondary)]">
-                            Ritmo diário
-                          </dt>
-                          <dd className="font-serif text-xl font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-accent-secondary)]">
-                            {editorialData.metrics.dailyPace.formatted}
-                          </dd>
-                        </div>
-                        <MetricFormulaHint
-                          basisLabel={
-                            editorialData.metrics.dailyPace.basisLabel
-                          }
-                          formula={
-                            editorialData.metrics.dailyPace.formulaTooltip
-                          }
-                          className="mt-0.5"
-                        />
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 py-2.5 first:pt-1.5">
+                        <dt className="rf-type-label text-[var(--rf-text-secondary)]">
+                          Ritmo diário
+                        </dt>
+                        <dd className="font-serif text-xl font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-accent-secondary)]">
+                          {editorialData.metrics.dailyPace.formatted}
+                        </dd>
+                        <dd className="col-span-2 mt-0.5">
+                          <MetricFormulaHint
+                            basisLabel={
+                              editorialData.metrics.dailyPace.basisLabel
+                            }
+                            formula={
+                              editorialData.metrics.dailyPace.formulaTooltip
+                            }
+                          />
+                        </dd>
                       </div>
 
                       {/* Média semanal do mês */}
-                      <div className="py-2.5">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <dt className="rf-type-label text-[var(--rf-text-secondary)]">
-                            Média semanal
-                          </dt>
-                          <dd className="font-serif text-lg font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)]">
-                            {editorialData.metrics.weeklyMonthAverage.formatted}
-                          </dd>
-                        </div>
-                        <MetricFormulaHint
-                          basisLabel={
-                            editorialData.metrics.weeklyMonthAverage.basisLabel
-                          }
-                          formula={
-                            editorialData.metrics.weeklyMonthAverage
-                              .formulaTooltip
-                          }
-                          className="mt-0.5"
-                        />
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 py-2.5">
+                        <dt className="rf-type-label text-[var(--rf-text-secondary)]">
+                          Média semanal
+                        </dt>
+                        <dd className="font-serif text-lg font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)]">
+                          {editorialData.metrics.weeklyMonthAverage.formatted}
+                        </dd>
+                        <dd className="col-span-2 mt-0.5">
+                          <MetricFormulaHint
+                            basisLabel={
+                              editorialData.metrics.weeklyMonthAverage
+                                .basisLabel
+                            }
+                            formula={
+                              editorialData.metrics.weeklyMonthAverage
+                                .formulaTooltip
+                            }
+                          />
+                        </dd>
                       </div>
 
                       {/* Frequência semanal de leitura no mês */}
-                      <div className="py-2.5 last:pb-0">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <dt className="rf-type-label text-[var(--rf-text-secondary)]">
-                            Frequência
-                          </dt>
-                          <dd className="font-serif text-lg font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)]">
-                            {editorialData.metrics.readingFrequency.formatted}
-                          </dd>
-                        </div>
-                        <MetricFormulaHint
-                          basisLabel={
-                            editorialData.metrics.readingFrequency.basisLabel
-                          }
-                          formula={
-                            editorialData.metrics.readingFrequency
-                              .formulaTooltip
-                          }
-                          className="mt-0.5"
-                        />
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 py-2.5 last:pb-0">
+                        <dt className="rf-type-label text-[var(--rf-text-secondary)]">
+                          Frequência
+                        </dt>
+                        <dd className="font-serif text-lg font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)]">
+                          {editorialData.metrics.readingFrequency.formatted}
+                        </dd>
+                        <dd className="col-span-2 mt-0.5">
+                          <MetricFormulaHint
+                            basisLabel={
+                              editorialData.metrics.readingFrequency.basisLabel
+                            }
+                            formula={
+                              editorialData.metrics.readingFrequency
+                                .formulaTooltip
+                            }
+                          />
+                        </dd>
                       </div>
                     </dl>
                   )}
