@@ -271,6 +271,15 @@ export async function finishReadingAction(
   }
 
   const work = ws.works.find((w) => w.id === reading.workId);
+  if (reading.status === "finished") {
+    return {
+      ok: true,
+      undoId: ws.lastUndoAction?.id ?? `undo-${Date.now()}`,
+      label:
+        ws.lastUndoAction?.label ??
+        (work ? `Livro "${work.title}" concluído` : "Leitura concluída"),
+    };
+  }
   const prevProgressText =
     reading.progressUnit === "pages"
       ? `pág. ${reading.progressValue}${reading.progressTotal ? `/${reading.progressTotal}` : ""}`

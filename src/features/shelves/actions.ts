@@ -106,7 +106,7 @@ export async function reorderShelfBooksAction(
     return { ok: false, error: "Ordem dos livros inválida." };
   }
 
-  const orderedIds = parsed.data.itemIds;
+  const orderedIds = Array.from(new Set(parsed.data.itemIds));
   const itemsById = new Map(ws.items.map((it) => [it.id, it]));
   const validOrderedItems = orderedIds
     .map((id) => itemsById.get(id))

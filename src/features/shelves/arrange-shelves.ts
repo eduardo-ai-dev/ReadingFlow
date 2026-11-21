@@ -8,10 +8,7 @@ import {
 export const SHELF_LAYOUT_STORAGE_KEY = "readingflow:shelf-layout:v1";
 
 export type ShelfColorPresetId =
-  | "classic-dark"
-  | "editorial-tricolor"
-  | "parchment-wood"
-  | "crimson-gold";
+  "classic-dark" | "editorial-tricolor" | "parchment-wood" | "crimson-gold";
 
 export interface ShelfHeaderMeta {
   title?: string;
@@ -23,34 +20,20 @@ export interface ShelfHeaderMeta {
 }
 
 export type ShelfMaterialStyle =
-  | "classic-wood"
-  | "minimal-modern"
-  | "editorial-bordeaux";
+  "classic-wood" | "minimal-modern" | "editorial-bordeaux";
 
 export type ShelfOrganizationMode = "color" | "genre" | "custom";
 
 export type ShelfPresetId =
-  | "classica"
-  | "minimalista"
-  | "vitrine"
-  | "bordo"
-  | "personalizada";
+  "classica" | "minimalista" | "vitrine" | "bordo" | "personalizada";
 
 export type ShelfMaterial =
-  | "nogueira"
-  | "carvalho"
-  | "grafite"
-  | "bordo"
-  | "pedra";
+  "nogueira" | "carvalho" | "grafite" | "bordo" | "pedra";
 
 export type BracketStyle = "classico" | "dourado" | "flutuante";
 
 export type NicheBackdrop =
-  | "creme"
-  | "madeira"
-  | "verde_biblioteca"
-  | "bordo_profundo"
-  | "preto_fosco";
+  "creme" | "madeira" | "verde_biblioteca" | "bordo_profundo" | "preto_fosco";
 
 export type ShelfDensity = "compacta" | "padrao" | "vitrine";
 
@@ -679,7 +662,9 @@ export function computeArrangeBookDimensions(params: {
     return { widthPx: 76, heightPx };
   }
 
-  const widthPx = Math.round(Math.max(22, Math.min(48, 18 + safePages * 0.055)));
+  const widthPx = Math.round(
+    Math.max(22, Math.min(48, 18 + safePages * 0.055))
+  );
   return { widthPx, heightPx };
 }
 
@@ -895,8 +880,13 @@ function parseBookDisplayModes(
     result[String(id)] = "capa_frente";
   }
   if (raw && typeof raw === "object") {
-    for (const [bookId, mode] of Object.entries(raw as Record<string, unknown>)) {
-      if (typeof mode === "string" && VALID_BOOK_MODES.has(mode as BookDisplayMode)) {
+    for (const [bookId, mode] of Object.entries(
+      raw as Record<string, unknown>
+    )) {
+      if (
+        typeof mode === "string" &&
+        VALID_BOOK_MODES.has(mode as BookDisplayMode)
+      ) {
         result[bookId] = mode as BookDisplayMode;
       }
     }
@@ -909,7 +899,9 @@ function parseBookTiltDirections(
 ): Record<string, "left" | "right"> {
   const result: Record<string, "left" | "right"> = {};
   if (raw && typeof raw === "object") {
-    for (const [bookId, dir] of Object.entries(raw as Record<string, unknown>)) {
+    for (const [bookId, dir] of Object.entries(
+      raw as Record<string, unknown>
+    )) {
       if (dir === "left" || dir === "right") {
         result[bookId] = dir;
       }
@@ -924,7 +916,9 @@ function parseShelfDecorByRow(
   const result: Record<string, ShelfDecorPlacement[]> = {};
   if (!raw || typeof raw !== "object") return result;
 
-  for (const [shelfKey, list] of Object.entries(raw as Record<string, unknown>)) {
+  for (const [shelfKey, list] of Object.entries(
+    raw as Record<string, unknown>
+  )) {
     if (!Array.isArray(list)) continue;
     const valid: ShelfDecorPlacement[] = [];
     for (const item of list) {
@@ -956,7 +950,11 @@ function parseShelfDecorByRow(
 
 /** Constrói a lista canônica de CustomShelfRow a partir de prateleiras, modos e decorações. */
 export function buildCustomShelfRows(params: {
-  shelves: ReadonlyArray<{ key: string; title: string; bookIds: readonly string[] }>;
+  shelves: ReadonlyArray<{
+    key: string;
+    title: string;
+    bookIds: readonly string[];
+  }>;
   bookDisplayModes?: Record<string, BookDisplayMode>;
   bookTiltDirections?: Record<string, "left" | "right">;
   bookColorOverrides?: Record<string, string>;
@@ -1012,6 +1010,110 @@ export function buildCustomShelfRows(params: {
   });
 }
 
+/**
+ * Garante invariantes de integridade da arrumação da Estante 3D (mesmo sob edições concorrentes):
+ * - Chaves de prateleira em `shelfOrder` e `customShelves` são únicas.
+ * - Nenhum livro pode aparecer em duas prateleiras simultaneamente em `customOrderByShelf` ou `customRows`.
+ * - Se `bookShelfMap[bookId]` aponta para `shelfKey`, o livro só pode residir na lista ordenada de `shelfKey`.
+ */
+export function reconcileShelfLayoutIntegrity(
+  layout: PersistedShelfLayout
+): PersistedShelfLayout {
+  const uniqueShelfOrder = Array.from(
+    new Set(
+      layout.shelfOrder.filter((k) => typeof k === "string" && k.length > 0)
+    )
+  );
+
+  const seenCustomShelfKeys = new Set<string>();
+  const uniqueCustomShelves: Array<{ key: string; title: string }> = [];
+  for (const s of layout.customShelves) {
+    if (
+      !s ||
+      typeof s.key !== "string" ||
+      !s.key ||
+      seenCustomShelfKeys.has(s.key)
+    ) {
+      continue;
+    }
+    seenCustomShelfKeys.add(s.key);
+    uniqueCustomShelves.push({
+      key: s.key,
+      title:
+        typeof s.title === "string" && s.title.trim() ? s.title.trim() : s.key,
+    });
+  }
+
+  const bookShelfMap: Record<string, string> = {};
+  for (const [bookId, shelfKey] of Object.entries(layout.bookShelfMap ?? {})) {
+    if (
+      typeof bookId === "string" &&
+      bookId &&
+      typeof shelfKey === "string" &&
+      shelfKey
+    ) {
+      bookShelfMap[bookId] = shelfKey;
+    }
+  }
+
+  const claimedBooks = new Set<string>();
+  const reconciledOrderByShelf: Record<string, string[]> = {};
+
+  for (const [shelfKey, rawIds] of Object.entries(
+    layout.customOrderByShelf ?? {}
+  )) {
+    if (!Array.isArray(rawIds)) continue;
+    const cleanIds: string[] = [];
+    for (const rawId of rawIds) {
+      const bookId = String(rawId);
+      if (!bookId || claimedBooks.has(bookId)) continue;
+      const mappedShelf = bookShelfMap[bookId];
+      if (mappedShelf && mappedShelf !== shelfKey) {
+        continue;
+      }
+      claimedBooks.add(bookId);
+      cleanIds.push(bookId);
+    }
+    reconciledOrderByShelf[shelfKey] = cleanIds;
+  }
+
+  // Garante que todo livro mapeado em bookShelfMap para uma prateleira com ordem customizada esteja presente nela
+  for (const [bookId, targetShelfKey] of Object.entries(bookShelfMap)) {
+    if (!claimedBooks.has(bookId) && reconciledOrderByShelf[targetShelfKey]) {
+      reconciledOrderByShelf[targetShelfKey]!.push(bookId);
+      claimedBooks.add(bookId);
+    }
+  }
+
+  let reconciledCustomRows = layout.customRows;
+  if (Array.isArray(layout.customRows) && layout.customRows.length > 0) {
+    const claimedInRows = new Set<string>();
+    reconciledCustomRows = layout.customRows.map((row) => ({
+      ...row,
+      items: Array.isArray(row.items)
+        ? row.items.filter((slot) => {
+            if (slot.kind !== "book") return true;
+            const mappedShelf = bookShelfMap[slot.bookId];
+            if (mappedShelf && mappedShelf !== row.id) return false;
+            if (claimedInRows.has(slot.bookId)) return false;
+            claimedInRows.add(slot.bookId);
+            return true;
+          })
+        : [],
+    }));
+  }
+
+  return {
+    ...layout,
+    shelfOrder: uniqueShelfOrder,
+    customShelves: uniqueCustomShelves,
+    bookShelfMap,
+    customOrderByShelf: reconciledOrderByShelf,
+    featuredCoverIds: Array.from(new Set(layout.featuredCoverIds ?? [])),
+    customRows: reconciledCustomRows,
+  };
+}
+
 // Re-export compatível para leituras de estado compartilhado entre rotas
 export function parsePersistedShelfLayout(
   raw: string | null
@@ -1039,7 +1141,7 @@ export function parsePersistedShelfLayout(
       legacyMaterial,
       legacyOrg
     );
-    return {
+    return reconcileShelfLayoutIntegrity({
       shelfOrder: Array.isArray(parsed.shelfOrder) ? parsed.shelfOrder : [],
       bookShelfMap:
         parsed.bookShelfMap && typeof parsed.bookShelfMap === "object"
@@ -1053,12 +1155,14 @@ export function parsePersistedShelfLayout(
           ? parsed.shelfMeta
           : {},
       customOrderByShelf:
-        parsed.customOrderByShelf && typeof parsed.customOrderByShelf === "object"
+        parsed.customOrderByShelf &&
+        typeof parsed.customOrderByShelf === "object"
           ? parsed.customOrderByShelf
           : {},
       featuredCoverIds,
       bookColorOverrides:
-        parsed.bookColorOverrides && typeof parsed.bookColorOverrides === "object"
+        parsed.bookColorOverrides &&
+        typeof parsed.bookColorOverrides === "object"
           ? parsed.bookColorOverrides
           : {},
       shelfMaterial: toLegacyShelfMaterial(themeConfig.material),
@@ -1071,7 +1175,7 @@ export function parsePersistedShelfLayout(
       bookTiltDirections: parseBookTiltDirections(parsed.bookTiltDirections),
       shelfDecorByRow: parseShelfDecorByRow(parsed.shelfDecorByRow),
       customRows: Array.isArray(parsed.customRows) ? parsed.customRows : [],
-    };
+    });
   } catch {
     return EMPTY_PERSISTED_SHELF_LAYOUT;
   }

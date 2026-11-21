@@ -103,6 +103,31 @@ export async function lookupBookByIsbnAction(rawInput: {
   return { ok: true, result };
 }
 
+const userCatalogMutationLocks = new Map<string, Promise<unknown>>();
+
+async function withUserCatalogLock<T>(
+  userId: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  const prev = userCatalogMutationLocks.get(userId) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const chained = prev.then(() => gate);
+  userCatalogMutationLocks.set(userId, chained);
+
+  await prev.catch(() => {});
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (userCatalogMutationLocks.get(userId) === chained) {
+      userCatalogMutationLocks.delete(userId);
+    }
+  }
+}
+
 export async function addBookToLibraryAction(rawInput: unknown): Promise<
   | {
       ok: true;
@@ -134,276 +159,279 @@ export async function addBookToLibraryAction(rawInput: unknown): Promise<
     };
   }
 
-  const data = parsed.data;
-  let normalizedIsbn: string | undefined;
-  if (data.isbn && data.isbn.trim().length > 0) {
-    const checked = normalizeToIsbn13(data.isbn);
-    if (!checked) {
-      return { ok: false, error: ptBR.validation.invalidIsbn };
+  return withUserCatalogLock(ws.profile.id, async () => {
+    const data = parsed.data;
+    let normalizedIsbn: string | undefined;
+    if (data.isbn && data.isbn.trim().length > 0) {
+      const checked = normalizeToIsbn13(data.isbn);
+      if (!checked) {
+        return { ok: false, error: ptBR.validation.invalidIsbn };
+      }
+      normalizedIsbn = checked;
     }
-    normalizedIsbn = checked;
-  }
 
-  const cleanTitle = sanitizePlainText(data.title, 300);
-  const cleanSubtitle = data.subtitle
-    ? sanitizePlainText(data.subtitle, 300)
-    : undefined;
-  const cleanAuthor = sanitizePlainText(data.primaryAuthor, 200);
-  const cleanTranslator = data.translator
-    ? sanitizePlainText(data.translator, 200)
-    : undefined;
-  const cleanNarrator = data.narrator
-    ? sanitizePlainText(data.narrator, 200)
-    : undefined;
-  const cleanPublisher = data.publisher
-    ? sanitizePlainText(data.publisher, 200)
-    : undefined;
-  const cleanGenre = data.primaryGenre
-    ? sanitizePlainText(data.primaryGenre, 100)
-    : undefined;
-  const cleanDescription = data.description
-    ? sanitizePlainText(data.description, 4000)
-    : undefined;
-  const cleanStore = data.store
-    ? sanitizePlainText(data.store, 160)
-    : undefined;
-  const cleanNotes = data.notes
-    ? sanitizePlainText(data.notes, 2000)
-    : undefined;
-  const safeCoverUrl = sanitizeCoverInput(data.coverUrl);
-  if (data.coverUrl?.startsWith("data:") && !safeCoverUrl) {
-    return {
-      ok: false,
-      error:
-        "A imagem de capa enviada é inválida. Use JPEG, PNG ou WebP de até 300 KB, ou remova a capa.",
-    };
-  }
-
-  const dup = classifyBookDuplication(
-    {
-      isbn: normalizedIsbn,
-      title: cleanTitle,
-      primaryAuthor: cleanAuthor,
-      language: data.language,
-    },
-    ws.editions,
-    ws.works
-  );
-
-  if (
-    (dup.kind === "exact" || dup.kind === "probable") &&
-    !data.forceDuplicateCopy &&
-    !data.addToWishlistOnly
-  ) {
-    const workEditionIds = new Set(
-      ws.editions.filter((e) => e.workId === dup.workId).map((e) => e.id)
-    );
-    const alreadyOwned = ws.items.some((it) =>
-      workEditionIds.has(it.editionId)
-    );
-    if (alreadyOwned) {
+    const cleanTitle = sanitizePlainText(data.title, 300);
+    const cleanSubtitle = data.subtitle
+      ? sanitizePlainText(data.subtitle, 300)
+      : undefined;
+    const cleanAuthor = sanitizePlainText(data.primaryAuthor, 200);
+    const cleanTranslator = data.translator
+      ? sanitizePlainText(data.translator, 200)
+      : undefined;
+    const cleanNarrator = data.narrator
+      ? sanitizePlainText(data.narrator, 200)
+      : undefined;
+    const cleanPublisher = data.publisher
+      ? sanitizePlainText(data.publisher, 200)
+      : undefined;
+    const cleanGenre = data.primaryGenre
+      ? sanitizePlainText(data.primaryGenre, 100)
+      : undefined;
+    const cleanDescription = data.description
+      ? sanitizePlainText(data.description, 4000)
+      : undefined;
+    const cleanStore = data.store
+      ? sanitizePlainText(data.store, 160)
+      : undefined;
+    const cleanNotes = data.notes
+      ? sanitizePlainText(data.notes, 2000)
+      : undefined;
+    const safeCoverUrl = sanitizeCoverInput(data.coverUrl);
+    if (data.coverUrl?.startsWith("data:") && !safeCoverUrl) {
       return {
         ok: false,
         error:
-          dup.kind === "exact"
-            ? "Este ISBN já consta na sua estante. Confirme abaixo caso queira registrar outro exemplar."
-            : "Uma obra muito semelhante já está na sua estante. Confirme caso seja outro exemplar ou edição.",
-        duplicateWarning: {
-          kind: dup.kind,
-          existingWorkId: dup.workId,
-        },
+          "A imagem de capa enviada é inválida. Use JPEG, PNG ou WebP de até 300 KB, ou remova a capa.",
       };
     }
-  }
 
-  saveUndoSnapshot(ws, `Cadastro de "${cleanTitle}"`);
+    const dup = classifyBookDuplication(
+      {
+        isbn: normalizedIsbn,
+        title: cleanTitle,
+        primaryAuthor: cleanAuthor,
+        language: data.language,
+      },
+      ws.editions,
+      ws.works
+    );
 
-  const nowIso = new Date().toISOString();
-  const contributors: Contributor[] = [{ name: cleanAuthor, role: "author" }];
-  if (cleanTranslator) {
-    contributors.push({ name: cleanTranslator, role: "translator" });
-  }
-  if (cleanNarrator) {
-    contributors.push({ name: cleanNarrator, role: "narrator" });
-  }
-
-  let workId: string;
-  if (dup.kind === "exact" || dup.kind === "probable") {
-    workId = dup.workId;
-  } else {
-    workId = `work-${crypto.randomUUID()}`;
-    ws.works.push({
-      id: workId,
-      ownerId: ws.profile.id,
-      title: cleanTitle,
-      firstPublishedYear: data.publishedYear,
-      primaryGenre: cleanGenre,
-      description: cleanDescription,
-      contributors,
-      fingerprint: computeWorkFingerprint(
-        cleanTitle,
-        cleanAuthor,
-        data.language
-      ),
-      source: "manual",
-      createdAt: nowIso,
-    });
-  }
-
-  const dims = estimateBookDimensions(data.format, data.pages, {
-    heightMm: data.heightMm,
-    thicknessMm: data.thicknessMm,
-  });
-
-  let editionId: string;
-  if (dup.kind === "exact") {
-    editionId = dup.editionId;
-  } else {
-    editionId = `ed-${crypto.randomUUID()}`;
-    let persistedCoverUrl = safeCoverUrl;
-    if (safeCoverUrl?.startsWith("data:")) {
-      const stored = saveUserUploadedCover(ws, editionId, safeCoverUrl);
-      if (stored) {
-        persistedCoverUrl = stored.routeUrl;
+    if (
+      (dup.kind === "exact" || dup.kind === "probable") &&
+      !data.forceDuplicateCopy &&
+      !data.addToWishlistOnly
+    ) {
+      const workEditionIds = new Set(
+        ws.editions.filter((e) => e.workId === dup.workId).map((e) => e.id)
+      );
+      const alreadyOwned = ws.items.some((it) =>
+        workEditionIds.has(it.editionId)
+      );
+      if (alreadyOwned) {
+        return {
+          ok: false,
+          error:
+            dup.kind === "exact"
+              ? "Este ISBN já consta na sua estante. Confirme abaixo caso queira registrar outro exemplar."
+              : "Uma obra muito semelhante já está na sua estante. Confirme caso seja outro exemplar ou edição.",
+          duplicateWarning: {
+            kind: dup.kind,
+            existingWorkId: dup.workId,
+          },
+        };
       }
     }
-    const inferredCoverSource: BookCoverSource | null = !persistedCoverUrl
-      ? null
-      : inferCoverSourceFromUrl(persistedCoverUrl, data.coverSource);
-    const hasExplicitCover = Boolean(persistedCoverUrl);
-    const newEdition: Edition = {
-      id: editionId,
-      workId,
-      ownerId: ws.profile.id,
-      isbn13: normalizedIsbn,
-      title: cleanTitle,
-      subtitle: cleanSubtitle,
-      publisher: cleanPublisher,
-      language: data.language,
-      format: data.format,
-      pages: data.pages,
-      durationSeconds: data.durationMinutes
-        ? data.durationMinutes * 60
-        : undefined,
-      heightMm: dims.heightMm,
-      thicknessMm: dims.thicknessMm,
-      coverUrl: persistedCoverUrl,
-      coverSource: inferredCoverSource,
-      coverLocked: hasExplicitCover,
-      coverSelectedAt: hasExplicitCover ? nowIso : undefined,
-      contributors,
-      source: "manual",
-      createdAt: nowIso,
-    };
-    // Capa (se não dispensada nem escolhida pelo usuário), páginas e cores da lombada são resolvidas no cadastro.
-    await enrichEditionCoverMetadata(newEdition, cleanAuthor, {
-      skipCoverLookup: Boolean(
-        hasExplicitCover || data.skipAutoCover || data.coverSource === null
-      ),
-    });
-    ws.editions.push(newEdition);
-  }
 
-  invalidateUserWorkspaceCache(ws.profile.id);
+    saveUndoSnapshot(ws, `Cadastro de "${cleanTitle}"`);
 
-  if (data.addToWishlistOnly) {
-    const wishId = `wish-${crypto.randomUUID()}`;
-    ws.wishlist.push({
-      id: wishId,
-      userId: ws.profile.id,
-      workId,
-      editionId,
-      priority: data.priority ?? 3,
-      targetPrice: data.targetPrice,
-      currency: ws.profile.defaultCurrency,
-      whereToBuy: cleanStore,
-      notes: cleanNotes,
-      status: "wanted",
-      createdAt: nowIso,
+    const nowIso = new Date().toISOString();
+    const contributors: Contributor[] = [{ name: cleanAuthor, role: "author" }];
+    if (cleanTranslator) {
+      contributors.push({ name: cleanTranslator, role: "translator" });
+    }
+    if (cleanNarrator) {
+      contributors.push({ name: cleanNarrator, role: "narrator" });
+    }
+
+    let workId: string;
+    if (dup.kind === "exact" || dup.kind === "probable") {
+      workId = dup.workId;
+    } else {
+      workId = `work-${crypto.randomUUID()}`;
+      ws.works.push({
+        id: workId,
+        ownerId: ws.profile.id,
+        title: cleanTitle,
+        firstPublishedYear: data.publishedYear,
+        primaryGenre: cleanGenre,
+        description: cleanDescription,
+        contributors,
+        fingerprint: computeWorkFingerprint(
+          cleanTitle,
+          cleanAuthor,
+          data.language
+        ),
+        source: "manual",
+        createdAt: nowIso,
+      });
+    }
+
+    const dims = estimateBookDimensions(data.format, data.pages, {
+      heightMm: data.heightMm,
+      thicknessMm: data.thicknessMm,
     });
 
-    revalidatePath("/", "layout");
-    return { ok: true, workId, editionId, wishlistItemId: wishId };
-  }
+    let editionId: string;
+    if (dup.kind === "exact") {
+      editionId = dup.editionId;
+    } else {
+      editionId = `ed-${crypto.randomUUID()}`;
+      let persistedCoverUrl = safeCoverUrl;
+      if (safeCoverUrl?.startsWith("data:")) {
+        const stored = saveUserUploadedCover(ws, editionId, safeCoverUrl);
+        if (stored) {
+          persistedCoverUrl = stored.routeUrl;
+        }
+      }
+      const inferredCoverSource: BookCoverSource | null = !persistedCoverUrl
+        ? null
+        : inferCoverSourceFromUrl(persistedCoverUrl, data.coverSource);
+      const hasExplicitCover = Boolean(persistedCoverUrl);
+      const newEdition: Edition = {
+        id: editionId,
+        workId,
+        ownerId: ws.profile.id,
+        isbn13: normalizedIsbn,
+        title: cleanTitle,
+        subtitle: cleanSubtitle,
+        publisher: cleanPublisher,
+        language: data.language,
+        format: data.format,
+        pages: data.pages,
+        durationSeconds: data.durationMinutes
+          ? data.durationMinutes * 60
+          : undefined,
+        heightMm: dims.heightMm,
+        thicknessMm: dims.thicknessMm,
+        coverUrl: persistedCoverUrl,
+        coverSource: inferredCoverSource,
+        coverLocked: hasExplicitCover,
+        coverSelectedAt: hasExplicitCover ? nowIso : undefined,
+        contributors,
+        source: "manual",
+        createdAt: nowIso,
+      };
+      // Capa (se não dispensada nem escolhida pelo usuário), páginas e cores da lombada são resolvidas no cadastro.
+      await enrichEditionCoverMetadata(newEdition, cleanAuthor, {
+        skipCoverLookup: Boolean(
+          hasExplicitCover || data.skipAutoCover || data.coverSource === null
+        ),
+      });
+      ws.editions.push(newEdition);
+    }
 
-  const shelfKind = inferShelfKindFromFormat(data.format);
-  const targetShelf =
-    ws.shelves.find((s) => s.kind === shelfKind) ?? ws.shelves[0];
+    invalidateUserWorkspaceCache(ws.profile.id);
 
-  if (!targetShelf) {
-    return { ok: false, error: "Estante de destino não encontrada." };
-  }
-
-  const itemId = `item-${crypto.randomUUID()}`;
-  ws.items.push({
-    id: itemId,
-    userId: ws.profile.id,
-    editionId,
-    shelfId: targetShelf.id,
-    shelfPosition: ws.items.filter((i) => i.shelfId === targetShelf.id).length,
-    status: data.ownershipStatus,
-    acquiredOn:
-      data.acquiredOn ?? formatDateInTimezone(nowIso, ws.profile.timezone),
-    pricePaid: data.pricePaid,
-    currency: ws.profile.defaultCurrency,
-    store: cleanStore,
-    condition: data.condition,
-    notes: cleanNotes,
-    createdAt: nowIso,
-  });
-
-  if (data.startReadingImmediately) {
-    const check = canStartActiveReading(
-      workId,
-      ws.readings,
-      ws.profile.maxSimultaneousReadings
-    );
-    if (check.allowed) {
-      const unit =
-        data.format === "audiobook"
-          ? "seconds"
-          : data.pages
-            ? "pages"
-            : "percent";
-      const total =
-        unit === "seconds"
-          ? data.durationMinutes
-            ? data.durationMinutes * 60
-            : undefined
-          : unit === "pages"
-            ? data.pages
-            : 100;
-      ws.readings.push({
-        id: `read-${crypto.randomUUID()}`,
+    if (data.addToWishlistOnly) {
+      const wishId = `wish-${crypto.randomUUID()}`;
+      ws.wishlist.push({
+        id: wishId,
         userId: ws.profile.id,
         workId,
         editionId,
-        libraryItemId: itemId,
-        format: data.format,
-        status: "reading",
-        startedOn: formatDateInTimezone(nowIso, ws.profile.timezone),
-        progressUnit: unit,
-        progressValue: 0,
-        progressTotal: total,
-        countsForGoals: true,
+        priority: data.priority ?? 3,
+        targetPrice: data.targetPrice,
+        currency: ws.profile.defaultCurrency,
+        whereToBuy: cleanStore,
+        notes: cleanNotes,
+        status: "wanted",
         createdAt: nowIso,
-        updatedAt: nowIso,
       });
-    }
-  }
 
-  revalidatePath("/", "layout");
-  const savedEdition = ws.editions.find((e) => e.id === editionId);
-  return {
-    ok: true,
-    workId,
-    editionId,
-    itemId,
-    coverUrl: savedEdition?.coverUrl,
-    pages: savedEdition?.pages,
-    coverColor: savedEdition?.coverColor,
-    coverAccentColor: savedEdition?.coverAccentColor,
-  };
+      revalidatePath("/", "layout");
+      return { ok: true, workId, editionId, wishlistItemId: wishId };
+    }
+
+    const shelfKind = inferShelfKindFromFormat(data.format);
+    const targetShelf =
+      ws.shelves.find((s) => s.kind === shelfKind) ?? ws.shelves[0];
+
+    if (!targetShelf) {
+      return { ok: false, error: "Estante de destino não encontrada." };
+    }
+
+    const itemId = `item-${crypto.randomUUID()}`;
+    ws.items.push({
+      id: itemId,
+      userId: ws.profile.id,
+      editionId,
+      shelfId: targetShelf.id,
+      shelfPosition: ws.items.filter((i) => i.shelfId === targetShelf.id)
+        .length,
+      status: data.ownershipStatus,
+      acquiredOn:
+        data.acquiredOn ?? formatDateInTimezone(nowIso, ws.profile.timezone),
+      pricePaid: data.pricePaid,
+      currency: ws.profile.defaultCurrency,
+      store: cleanStore,
+      condition: data.condition,
+      notes: cleanNotes,
+      createdAt: nowIso,
+    });
+
+    if (data.startReadingImmediately) {
+      const check = canStartActiveReading(
+        workId,
+        ws.readings,
+        ws.profile.maxSimultaneousReadings
+      );
+      if (check.allowed) {
+        const unit =
+          data.format === "audiobook"
+            ? "seconds"
+            : data.pages
+              ? "pages"
+              : "percent";
+        const total =
+          unit === "seconds"
+            ? data.durationMinutes
+              ? data.durationMinutes * 60
+              : undefined
+            : unit === "pages"
+              ? data.pages
+              : 100;
+        ws.readings.push({
+          id: `read-${crypto.randomUUID()}`,
+          userId: ws.profile.id,
+          workId,
+          editionId,
+          libraryItemId: itemId,
+          format: data.format,
+          status: "reading",
+          startedOn: formatDateInTimezone(nowIso, ws.profile.timezone),
+          progressUnit: unit,
+          progressValue: 0,
+          progressTotal: total,
+          countsForGoals: true,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        });
+      }
+    }
+
+    revalidatePath("/", "layout");
+    const savedEdition = ws.editions.find((e) => e.id === editionId);
+    return {
+      ok: true,
+      workId,
+      editionId,
+      itemId,
+      coverUrl: savedEdition?.coverUrl,
+      pages: savedEdition?.pages,
+      coverColor: savedEdition?.coverColor,
+      coverAccentColor: savedEdition?.coverAccentColor,
+    };
+  });
 }
 
 export async function updateBookMetadataAction(
@@ -680,6 +708,39 @@ export async function updateEditionCoverAction(rawInput: unknown): Promise<
     deleteEditionUploadedCovers(ws, edition.id);
   }
 
+  // Revalida trava de capa após operações assíncronas (sharp/rede) para impedir condição de corrida entre abas
+  if (data.sourceAction === "backfill" && !canAutoUpdateEditionCover(edition)) {
+    return {
+      ok: false,
+      error:
+        "Esta capa foi travada manualmente em outra aba durante a busca automática.",
+    };
+  }
+
+  const seed = edition.isbn13 ?? edition.workId ?? edition.id;
+  let spineColor = edition.coverColor;
+  let spineAccent = edition.coverAccentColor;
+
+  if (validatedInput && !validatedInput.startsWith("/api/covers/file/")) {
+    const palette = await extractSpinePaletteFromCover(
+      validatedInput,
+      AbortSignal.timeout(4500)
+    );
+    if (palette) {
+      spineColor = clampPaperHsl(palette.spineColor);
+      spineAccent = clampPaperHsl(palette.spineAccent);
+    }
+  }
+
+  // Segunda revalidação imediatamente antes da escrita síncrona no estado da edição
+  if (data.sourceAction === "backfill" && !canAutoUpdateEditionCover(edition)) {
+    return {
+      ok: false,
+      error:
+        "Esta capa foi travada manualmente em outra aba durante a busca automática.",
+    };
+  }
+
   saveUndoSnapshot(ws, `Troca de capa de "${edition.title}"`);
 
   const nowIso = new Date().toISOString();
@@ -697,21 +758,6 @@ export async function updateEditionCoverAction(rawInput: unknown): Promise<
     (!edition.pages || edition.pages <= 0)
   ) {
     edition.pages = data.pageCount;
-  }
-
-  const seed = edition.isbn13 ?? edition.workId ?? edition.id;
-  let spineColor = edition.coverColor;
-  let spineAccent = edition.coverAccentColor;
-
-  if (validatedInput && !validatedInput.startsWith("/api/covers/file/")) {
-    const palette = await extractSpinePaletteFromCover(
-      validatedInput,
-      AbortSignal.timeout(4500)
-    );
-    if (palette) {
-      spineColor = clampPaperHsl(palette.spineColor);
-      spineAccent = clampPaperHsl(palette.spineAccent);
-    }
   }
 
   if (!spineColor || !persistedCoverUrl) {

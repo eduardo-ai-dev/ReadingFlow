@@ -68,6 +68,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (parsed.data.editionId && result.coverUrl) {
     const edition = ws.editions.find((e) => e.id === parsed.data.editionId);
     if (edition) {
+      if (edition.ownerId && edition.ownerId !== ws.profile.id) {
+        return NextResponse.json(
+          { error: "Sem permissão para alterar esta edição." },
+          { status: 403 }
+        );
+      }
+
+      // Extrai paleta antes de mutar e revalida coverLocked após o await para evitar condição de corrida com escolha manual
+      const canHydrateCover = !edition.coverLocked && !edition.coverUrl;
+      const targetCoverForPalette = canHydrateCover
+        ? result.coverUrl
+        : edition.coverUrl;
+      let extractedPalette: { spineColor: string; spineAccent: string } | null =
+        null;
+
+      if (
+        (!edition.coverColor || !edition.coverAccentColor) &&
+        targetCoverForPalette
+      ) {
+        extractedPalette = await extractSpinePaletteFromCover(
+          targetCoverForPalette,
+          AbortSignal.timeout(3500)
+        );
+      }
+
       if (!edition.coverLocked && !edition.coverUrl) {
         edition.coverUrl = result.coverUrl;
         mutated = true;
@@ -76,23 +101,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         edition.pages = result.pages;
         mutated = true;
       }
-      if (
-        (!edition.coverColor || !edition.coverAccentColor) &&
-        edition.coverUrl
-      ) {
-        const palette = await extractSpinePaletteFromCover(
-          edition.coverUrl,
-          AbortSignal.timeout(3500)
-        );
-        if (palette) {
-          if (!edition.coverColor) {
-            edition.coverColor = clampPaperHsl(palette.spineColor);
-            mutated = true;
-          }
-          if (!edition.coverAccentColor) {
-            edition.coverAccentColor = clampPaperHsl(palette.spineAccent);
-            mutated = true;
-          }
+      if (extractedPalette && !edition.coverLocked) {
+        if (!edition.coverColor) {
+          edition.coverColor = clampPaperHsl(extractedPalette.spineColor);
+          mutated = true;
+        }
+        if (!edition.coverAccentColor) {
+          edition.coverAccentColor = clampPaperHsl(
+            extractedPalette.spineAccent
+          );
+          mutated = true;
         }
       }
       if (edition.coverColor && !edition.coverAccentColor) {

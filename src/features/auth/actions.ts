@@ -57,10 +57,10 @@ import {
 } from "@/server/security/sanitize";
 import {
   generatePasswordResetToken,
-  hashPassword,
+  hashPasswordAsync,
   hashResetToken,
   isHashedPassword,
-  verifyPassword,
+  verifyPasswordAsync,
 } from "@/server/security/password";
 import { formatDateInTimezone } from "@/lib/dates";
 import {
@@ -228,13 +228,16 @@ export async function signInWithEmailAction(rawInput: {
   const ws = userId ? store.usersById.get(userId) : undefined;
 
   // Generic error message so we never reveal whether an email exists (§11.2)
-  if (!ws || !verifyPassword(parsed.data.password, ws.passwordHashSim)) {
+  if (
+    !ws ||
+    !(await verifyPasswordAsync(parsed.data.password, ws.passwordHashSim))
+  ) {
     return { ok: false, error: "E-mail ou senha incorretos." };
   }
 
   // Migra registros legados sem hash para scrypt salgado no login bem-sucedido
   if (!isHashedPassword(ws.passwordHashSim)) {
-    const upgraded = hashPassword(parsed.data.password);
+    const upgraded = await hashPasswordAsync(parsed.data.password);
     ws.passwordHashSim = upgraded;
     await ormUpdateUser(ws.profile.id, { passwordHash: upgraded }).catch(
       () => {}
@@ -284,7 +287,7 @@ export async function signUpAction(rawInput: {
     ? sanitizePlainText(parsed.data.displayName, 60)
     : (emailKey.split("@")[0] ?? "Leitor");
 
-  const passwordHash = hashPassword(parsed.data.password);
+  const passwordHash = await hashPasswordAsync(parsed.data.password);
   const defaultShelves = createDefaultShelves(userId);
   const newProfile = {
     id: userId,
@@ -455,7 +458,7 @@ export async function resetPasswordAction(rawInput: {
   // Token de uso único: remove imediatamente após validação
   store.passwordResetTokens.delete(tokenHash);
 
-  const nextHash = hashPassword(parsed.data.password);
+  const nextHash = await hashPasswordAsync(parsed.data.password);
   ws.passwordHashSim = nextHash;
 
   // Revoga todas as sessões ativas do usuário após troca de senha

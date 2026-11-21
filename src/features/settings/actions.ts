@@ -58,14 +58,15 @@ export async function saveShelfCustomizationAction(
 
   saveUndoSnapshot(ws, "Personalização da Estante 3D");
 
-  // 1. Reordenação atômica restrita aos exemplares da conta autenticada
+  // 1. Reordenação atômica restrita aos exemplares da conta autenticada (deduplicada para jamais perder ou duplicar exemplares)
   if (parsed.data.orderedItemIds && parsed.data.orderedItemIds.length > 0) {
+    const uniqueOrderedIds = Array.from(new Set(parsed.data.orderedItemIds));
     const ownedItemsById = new Map(
       ws.items
         .filter((it) => it.userId === ws.profile.id)
         .map((it) => [it.id, it])
     );
-    const validOrdered = parsed.data.orderedItemIds
+    const validOrdered = uniqueOrderedIds
       .map((id) => ownedItemsById.get(id))
       .filter((it): it is NonNullable<typeof it> => Boolean(it));
 
