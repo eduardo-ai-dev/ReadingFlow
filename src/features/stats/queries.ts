@@ -50,6 +50,7 @@ export async function getStatisticsView(params?: {
     countRereads: ws.profile.goalsCountRereads,
     periodStartYmd,
     periodEndYmd,
+    timeZone: ws.profile.timezone,
   });
 
   return {

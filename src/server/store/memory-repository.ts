@@ -16,7 +16,7 @@ import {
   clampPaperHsl,
   deriveSpineAccentHex,
 } from "@/features/catalog/spine-color-rules";
-import { formatDateInTimezone } from "@/lib/dates";
+import { formatDateInTimezone, shiftYmdDays } from "@/lib/dates";
 import { createLiveCatalogPipeline } from "@/server/catalog/providers";
 import { ormSeedWorkspace } from "@/server/db/orm-repository";
 import { hashPassword } from "@/server/security/password";
@@ -100,17 +100,10 @@ function buildDemoWorkspace(): UserWorkspaceData {
   const todayYmd = formatDateInTimezone(new Date(), "America/Sao_Paulo");
   const currentYearMonth = todayYmd.slice(0, 7);
   const demoDailyPageSlices = [28, 32, 30, 36, 28, 34, 30, 30] as const; // Soma = 248 páginas
-  const baseDateUtc = new Date(`${todayYmd}T12:00:00.000Z`);
-  const demoDailyLogs = demoDailyPageSlices.map((pages, idx) => {
-    const logDate = new Date(baseDateUtc);
-    logDate.setUTCDate(
-      logDate.getUTCDate() - (demoDailyPageSlices.length - 1 - idx)
-    );
-    return {
-      ymd: logDate.toISOString().slice(0, 10),
-      pages,
-    };
-  });
+  const demoDailyLogs = demoDailyPageSlices.map((pages, idx) => ({
+    ymd: shiftYmdDays(todayYmd, -(demoDailyPageSlices.length - 1 - idx)),
+    pages,
+  }));
 
   const works: Work[] = [
     {

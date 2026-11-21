@@ -122,7 +122,9 @@ export async function updateReadingProgressAction(
     editionsById
   );
   const previousYmd =
-    reading.updatedAt?.slice(0, 10) ||
+    (reading.updatedAt
+      ? formatDateInTimezone(reading.updatedAt, ws.profile.timezone)
+      : undefined) ||
     reading.startedOn ||
     formatDateInTimezone(new Date(), ws.profile.timezone);
 
@@ -214,8 +216,7 @@ export async function togglePauseReadingAction(
 export async function finishReadingAction(
   rawInput: unknown
 ): Promise<
-  | { ok: true; undoId: string; label: string }
-  | { ok: false; error: string }
+  { ok: true; undoId: string; label: string } | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
   const parsed = finishReadingSchema.safeParse(rawInput);
@@ -247,13 +248,18 @@ export async function finishReadingAction(
   try {
     const nowIso = new Date().toISOString();
     const editionsById = new Map(ws.editions.map((e) => [e.id, e]));
-    const previousPages = resolveReadingPagesContribution(reading, editionsById);
+    const previousPages = resolveReadingPagesContribution(
+      reading,
+      editionsById
+    );
     const previousSeconds = resolveReadingAudioSecondsContribution(
       reading,
       editionsById
     );
     const previousYmd =
-      reading.updatedAt?.slice(0, 10) ||
+      (reading.updatedAt
+        ? formatDateInTimezone(reading.updatedAt, ws.profile.timezone)
+        : undefined) ||
       reading.startedOn ||
       formatDateInTimezone(nowIso, ws.profile.timezone);
 
@@ -270,7 +276,9 @@ export async function finishReadingAction(
     finished.dailyLogs = syncDailyLogsForProgressDelta({
       existingLogs: reading.dailyLogs,
       previousYmd,
-      todayYmd: finished.finishedOn ?? formatDateInTimezone(nowIso, ws.profile.timezone),
+      todayYmd:
+        finished.finishedOn ??
+        formatDateInTimezone(nowIso, ws.profile.timezone),
       previousPages,
       nextPages,
       previousSeconds,

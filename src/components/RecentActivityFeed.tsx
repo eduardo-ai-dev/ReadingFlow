@@ -8,9 +8,11 @@ import { rfButtonClassName } from "@/components/ui/ActionControls";
 export function RecentActivityFeed({
   events,
   referenceDateIso,
+  timeZone = "America/Sao_Paulo",
 }: {
   events: DashboardActivityEvent[];
   referenceDateIso?: string;
+  timeZone?: string;
 }) {
   const iconMap: Record<
     DashboardActivityEvent["type"],
@@ -111,7 +113,11 @@ export function RecentActivityFeed({
                       <span>{ev.detail}</span>
                       <span aria-hidden="true">·</span>
                       <time dateTime={ev.timestamp}>
-                        {formatRelativeTimePtBr(ev.timestamp, referenceDateIso)}
+                        {formatRelativeTimePtBr(
+                          ev.timestamp,
+                          referenceDateIso,
+                          timeZone
+                        )}
                       </time>
                     </div>
                   </div>

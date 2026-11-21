@@ -48,3 +48,28 @@ export function daysBetweenInclusive(startYmd: string, endYmd: string): number {
   }
   return Math.floor((end - start) / 86_400_000) + 1;
 }
+
+/**
+ * Soma ou subtrai dias civis em uma data YYYY-MM-DD usando aritmética UTC pura
+ * (imune a horário de verão e ao fuso do servidor).
+ */
+export function shiftYmdDays(ymd: string, deltaDays: number): string {
+  const [yStr, mStr, dStr] = ymd.split("-");
+  const year = Number.parseInt(yStr ?? "1970", 10);
+  const month = Number.parseInt(mStr ?? "1", 10) - 1;
+  const day = Number.parseInt(dStr ?? "1", 10);
+  const dt = new Date(Date.UTC(year, month, day + deltaDays));
+  const y = dt.getUTCFullYear();
+  const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(dt.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Dia da semana (0 = domingo .. 6 = sábado) de uma data civil YYYY-MM-DD. */
+export function getWeekdayOfYmd(ymd: string): number {
+  const [yStr, mStr, dStr] = ymd.split("-");
+  const year = Number.parseInt(yStr ?? "1970", 10);
+  const month = Number.parseInt(mStr ?? "1", 10) - 1;
+  const day = Number.parseInt(dStr ?? "1", 10);
+  return new Date(Date.UTC(year, month, day)).getUTCDay();
+}

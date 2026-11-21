@@ -1,7 +1,12 @@
 import "server-only";
 import { requireAuthenticatedWorkspace } from "@/server/store/memory-repository";
 import { selectEligibleFinishedReadings } from "@/features/goals/rules";
-import { daysBetweenInclusive, formatDateInTimezone } from "@/lib/dates";
+import {
+  daysBetweenInclusive,
+  formatDateInTimezone,
+  getWeekdayOfYmd,
+  shiftYmdDays,
+} from "@/lib/dates";
 import {
   MONTH_NAMES_PT_BR,
   computeActiveDaysMetrics,
@@ -42,6 +47,7 @@ export interface CollectionSummaryItem {
 export interface DashboardEditorialData {
   referenceDateIso: string;
   todayYmd: string;
+  timezone: string;
   activityFeed: DashboardActivityEvent[];
   streak: {
     activeDaysInMonth: number;
@@ -114,13 +120,22 @@ export async function getDashboardEditorialData(): Promise<DashboardEditorialDat
     if (!work) continue;
 
     if (r.status === "finished") {
+      // Quando o registro foi concluído no mesmo dia civil de updatedAt, usa o timestamp exato
+      // para exibir "Há Xh" fiel ao momento real; se o usuário informou data retrô, usa finishedOn.
+      const updatedYmd = r.updatedAt
+        ? formatDateInTimezone(r.updatedAt, timezone)
+        : "";
+      const finishTimestamp =
+        r.finishedOn && r.updatedAt && r.finishedOn === updatedYmd
+          ? r.updatedAt
+          : (r.finishedOn ?? r.updatedAt);
       rawActivityEvents.push({
         id: `act-fin-${r.id}`,
         type: "finished",
         title: `Concluiu "${work.title}"`,
         workTitle: work.title,
         detail: `Leitura em ${r.progressUnit === "seconds" ? "áudio" : "páginas"} finalizada.`,
-        timestamp: r.finishedOn ?? r.updatedAt,
+        timestamp: finishTimestamp,
         workId: work.id,
       });
     } else if (r.status === "reading") {
@@ -129,12 +144,13 @@ export async function getDashboardEditorialData(): Promise<DashboardEditorialDat
         type: "progress",
         title: `Leu "${work.title}"`,
         workTitle: work.title,
-        detail: `Progresso registrado: ${r.progressUnit === "seconds"
-          ? `${Math.round(r.progressValue / 60)} minutos`
-          : r.progressUnit === "pages"
-            ? `${r.progressValue} páginas`
-            : `${r.progressValue}%`
-          }.`,
+        detail: `Progresso registrado: ${
+          r.progressUnit === "seconds"
+            ? `${Math.round(r.progressValue / 60)} minutos`
+            : r.progressUnit === "pages"
+              ? `${r.progressValue} páginas`
+              : `${r.progressValue}%`
+        }.`,
         timestamp: r.updatedAt,
         workId: work.id,
       });
@@ -180,7 +196,12 @@ export async function getDashboardEditorialData(): Promise<DashboardEditorialDat
   const recentEvents = curateDashboardActivityFeed(rawActivityEvents, 5);
 
   // 2. Fonte Única de Métricas (src/lib/reading-metrics.ts)
-  const ledger = deriveDailyReadingLedger(ws.readings, worksById, editionsById);
+  const ledger = deriveDailyReadingLedger(
+    ws.readings,
+    worksById,
+    editionsById,
+    timezone
+  );
 
   const daysByYmd: Record<string, DailyReadingRecord> = {};
   let earliestYearMonth = currentYearMonth;
@@ -236,14 +257,12 @@ export async function getDashboardEditorialData(): Promise<DashboardEditorialDat
     countRereads: ws.profile.goalsCountRereads,
   });
 
-  // Compatibilidade legada para streak.heatmap (últimos 28 dias)
+  // Compatibilidade legada para streak.heatmap (últimos 28 dias no fuso do perfil)
   const heatmap: HeatmapDay[] = [];
   for (let i = 27; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const ymd = formatDateInTimezone(d, timezone);
-    const dom = Number.parseInt(ymd.slice(8, 10), 10) || d.getDate();
-    const dow = d.getDay();
+    const ymd = shiftYmdDays(todayYmd, -i);
+    const dom = Number.parseInt(ymd.slice(8, 10), 10) || 1;
+    const dow = getWeekdayOfYmd(ymd);
     const pages = ledger.get(ymd)?.pages ?? 0;
     const level: 0 | 1 | 2 | 3 =
       pages === 0 ? 0 : pages < 20 ? 1 : pages < 33 ? 2 : 3;
@@ -312,6 +331,7 @@ export async function getDashboardEditorialData(): Promise<DashboardEditorialDat
   return {
     referenceDateIso: now.toISOString(),
     todayYmd,
+    timezone,
     activityFeed: recentEvents,
     streak: {
       activeDaysInMonth: monthPeriod.activeDays,

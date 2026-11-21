@@ -7,6 +7,7 @@
  */
 
 import type { BookFormat, Edition, Reading, Work } from "@/lib/domain";
+import { formatDateInTimezone, shiftYmdDays } from "@/lib/dates";
 import { formatNumberPtBr } from "@/lib/formatters";
 
 export const MONTH_NAMES_PT_BR = [
@@ -254,7 +255,8 @@ export function resolveReadingAudioSecondsContribution(
 export function deriveDailyReadingLedger(
   readings: readonly Reading[],
   worksById: ReadonlyMap<string, Work>,
-  editionsById: ReadonlyMap<string, Edition>
+  editionsById: ReadonlyMap<string, Edition>,
+  timeZone = "America/Sao_Paulo"
 ): Map<string, DailyReadingRecord> {
   const byDay = new Map<string, DailyReadingRecord>();
 
@@ -319,7 +321,9 @@ export function deriveDailyReadingLedger(
     );
     const fallbackYmd =
       reading.finishedOn ??
-      reading.updatedAt?.slice(0, 10) ??
+      (reading.updatedAt
+        ? formatDateInTimezone(reading.updatedAt, timeZone)
+        : undefined) ??
       reading.startedOn ??
       "";
     pushSession(fallbackYmd, reading, pages, seconds);
@@ -430,6 +434,7 @@ export function computeReadingForecast(params: {
   progressUnit: string;
   dailyPacePages: number;
   referenceDate?: Date;
+  timeZone?: string;
 }): ReadingForecastResult | null {
   if (
     params.progressUnit !== "pages" ||
@@ -448,16 +453,19 @@ export function computeReadingForecast(params: {
   if (pace <= 0 || remainingPages <= 0) return null;
 
   const daysNeeded = Math.max(1, Math.ceil(remainingPages / pace));
-  const baseDate = params.referenceDate
-    ? new Date(params.referenceDate.getTime())
-    : new Date();
-  baseDate.setUTCDate(baseDate.getUTCDate() + daysNeeded);
+  const tz = params.timeZone ?? "America/Sao_Paulo";
+  const baseYmd = formatDateInTimezone(params.referenceDate ?? new Date(), tz);
+  const projectedYmd = shiftYmdDays(baseYmd, daysNeeded);
+  const [projY, projM, projD] = projectedYmd.split("-").map(Number);
+  const projectedUtc = new Date(
+    Date.UTC(projY ?? 2026, (projM ?? 1) - 1, projD ?? 1)
+  );
 
   const formattedDate = new Intl.DateTimeFormat("pt-BR", {
     day: "numeric",
     month: "long",
     timeZone: "UTC",
-  }).format(baseDate);
+  }).format(projectedUtc);
 
   return {
     remainingPages,
@@ -515,7 +523,10 @@ export function computeGoalPaceMetrics(params: {
   const unitSingular = params.unitKind === "books" ? "livro" : "pág.";
   const unitPlural = params.unitKind === "books" ? "livros" : "páginas";
   const unitShortPlural = params.unitKind === "books" ? "livros" : "pág.";
-  const remainingValue = Math.max(0, params.targetValue - params.completedValue);
+  const remainingValue = Math.max(
+    0,
+    params.targetValue - params.completedValue
+  );
   const safeElapsed = Math.max(0, params.elapsedDays);
   const safeRemaining = Math.max(0, params.remainingDays);
 
@@ -672,12 +683,13 @@ export function curateDashboardActivityFeed(
         ? `${sampleTitles.join(", ")}${remainingCount > 0 ? ` e mais ${remainingCount}` : ""}.`
         : `${count} registros no mesmo lote.`;
 
-    const batchTitleByType: Record<RawDashboardActivityEvent["type"], string> = {
-      added: `Adicionou ${count} livros`,
-      finished: `Concluiu ${count} livros`,
-      progress: `Atualizou ${count} leituras`,
-      reviewed: `Avaliou ${count} livros`,
-    };
+    const batchTitleByType: Record<RawDashboardActivityEvent["type"], string> =
+      {
+        added: `Adicionou ${count} livros`,
+        finished: `Concluiu ${count} livros`,
+        progress: `Atualizou ${count} leituras`,
+        reviewed: `Avaliou ${count} livros`,
+      };
 
     collapsed.push({
       id: `batch-${key}`,
@@ -791,9 +803,7 @@ function interpolateQuantile(sortedAsc: readonly number[], q: number): number {
 export function computeCalendarQuantileLevels(
   pagesValues: readonly number[]
 ): CalendarQuantileScale {
-  const positives = pagesValues
-    .filter((v) => v > 0)
-    .sort((a, b) => a - b);
+  const positives = pagesValues.filter((v) => v > 0).sort((a, b) => a - b);
 
   if (positives.length === 0) {
     return {
@@ -875,7 +885,10 @@ export function buildMonthCalendarGrid(
 ): CalendarMonthGrid {
   const [yStr, mStr] = yearMonth.split("-");
   const year = Number.parseInt(yStr ?? "2026", 10);
-  const monthIndex = Math.max(0, Math.min(11, Number.parseInt(mStr ?? "1", 10) - 1));
+  const monthIndex = Math.max(
+    0,
+    Math.min(11, Number.parseInt(mStr ?? "1", 10) - 1)
+  );
   const daysInMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
   const leadingEmptyDays = new Date(Date.UTC(year, monthIndex, 1)).getUTCDay();
 

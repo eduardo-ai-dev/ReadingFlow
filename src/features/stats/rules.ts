@@ -1,4 +1,5 @@
 import type { Edition, LibraryItem, Reading, Review, Work } from "@/lib/domain";
+import { formatDateInTimezone } from "@/lib/dates";
 import {
   computePagesReadInPeriod,
   resolveReadingAudioSecondsContribution,
@@ -42,7 +43,9 @@ export function computeLibraryStatistics(params: {
   countRereads: boolean;
   periodStartYmd: string;
   periodEndYmd: string;
+  timeZone?: string;
 }): LibraryStatistics {
+  const tz = params.timeZone ?? "America/Sao_Paulo";
   const editionsById = new Map(params.editions.map((e) => [e.id, e]));
 
   const ownedItems = params.items.filter(
@@ -79,6 +82,7 @@ export function computeLibraryStatistics(params: {
     startsOn: params.periodStartYmd,
     endsOn: params.periodEndYmd,
     countRereads: params.countRereads,
+    timeZone: tz,
   });
 
   let secondsListened = 0;
@@ -103,7 +107,10 @@ export function computeLibraryStatistics(params: {
         }
       }
     } else {
-      const activeYmd = r.updatedAt?.slice(0, 10) || r.startedOn || "";
+      const activeYmd =
+        (r.updatedAt ? formatDateInTimezone(r.updatedAt, tz) : "") ||
+        r.startedOn ||
+        "";
       if (
         activeYmd >= params.periodStartYmd &&
         activeYmd <= params.periodEndYmd
@@ -116,13 +123,15 @@ export function computeLibraryStatistics(params: {
     }
   }
 
-  const abandonedCount = params.readings.filter(
-    (r) =>
-      r.status === "abandoned" &&
-      (!r.updatedAt ||
-        (r.updatedAt.slice(0, 10) >= params.periodStartYmd &&
-          r.updatedAt.slice(0, 10) <= params.periodEndYmd))
-  ).length;
+  const abandonedCount = params.readings.filter((r) => {
+    if (r.status !== "abandoned") return false;
+    if (!r.updatedAt) return true;
+    const abandonedYmd = formatDateInTimezone(r.updatedAt, tz);
+    return (
+      abandonedYmd >= params.periodStartYmd &&
+      abandonedYmd <= params.periodEndYmd
+    );
+  }).length;
 
   const ratedValues = params.reviews
     .map((rev) => rev.rating)
@@ -150,9 +159,7 @@ export function computeLibraryStatistics(params: {
         label: def.label,
         count,
         percent:
-          ratedWorksCount > 0
-            ? Math.round((count / ratedWorksCount) * 100)
-            : 0,
+          ratedWorksCount > 0 ? Math.round((count / ratedWorksCount) * 100) : 0,
       };
     }
   );
@@ -187,9 +194,10 @@ export function computeLibraryStatistics(params: {
   for (const r of params.readings) {
     if (r.status !== "reading" && r.status !== "paused") continue;
     if (!r.countsForGoals) continue;
-    const year = Number(
-      (r.updatedAt?.slice(0, 4) || r.startedOn?.slice(0, 4) || "2026")
-    );
+    const localYmd = r.updatedAt
+      ? formatDateInTimezone(r.updatedAt, tz)
+      : (r.startedOn ?? "2026-01-01");
+    const year = Number(localYmd.slice(0, 4) || "2026");
     const bucket = byYear.get(year) ?? {
       booksRead: 0,
       pagesRead: 0,

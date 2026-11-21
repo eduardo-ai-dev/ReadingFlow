@@ -1,5 +1,5 @@
 import type { Edition, Reading, ReadingGoal } from "@/lib/domain";
-import { daysBetweenInclusive } from "@/lib/dates";
+import { daysBetweenInclusive, formatDateInTimezone } from "@/lib/dates";
 import {
   computeGoalPaceMetrics,
   resolveReadingAudioSecondsContribution,
@@ -48,7 +48,8 @@ function isPaginatedFormat(format: Reading["format"]): boolean {
  */
 export function deriveDailyReadingActivityMap(
   readings: readonly Reading[],
-  editionsById: ReadonlyMap<string, Edition>
+  editionsById: ReadonlyMap<string, Edition>,
+  timeZone = "America/Sao_Paulo"
 ): Map<string, { pages: number; seconds: number }> {
   const byDay = new Map<string, { pages: number; seconds: number }>();
 
@@ -79,7 +80,10 @@ export function deriveDailyReadingActivityMap(
     const pages = resolveReadingPagesContribution(r, editionsById);
     const seconds = resolveReadingAudioSecondsContribution(r, editionsById);
     const fallbackYmd =
-      r.finishedOn ?? r.updatedAt?.slice(0, 10) ?? r.startedOn ?? "";
+      r.finishedOn ??
+      (r.updatedAt ? formatDateInTimezone(r.updatedAt, timeZone) : undefined) ??
+      r.startedOn ??
+      "";
     addEntry(fallbackYmd, pages, seconds);
   }
 
@@ -149,7 +153,9 @@ export function computePagesReadInPeriod(params: {
   endsOn: string;
   countRereads: boolean;
   formats?: readonly Reading["format"][];
+  timeZone?: string;
 }): number {
+  const tz = params.timeZone ?? "America/Sao_Paulo";
   const eligibleFinished = selectEligibleFinishedReadings(params.readings, {
     startsOn: params.startsOn,
     endsOn: params.endsOn,
@@ -183,7 +189,9 @@ export function computePagesReadInPeriod(params: {
       }
     } else {
       const activeYmd =
-        r.updatedAt?.slice(0, 10) || r.startedOn || "";
+        (r.updatedAt ? formatDateInTimezone(r.updatedAt, tz) : "") ||
+        r.startedOn ||
+        "";
       if (activeYmd >= params.startsOn && activeYmd <= params.endsOn) {
         totalPages += resolveReadingPagesContribution(r, params.editionsById);
       }
@@ -199,8 +207,16 @@ export function evaluateReadingGoal(params: {
   editionsById: ReadonlyMap<string, Edition>;
   todayYmd: string;
   activeDailyPacePages?: number;
+  timeZone?: string;
 }): GoalEvaluation {
-  const { goal, readings, editionsById, todayYmd, activeDailyPacePages } = params;
+  const {
+    goal,
+    readings,
+    editionsById,
+    todayYmd,
+    activeDailyPacePages,
+    timeZone,
+  } = params;
 
   const eligible = selectEligibleFinishedReadings(readings, {
     startsOn: goal.startsOn,
@@ -220,6 +236,7 @@ export function evaluateReadingGoal(params: {
       endsOn: goal.endsOn,
       countRereads: goal.countRereads,
       formats: goal.formats,
+      timeZone,
     });
   }
 
@@ -294,8 +311,8 @@ export function evaluateReadingGoal(params: {
   // Regra: nunca exibir "termina em N dias" quando N ultrapassa o prazo restante da meta
   const projectedFinishLabel =
     projectedDaysToFinish !== null &&
-      projectedDaysToFinish > 0 &&
-      projectedFitsBeforeDeadline
+    projectedDaysToFinish > 0 &&
+    projectedFitsBeforeDeadline
       ? `No ritmo atual termina em ${projectedDaysToFinish} ${projectedDaysToFinish === 1 ? "dia" : "dias"}`
       : null;
 

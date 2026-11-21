@@ -3,14 +3,21 @@ import { z } from "zod";
 import { getAuthenticatedWorkspace } from "@/server/store/memory-repository";
 import { createPortableBackupJson } from "@/features/portability/rules";
 import { serializeRowsToSafeCsv } from "@/server/security/csv";
+import { formatDateInTimezone } from "@/lib/dates";
 
 const exportQuerySchema = z.object({
-  format: z.enum(["json", "csv", "template"], {
-    error: "Formato de exportação inválido. Utilize 'json', 'csv' ou 'template'.",
-  }).default("json"),
-  entity: z.enum(["all", "books", "readings", "wishlist"], {
-    error: "Entidade de exportação inválida. Utilize 'all', 'books', 'readings' ou 'wishlist'.",
-  }).default("all"),
+  format: z
+    .enum(["json", "csv", "template"], {
+      error:
+        "Formato de exportação inválido. Utilize 'json', 'csv' ou 'template'.",
+    })
+    .default("json"),
+  entity: z
+    .enum(["all", "books", "readings", "wishlist"], {
+      error:
+        "Entidade de exportação inválida. Utilize 'all', 'books', 'readings' ou 'wishlist'.",
+    })
+    .default("all"),
 });
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -22,7 +29,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const parsed = exportQuerySchema.safeParse(queryParams);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Parâmetros de rota inválidos." },
+      {
+        error:
+          parsed.error.issues[0]?.message ?? "Parâmetros de rota inválidos.",
+      },
       { status: 400 }
     );
   }
@@ -69,7 +79,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
-  const dateStamp = new Date().toISOString().slice(0, 10);
+  const dateStamp = formatDateInTimezone(new Date(), ws.profile.timezone);
+  const privateCacheHeader = { "Cache-Control": "private, no-store" };
 
   if (format === "csv") {
     const worksById = new Map(ws.works.map((w) => [w.id, w]));
@@ -106,6 +117,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return new NextResponse(csv, {
         status: 200,
         headers: {
+          ...privateCacheHeader,
           "Content-Type": "text/csv; charset=utf-8",
           "Content-Disposition": `attachment; filename="readingflow-leituras-${dateStamp}.csv"`,
         },
@@ -136,6 +148,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return new NextResponse(csv, {
         status: 200,
         headers: {
+          ...privateCacheHeader,
           "Content-Type": "text/csv; charset=utf-8",
           "Content-Disposition": `attachment; filename="readingflow-desejos-${dateStamp}.csv"`,
         },
@@ -184,6 +197,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return new NextResponse(csvContent, {
       status: 200,
       headers: {
+        ...privateCacheHeader,
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="readingflow-livros-${dateStamp}.csv"`,
       },
@@ -207,6 +221,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   return new NextResponse(backupJson, {
     status: 200,
     headers: {
+      ...privateCacheHeader,
       "Content-Type": "application/json; charset=utf-8",
       "Content-Disposition": `attachment; filename="readingflow-backup-${dateStamp}.json"`,
     },

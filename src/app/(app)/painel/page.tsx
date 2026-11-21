@@ -31,7 +31,8 @@ export const metadata: Metadata = {
 };
 
 export default async function DashboardPage() {
-  await requireAuthenticatedWorkspace();
+  const ws = await requireAuthenticatedWorkspace();
+  const userTimezone = ws.profile.timezone || "America/Sao_Paulo";
 
   const [
     readingsResult,
@@ -60,28 +61,28 @@ export default async function DashboardPage() {
 
   const stats = statsData?.stats ?? null;
   const statsYear = statsData?.periodStartYmd.slice(0, 4) ?? "2026";
-  const todayFormatted = formatFullDatePtBr(new Date());
+  const todayFormatted = formatFullDatePtBr(new Date(), userTimezone);
 
   const activeSpotlightEntries: ActiveReadingSpotlightItem[] = readings
     ? readings.active.map((entry) => ({
-      readingId: entry.reading.id,
-      workId: entry.work.id,
-      title: entry.work.title,
-      author: entry.primaryAuthor,
-      format: entry.reading.format,
-      status: entry.reading.status,
-      progressUnit: entry.reading.progressUnit,
-      progressValue: entry.reading.progressValue,
-      progressTotal: entry.reading.progressTotal,
-      editionPages: entry.edition?.pages,
-      percent: entry.percent,
-      isReread: entry.isReread,
-      updatedAt: entry.reading.updatedAt,
-      coverUrl: entry.edition?.coverUrl,
-      spineColor: entry.edition?.coverColor,
-      spineAccent: entry.edition?.coverAccentColor,
-      seed: entry.edition?.isbn13 ?? entry.work.id,
-    }))
+        readingId: entry.reading.id,
+        workId: entry.work.id,
+        title: entry.work.title,
+        author: entry.primaryAuthor,
+        format: entry.reading.format,
+        status: entry.reading.status,
+        progressUnit: entry.reading.progressUnit,
+        progressValue: entry.reading.progressValue,
+        progressTotal: entry.reading.progressTotal,
+        editionPages: entry.edition?.pages,
+        percent: entry.percent,
+        isReread: entry.isReread,
+        updatedAt: entry.reading.updatedAt,
+        coverUrl: entry.edition?.coverUrl,
+        spineColor: entry.edition?.coverColor,
+        spineAccent: entry.edition?.coverAccentColor,
+        seed: entry.edition?.isbn13 ?? entry.work.id,
+      }))
     : [];
 
   const nextUpBook = (() => {
@@ -224,7 +225,9 @@ export default async function DashboardPage() {
                   h
                 </span>
               </dd>
-              <p className="rf-type-caption mt-1">Tempo ouvido em {statsYear}</p>
+              <p className="rf-type-caption mt-1">
+                Tempo ouvido em {statsYear}
+              </p>
             </div>
           </dl>
         )}
@@ -237,10 +240,7 @@ export default async function DashboardPage() {
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <span className="rf-section-marker">02 · Na Cabeceira</span>
-            <h2
-              id="na-cabeceira-titulo"
-              className="rf-type-section-title mt-1"
-            >
+            <h2 id="na-cabeceira-titulo" className="rf-type-section-title mt-1">
               Leitura em Andamento ({activeSpotlightEntries.length})
             </h2>
           </div>
@@ -272,6 +272,7 @@ export default async function DashboardPage() {
                   entries={activeSpotlightEntries}
                   dailyPace={editorialData.metrics.dailyPace}
                   referenceDateIso={editorialData.referenceDateIso}
+                  timeZone={editorialData.timezone}
                 />
               )}
             </div>
@@ -334,7 +335,9 @@ export default async function DashboardPage() {
                           </dd>
                         </div>
                         <MetricFormulaHint
-                          basisLabel={editorialData.metrics.dailyPace.basisLabel}
+                          basisLabel={
+                            editorialData.metrics.dailyPace.basisLabel
+                          }
                           formula={
                             editorialData.metrics.dailyPace.formulaTooltip
                           }
@@ -516,6 +519,7 @@ export default async function DashboardPage() {
                 <RecentActivityFeed
                   events={editorialData.activityFeed}
                   referenceDateIso={editorialData.referenceDateIso}
+                  timeZone={editorialData.timezone}
                 />
               )}
             </div>
@@ -613,8 +617,8 @@ export default async function DashboardPage() {
 
                               <div className="mt-2 flex items-baseline justify-between font-sans text-[13px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums]">
                                 <span className="font-semibold text-[var(--rf-text-primary)]">
-                                  {formatNumberPtBr(evaluation.completedValue)} de{" "}
-                                  {formatNumberPtBr(evaluation.targetValue)}{" "}
+                                  {formatNumberPtBr(evaluation.completedValue)}{" "}
+                                  de {formatNumberPtBr(evaluation.targetValue)}{" "}
                                   {unitPlural}
                                 </span>
                                 <span className="font-serif text-base font-bold text-[var(--rf-text-accent-secondary)]">
@@ -660,13 +664,15 @@ export default async function DashboardPage() {
                                     </span>
                                     <MetricFormulaHint
                                       basisLabel="ver fórmula"
-                                      formula={evaluation.requiredFormulaTooltip}
+                                      formula={
+                                        evaluation.requiredFormulaTooltip
+                                      }
                                     />
                                   </div>
 
                                   {/* Equivalente em dias de leitura/semana no ritmo atual (quando há base) */}
                                   {evaluation.requiredDaysPerWeekLabel &&
-                                    evaluation.requiredDaysPerWeekFormulaTooltip ? (
+                                  evaluation.requiredDaysPerWeekFormulaTooltip ? (
                                     <div>
                                       <MetricFormulaHint
                                         basisLabel={`Equivale a ${evaluation.requiredDaysPerWeekLabel}`}
@@ -679,8 +685,8 @@ export default async function DashboardPage() {
 
                                   {/* Projeção só aparece se terminar DENTRO do prazo da meta */}
                                   {evaluation.projectedFitsBeforeDeadline &&
-                                    evaluation.projectedDaysToFinish &&
-                                    evaluation.projectedDaysToFinish > 0 ? (
+                                  evaluation.projectedDaysToFinish &&
+                                  evaluation.projectedDaysToFinish > 0 ? (
                                     <p className="rf-type-caption text-[var(--rf-status-success)]">
                                       No ritmo ({evaluation.currentBasisLabel})
                                       termina em{" "}

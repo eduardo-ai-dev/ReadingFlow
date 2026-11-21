@@ -40,15 +40,16 @@ export function ActiveReadingSpotlight({
   entries,
   dailyPace,
   referenceDateIso,
+  timeZone = "America/Sao_Paulo",
 }: {
   entries: ActiveReadingSpotlightItem[];
   dailyPace: MetricWithBasis;
   referenceDateIso: string;
+  timeZone?: string;
 }) {
   // Garante ordenação do mais recente para o mais antigo
   const orderedEntries = useMemo(
-    () =>
-      [...entries].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    () => [...entries].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [entries]
   );
 
@@ -88,17 +89,21 @@ export function ActiveReadingSpotlight({
     progressUnit: current.progressUnit,
     dailyPacePages: dailyPace.value,
     referenceDate: new Date(referenceDateIso),
+    timeZone,
   });
 
   const relativeRaw = formatRelativeTimePtBr(
     current.updatedAt,
-    referenceDateIso
+    referenceDateIso,
+    timeZone
   );
   const updatedLabel = relativeRaw.startsWith("Há ")
     ? `Atualizado ${relativeRaw.charAt(0).toLowerCase()}${relativeRaw.slice(1)}`
     : relativeRaw === "Ontem"
       ? "Atualizado ontem"
-      : `Atualizado em ${relativeRaw}`;
+      : relativeRaw === "Hoje"
+        ? "Atualizado hoje"
+        : `Atualizado em ${relativeRaw}`;
 
   const progressCaption =
     current.progressUnit === "pages" && effectiveTotal

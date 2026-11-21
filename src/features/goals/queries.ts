@@ -32,7 +32,12 @@ export async function getEvaluatedGoals(): Promise<{
   const currentYearMonth = todayYmd.slice(0, 7);
   const monthIdx = Number.parseInt(todayYmd.slice(5, 7), 10) - 1;
   const monthNameLower = (MONTH_NAMES_PT_BR[monthIdx] ?? "mês").toLowerCase();
-  const ledger = deriveDailyReadingLedger(ws.readings, worksById, editionsById);
+  const ledger = deriveDailyReadingLedger(
+    ws.readings,
+    worksById,
+    editionsById,
+    ws.profile.timezone
+  );
   const monthPeriod = computeActiveDaysMetrics(
     ledger,
     `${currentYearMonth}-01`,
@@ -54,6 +59,7 @@ export async function getEvaluatedGoals(): Promise<{
         editionsById,
         todayYmd,
         activeDailyPacePages,
+        timeZone: ws.profile.timezone,
       }),
     }));
 
