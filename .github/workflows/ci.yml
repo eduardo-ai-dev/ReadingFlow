@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    name: Qualidade e Testes (R0 — Sem Banco)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Verificação de tipos (TypeScript estrito)
+        run: npm run typecheck
+
+      - name: Testes unitários e de componentes (Vitest)
+        run: npm run test
+
+      - name: Build de produção
+        run: npm run build

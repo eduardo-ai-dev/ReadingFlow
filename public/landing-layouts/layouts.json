@@ -1,0 +1,52 @@
+{
+  "layouts": {
+    "01-biblioteca-classica.webp": {
+      "label": "Biblioteca Clássica",
+      "alt": "Biblioteca noturna clássica com janela em arco iluminada pela lua à esquerda, estante de madeira escura ao centro e poltrona de couro com abajur à direita",
+      "objectPosition": "50% 50%",
+      "mobileObjectPosition": "32% 50%"
+    },
+    "02-dark-academia.jpg": {
+      "label": "Dark Academia",
+      "alt": "Sala de leitura em madeira escura e verde musgo com janela em arco sob chuva, estante alta com escada e escrivaninha iluminada",
+      "objectPosition": "50% 50%",
+      "mobileObjectPosition": "35% 50%"
+    },
+    "03-madeira-dourada.jpg": {
+      "label": "Madeira Dourada",
+      "alt": "Biblioteca clássica em mogno iluminada pelo sol da tarde com cortinas verde-oliva, globo antigo, estante alta e poltrona de couro",
+      "objectPosition": "50% 50%",
+      "mobileObjectPosition": "34% 50%"
+    },
+    "04-refugio-botanico.jpg": {
+      "label": "Refúgio Botânico",
+      "alt": "Canto de leitura acolhedor junto à janela chuvosa com plantas pendentes, estante iluminada por luzes quentes e poltrona de linho",
+      "objectPosition": "50% 50%",
+      "mobileObjectPosition": "36% 50%"
+    },
+    "05-cottage-manha.jpg": {
+      "label": "Manhã no Jardim",
+      "alt": "Biblioteca clara banhada por luz natural da manhã com janela voltada ao jardim, estante de carvalho com escada e poltrona neutra",
+      "objectPosition": "50% 50%",
+      "mobileObjectPosition": "36% 50%"
+    },
+    "06-noite-lofi.jpg": {
+      "label": "Noite Chuvosa",
+      "alt": "Ilustração de quarto de leitura aconchegante em noite chuvosa com vista para a cidade, luminária quente e poltrona com manta",
+      "objectPosition": "50% 50%",
+      "mobileObjectPosition": "34% 50%"
+    },
+    "07-torre-noturna.jpg": {
+      "label": "Torre Noturna",
+      "alt": "Biblioteca circular com janela redonda voltada ao céu estrelado, escada em espiral de madeira e poltrona azul de veludo",
+      "objectPosition": "50% 50%",
+      "mobileObjectPosition": "35% 50%"
+    },
+    "08-minimalista-claro.jpg": {
+      "label": "Santuário Minimalista",
+      "alt": "Espaço arquitetônico contemporâneo em madeira clara e prateleiras iluminadas com vista panorâmica ao entardecer",
+      "objectPosition": "50% 50%",
+      "mobileObjectPosition": "32% 50%"
+    }
+  }
+}

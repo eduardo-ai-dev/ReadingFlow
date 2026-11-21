@@ -1,0 +1,1514 @@
+/* ==========================================================================
+   ReadingFlow · Livro 3D Realista & Capa 2D (Classes globais rf-*)
+   CSS 3D puro, sem Three.js e sem dependências externas.
+   Paleta: Onyx var(--rf-onyx), Carbon Black var(--rf-carbon), Coffee Bean var(--rf-coffee),
+   Soft Linen var(--rf-linen), Wine Plum #722F3E, Camel var(--rf-camel), Soft Fawn var(--rf-fawn),
+   Hunter Green #3B523E, Slate Grey #6B7F94. Sem #FFF nem #000.
+   ========================================================================== */
+
+:root {
+  --mm: 1.35px;
+
+  /* Tokens do design system usados pela estante (única fonte de verdade) */
+  --rf-onyx: #141514;
+  --rf-carbon: #222422;
+  --rf-coffee: #2c221e;
+  --rf-linen: #f4efe6;
+  --soft-linen: #f4efe6;
+  --rf-camel: #c8a46e;
+  --rf-fawn: #dfbe88;
+
+  /* Fundo da cena sobre a superfície creme da página (tema escuro opcional em data-shelf-theme="dark") */
+  --rf-shelf-bg: var(--soft-linen);
+  /* Escala dos livros em telas estreitas (aplicada em altura, espessura e profundidade) */
+  --rf-shelf-scale: 1;
+  /* Reutiliza a textura única de papel do aplicativo (--rf-paper-texture) */
+  --rf-paper-tile: var(--rf-paper-texture);
+}
+
+[data-shelf-theme="dark"] {
+  --rf-shelf-bg: var(--rf-onyx);
+}
+
+@media (max-width: 480px) {
+  :root {
+    --rf-shelf-scale: 0.8;
+  }
+}
+
+/* ==========================================================================
+   CAPA 2D UNIFICADA (.rf-book-cover-2d) — Container Queries + cqw
+   ========================================================================== */
+.rf-book-cover-2d {
+  container-type: inline-size;
+}
+
+.rf-book-cover-title {
+  font-family: var(--font-serif, "Playfair Display", Georgia, serif);
+  font-size: clamp(9.5px, 12.2cqw, 17px);
+  line-height: 1.15;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rf-book-cover-title[data-title-scale="short"] {
+  font-size: clamp(11px, 15cqw, 20px);
+}
+
+.rf-book-cover-title[data-title-scale="long"] {
+  font-size: clamp(8.5px, 10cqw, 13.5px);
+}
+
+.rf-book-cover-author {
+  font-size: clamp(7px, 7.8cqw, 10.5px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Lista de Desejos: dessaturação editorial sutil que restaura cor total ao hover */
+.rf-book-cover-wishlist {
+  filter: grayscale(45%) saturate(65%);
+  opacity: 0.9;
+}
+
+.rf-book-cover-wishlist:hover,
+.group:hover .rf-book-cover-wishlist,
+a:hover .rf-book-cover-wishlist {
+  filter: grayscale(0%) saturate(100%);
+  opacity: 1;
+}
+
+/* Capas muito pequenas (< 64px): exibe título compacto em Playfair sem monograma */
+@container (max-width: 63.99px) {
+  .rf-book-cover-author {
+    display: none !important;
+  }
+
+  .rf-book-cover-inner {
+    justify-content: center !important;
+    align-items: center !important;
+    text-align: center !important;
+  }
+
+  .rf-book-cover-title {
+    font-size: clamp(6.5px, 17cqw, 9px) !important;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+}
+
+/* ==========================================================================
+   PALCO DE PRATELEIRA DE GÊNEROS (VirtualGenreShelf)
+   ========================================================================== */
+.rf-shelf-stage {
+  --mm: 1.35px;
+  position: relative;
+  border-radius: 10px;
+  border: 1px solid rgba(200, 164, 110, 0.25);
+  background: linear-gradient(180deg, var(--rf-coffee) 0%, var(--rf-onyx) 100%);
+  padding: 28px 20px 22px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  box-shadow: 0 10px 26px rgba(20, 21, 20, 0.55);
+}
+
+.rf-shelf-plank {
+  position: relative;
+  height: 16px;
+  margin: 0 auto;
+  border-radius: 3px;
+  background-color: #6B4226;
+  background-image:
+    var(--rf-paper-tile),
+    repeating-linear-gradient(180deg,
+      rgba(246, 228, 200, 0.06) 0px,
+      rgba(246, 228, 200, 0.06) 1.5px,
+      transparent 1.5px,
+      transparent 3.5px,
+      rgba(42, 22, 10, 0.09) 3.5px,
+      rgba(42, 22, 10, 0.09) 5px),
+    linear-gradient(90deg,
+      rgba(52, 29, 14, 0.14) 0%,
+      rgba(246, 228, 200, 0.08) 24%,
+      rgba(52, 29, 14, 0.06) 52%,
+      rgba(246, 228, 200, 0.07) 78%,
+      rgba(52, 29, 14, 0.15) 100%),
+    linear-gradient(180deg,
+      #B5895D 0px,
+      #9E7046 5px,
+      #5E381E 5.5px,
+      #774B2C 7px,
+      #5F391F 13px,
+      #4A2B16 100%);
+  background-blend-mode: soft-light, normal, normal, normal;
+  box-shadow:
+    inset 0 1px 0 rgba(246, 228, 200, 0.44),
+    inset 0 -1px 0 rgba(42, 22, 10, 0.34),
+    0 8px 16px -4px rgba(56, 33, 18, 0.26),
+    0 3px 6px -2px rgba(56, 33, 18, 0.16);
+}
+
+.rf-shelf {
+  --mm: 1.35px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 2.5px;
+  min-width: max-content;
+  margin: 0;
+  padding: 12px 16px 0;
+  list-style: none;
+  perspective: 1800px;
+  perspective-origin: 50% -140px;
+}
+
+/* ==========================================================================
+   SLOT E PRISMA DO LIVRO 3D REALISTA (.rf-book-slot / .rf-book-prism)
+   ========================================================================== */
+.rf-book-slot {
+  /* Espessura: clamp(12px, calc(var(--pages, 240) * 0.07px), 56px) + variação ±2px por hash */
+  --spine-raw: clamp(12px, calc(var(--pages, 240) * 0.07px), 56px);
+  --spine-base: clamp(12px, calc(var(--spine-raw) + var(--spine-jitter, 0px)), 56px);
+  --spine-width: calc(var(--spine-base) * var(--rf-shelf-scale, 1));
+  --half-spine: calc(var(--spine-width) / 2);
+  position: relative;
+  width: var(--spine-width);
+  /* Altura determinística (150px–215px), alinhada pela base */
+  height: calc(clamp(150px, var(--book-h, 178px), 215px) * var(--rf-shelf-scale, 1));
+  flex: 0 0 var(--spine-width);
+  z-index: 1;
+  scroll-snap-align: start;
+  perspective: 1100px;
+  transform-style: preserve-3d;
+}
+
+/* Sombra curta de contato sob a base de cada lombada */
+.rf-book-contact-shadow {
+  position: absolute;
+  bottom: -3px;
+  left: -6%;
+  width: 112%;
+  height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 45%,
+      rgba(0, 0, 0, 0.28) 0%,
+      rgba(0, 0, 0, 0.12) 52%,
+      transparent 76%);
+  pointer-events: none;
+  z-index: 0;
+  transition: transform 280ms ease-out, opacity 280ms ease-out;
+}
+
+.rf-book-slot:hover .rf-book-contact-shadow,
+.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-book-contact-shadow,
+.rf-book-slot.is-selected .rf-book-contact-shadow {
+  transform: translate(3px, 2px) scaleX(1.08);
+  opacity: 0.95;
+}
+
+/* ==========================================================================
+   TOOLTIP EDITORIAL (.rf-book-tooltip) — renderizado em portal no <body>,
+   centralizada acima do livro, com seta e barra dourada, com clamp na viewport
+   (nunca cobre o pill do cabeçalho nem o livro em hover).
+   ========================================================================== */
+.rf-book-tooltip {
+  position: fixed;
+  left: var(--tip-x, 0px);
+  top: var(--tip-y, 0px);
+  transform: translate(-50%, -100%);
+  z-index: 1000;
+  pointer-events: none;
+  width: max-content;
+  min-width: 164px;
+  max-width: 236px;
+  padding: 8px 12px 9px;
+  border-radius: 9px;
+  border: 1px solid rgb(200 164 110 / 0.55);
+  background: #1B1815;
+  box-shadow:
+    0 12px 26px rgb(20 18 15 / 0.45),
+    0 2px 6px rgb(20 18 15 / 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  animation: rf-tip-in 150ms ease-out both;
+}
+
+.rf-book-tooltip[data-placement="bottom"] {
+  transform: translate(-50%, 0);
+}
+
+.rf-book-tooltip-arrow {
+  position: absolute;
+  left: calc(50% + var(--tip-arrow-offset, 0px));
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  background: #1B1815;
+  border-right: 1px solid rgb(200 164 110 / 0.55);
+  border-bottom: 1px solid rgb(200 164 110 / 0.55);
+  transform: translateX(-50%) rotate(45deg);
+  pointer-events: none;
+}
+
+.rf-book-tooltip[data-placement="bottom"] .rf-book-tooltip-arrow {
+  bottom: auto;
+  top: -6px;
+  border-right: none;
+  border-bottom: none;
+  border-left: 1px solid rgb(200 164 110 / 0.55);
+  border-top: 1px solid rgb(200 164 110 / 0.55);
+}
+
+@keyframes rf-tip-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (hover: none) {
+  .rf-book-tooltip {
+    display: none;
+  }
+}
+
+.rf-book-tooltip-title {
+  font-family: var(--font-serif, "Playfair Display", Georgia, serif);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--rf-linen);
+}
+
+.rf-book-tooltip-author {
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--rf-linen);
+  opacity: 0.82;
+}
+
+.rf-book-tooltip-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--rf-fawn);
+}
+
+.rf-book-tooltip-pct {
+  font-variant-numeric: tabular-nums;
+  color: var(--rf-fawn);
+}
+
+.rf-book-tooltip-bar {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: rgb(244 239 230 / 0.14);
+  overflow: hidden;
+}
+
+.rf-book-tooltip-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #C4A77D 0%, #D4AF37 55%, #F3E5AB 100%);
+  box-shadow: 0 0 6px rgba(212, 175, 55, 0.55);
+  transition: width 220ms ease-out;
+}
+
+.rf-book-slot::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  pointer-events: auto;
+}
+
+.rf-book-slot:hover,
+.rf-book-slot:has(.rf-book-prism:focus-visible),
+.rf-book-slot.is-selected {
+  z-index: 40;
+}
+
+.rf-book-slot[draggable="true"] {
+  cursor: grab;
+}
+
+.rf-book-slot.is-dragging {
+  opacity: 0.42;
+  cursor: grabbing;
+}
+
+.rf-book-slot.is-drop-before::after,
+.rf-book-slot.is-drop-after::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--rf-camel);
+  box-shadow: 0 0 10px rgb(200 164 110 / 0.9);
+  pointer-events: none;
+  z-index: 65;
+}
+
+.rf-book-slot.is-drop-before::after {
+  left: -4px;
+}
+
+.rf-book-slot.is-drop-after::after {
+  right: -4px;
+}
+
+.rf-book-prism {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  transform-style: preserve-3d;
+  transform-origin: left bottom 0px;
+  transition:
+    transform 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+    filter 0.35s ease;
+}
+
+/* Lista de Desejos em 3D: dessaturação editorial com retorno completo da cor ao hover */
+.rf-book-slot.is-wishlist .rf-book-prism {
+  filter: grayscale(45%) saturate(65%);
+  opacity: 0.9;
+}
+
+@media (hover: hover) {
+
+  .rf-book-slot.is-wishlist:hover .rf-book-prism,
+  .rf-book-slot.is-wishlist:focus-within .rf-book-prism {
+    filter: grayscale(0%) saturate(100%);
+    opacity: 1;
+  }
+}
+
+/* Acessibilidade: :focus-visible com outline de 2px Camel (var(--rf-camel)) e offset 2px */
+.rf-book-prism:focus-visible {
+  outline: 2px solid var(--rf-camel);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Modo "Ver Capas em 3D": angulação contínua mostrando lombada e lateral da capa real */
+.rf-covers-mode .rf-book-slot {
+  margin-right: 54px;
+}
+
+.rf-covers-mode .rf-book-prism {
+  transform: translateZ(16px) rotateY(-28deg);
+}
+
+/* Hover apenas em dispositivos com ponteiro fino: eleva -10px, puxa +45px, gira -72deg e escala 1.1 para capa maior e legível */
+@media (hover: hover) {
+
+  .rf-book-slot:hover,
+  .rf-covers-mode .rf-book-slot:hover {
+    z-index: 40;
+  }
+
+  .rf-book-slot:hover .rf-book-prism,
+  .rf-covers-mode .rf-book-slot:hover .rf-book-prism {
+    will-change: transform;
+    transform: translateY(-10px) translateZ(45px) rotateY(-72deg) scale(1.1);
+  }
+}
+
+.rf-book-slot:has(.rf-book-prism:focus-visible),
+.rf-book-slot.is-selected {
+  z-index: 40;
+}
+
+.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-book-prism,
+.rf-book-slot.is-selected .rf-book-prism,
+.rf-covers-mode .rf-book-slot:has(.rf-book-prism:focus-visible) .rf-book-prism,
+.rf-covers-mode .rf-book-slot.is-selected .rf-book-prism {
+  transform: translateY(-10px) translateZ(45px) rotateY(-72deg) scale(1.1);
+}
+
+/* @media (hover:none): apenas o toque/seleção ativa */
+@media (hover: none) {
+  .rf-book-slot:hover:not(.is-selected):not(:has(.rf-book-prism:focus-visible)) .rf-book-prism {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   1. FACE FRONTAL DA LOMBADA (.rf-face-spine) — Acabamento de papel + 4 templates (A/B/C/D)
+   ========================================================================== */
+.rf-face-spine {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px 1px 1px 2px;
+  /* 8% de Soft Linen misturado para tirar aspecto plástico */
+  background-color: color-mix(in srgb, var(--c, #51262F) 92%, var(--rf-linen) 8%);
+  /* Luz: escurecimento vertical de ~10% nas pontas + gradiente cilíndrico horizontal (realce à esquerda, sombra à direita) */
+  background-image:
+    linear-gradient(180deg,
+      rgba(20, 21, 20, 0.11) 0%,
+      rgba(20, 21, 20, 0) 13%,
+      rgba(20, 21, 20, 0) 87%,
+      rgba(20, 21, 20, 0.13) 100%),
+    linear-gradient(90deg,
+      rgba(255, 255, 255, 0.22) 0%,
+      rgba(255, 255, 255, 0.06) 24%,
+      rgba(20, 21, 20, 0.03) 68%,
+      rgba(20, 21, 20, 0.24) 100%);
+  color: var(--txt, var(--rf-linen));
+  /* Aresta clara de 1px + contorno sutil + sombra curta entre livros */
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1px rgba(20, 21, 20, 0.18),
+    -2px 0 4px rgba(20, 21, 20, 0.16);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 2px 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+  backface-visibility: hidden;
+  user-select: none;
+}
+
+.rf-book-slot.is-finished .rf-face-spine {
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1px rgba(20, 21, 20, 0.18),
+    -2px 0 4px rgba(20, 21, 20, 0.16);
+}
+
+/* Nos temas escuros, aresta clara de 1px garante leitura até de lombadas pretas sem alterar a cor da capa */
+[data-theme="dark-academia"] .rf-face-spine,
+[data-theme="gotico"] .rf-face-spine,
+[data-theme="dark"] .rf-face-spine,
+[data-theme="editorial-dark"] .rf-face-spine {
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.34),
+    inset 0 0 0 1px var(--rf-spine-edge-highlight, rgba(244, 239, 230, 0.26)),
+    -2px 0 5px rgba(0, 0, 0, 0.45);
+}
+
+/* Dois vincos finos horizontais perto das pontas superior e inferior */
+.rf-spine-crease-top,
+.rf-spine-crease-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(20, 21, 20, 0.16);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.rf-spine-crease-top {
+  top: 8px;
+}
+
+.rf-spine-crease-bottom {
+  bottom: 8px;
+}
+
+/* ebook / audio: acabamento fosco suave */
+.rf-format-ebook .rf-face-spine,
+.rf-format-audio .rf-face-spine {
+  background-image:
+    linear-gradient(180deg,
+      rgba(20, 21, 20, 0.1) 0%,
+      rgba(20, 21, 20, 0) 13%,
+      rgba(20, 21, 20, 0) 87%,
+      rgba(20, 21, 20, 0.12) 100%),
+    linear-gradient(90deg,
+      rgba(244, 239, 230, 0.18) 0%,
+      rgba(20, 21, 20, 0.04) 55%,
+      rgba(20, 21, 20, 0.22) 100%);
+}
+
+/* Ruído de papel a ~6% com o único tile SVG compartilhado em :root */
+.rf-spine-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  mix-blend-mode: multiply;
+  background-image: var(--rf-paper-tile);
+  background-repeat: repeat;
+  z-index: 2;
+}
+
+/* Faixa superior (filho flex) para templates B (duas cores) e D (bloco colorido no topo) — nunca sobrepõe o título */
+.rf-spine-top-band {
+  position: relative;
+  width: calc(100% + 4px);
+  margin-inline: -2px;
+  flex-shrink: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Template B: duas cores com faixa de acento no topo */
+.rf-tpl-B .rf-face-spine {
+  padding-top: 0;
+}
+
+.rf-tpl-B .rf-spine-top-band {
+  height: 23%;
+  background-color: color-mix(in srgb, var(--accent, #C8A46E) 92%, var(--rf-linen) 8%);
+  background-image:
+    linear-gradient(180deg,
+      rgba(20, 21, 20, 0.14) 0%,
+      rgba(20, 21, 20, 0) 42%),
+    linear-gradient(90deg,
+      rgba(255, 255, 255, 0.22) 0%,
+      rgba(255, 255, 255, 0.06) 24%,
+      rgba(20, 21, 20, 0.03) 68%,
+      rgba(20, 21, 20, 0.24) 100%);
+  border-bottom: 1px solid rgba(20, 21, 20, 0.22);
+}
+
+/* Template C: serifa bold com filete ornamental fino sob o título */
+.rf-tpl-C .rf-spine-title {
+  font-family: var(--font-serif, "Playfair Display", Georgia, serif) !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  letter-spacing: 0.015em !important;
+}
+
+.rf-spine-ornament-rule {
+  display: block;
+  flex-shrink: 0;
+  width: 58%;
+  height: 1.5px;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--accent, var(--txt)) 65%, var(--txt) 35%);
+  opacity: 0.8;
+}
+
+/* Template D: bloco colorido no topo + restante claro (papel marfim), sans minimalista */
+.rf-tpl-D .rf-face-spine {
+  background-color: color-mix(in srgb, #EAE3D5 92%, var(--rf-linen) 8%);
+  color: var(--rf-onyx);
+  padding-top: 0;
+}
+
+.rf-tpl-D .rf-spine-top-band {
+  height: 27%;
+  background-color: color-mix(in srgb, var(--c, #51262F) 92%, var(--rf-linen) 8%);
+  background-image:
+    linear-gradient(180deg,
+      rgba(20, 21, 20, 0.14) 0%,
+      rgba(20, 21, 20, 0) 40%),
+    linear-gradient(90deg,
+      rgba(255, 255, 255, 0.22) 0%,
+      rgba(255, 255, 255, 0.06) 24%,
+      rgba(20, 21, 20, 0.03) 68%,
+      rgba(20, 21, 20, 0.24) 100%);
+  border-bottom: 1.5px solid color-mix(in srgb, var(--accent, var(--c)) 80%, rgba(20, 21, 20, 0.2) 20%);
+}
+
+.rf-tpl-D .rf-spine-title {
+  font-family: var(--font-sans, system-ui, sans-serif) !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: 0.03em !important;
+  color: var(--rf-onyx) !important;
+}
+
+.rf-tpl-D .rf-spine-author {
+  color: #4A433C !important;
+  opacity: 0.88 !important;
+}
+
+.rf-tpl-D .rf-spine-imprint {
+  color: var(--rf-onyx);
+}
+
+/* Marca de editora discreta na base (~50% dos livros, 6 glifos simples) */
+.rf-spine-imprint {
+  position: relative;
+  z-index: 3;
+  flex-shrink: 0;
+  margin-top: 4px;
+  padding-bottom: 2px;
+  font-size: 7px;
+  line-height: 1;
+  color: var(--txt, var(--rf-linen));
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.rf-thin-spine .rf-spine-imprint {
+  font-size: 5.5px;
+  opacity: 0.55;
+}
+
+/* Capa dura: 2 sulcos finos a ~3mm das bordas */
+.rf-spine-groove-left,
+.rf-spine-groove-right {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg,
+      rgba(20, 21, 20, 0.55) 0%,
+      rgba(200, 164, 110, 0.16) 50%,
+      rgba(20, 21, 20, 0.58) 100%);
+  pointer-events: none;
+}
+
+.rf-spine-groove-left {
+  left: 3px;
+}
+
+.rf-spine-groove-right {
+  right: 3px;
+}
+
+/* Brochura / Bolso: 1 vinco longitudinal sutil */
+.rf-spine-crease-center {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2.5px;
+  width: 1px;
+  background: rgba(20, 21, 20, 0.38);
+  pointer-events: none;
+}
+
+/* Foil: dois filetes horizontais com gradiente Soft Fawn (var(--rf-fawn)) -> Camel (var(--rf-camel)) */
+.rf-spine-fillets {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: calc(100% - 4px);
+  flex-shrink: 0;
+}
+
+.rf-spine-fillet-line {
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, var(--rf-fawn) 0%, var(--rf-camel) 100%);
+  opacity: 0.85;
+}
+
+/* Destaque de status 'Em andamento': filete superior iluminado (var(--rf-camel)) + barra sutil na lombada */
+.rf-book-slot.is-reading .rf-spine-fillet-line {
+  height: 1.5px;
+  opacity: 1;
+  background: var(--rf-camel);
+  box-shadow: 0 0 6px rgb(200 164 110 / 0.9);
+}
+
+.rf-spine-reading-fillet {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--rf-fawn) 0%, var(--rf-camel) 50%, var(--rf-fawn) 100%);
+  box-shadow: 0 1px 8px rgb(200 164 110 / 0.85);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.rf-spine-progress-track {
+  position: relative;
+  z-index: 3;
+  width: calc(100% - 6px);
+  height: 3px;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: rgb(20 21 20 / 0.68);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.rf-spine-progress-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #D4AF37 0%, #F3E5AB 100%);
+  box-shadow: 0 0 6px rgba(212, 175, 55, 0.85);
+}
+
+/* Bloco tipográfico vertical (writing-mode: vertical-rl, título e autor fluem de cima para baixo ao longo da altura da lombada) */
+.rf-spine-titles {
+  position: relative;
+  z-index: 3;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 2px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  overflow: hidden;
+}
+
+.rf-spine-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font-family: var(--font-serif, "Playfair Display", Georgia, serif);
+  font-size: var(--title-fs, 11px);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: 0.015em;
+  color: var(--txt, var(--rf-linen));
+  text-align: center;
+  overflow: hidden;
+  text-overflow: clip;
+  max-height: 100%;
+}
+
+.rf-spine-title-line {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+/* 3 estilos tipográficos escolhidos por hash: serifa bold, sans condensada em caixa alta e sans leve */
+.rf-typo-serif-bold .rf-spine-title {
+  font-family: var(--font-serif, "Playfair Display", Georgia, serif);
+  font-weight: 700;
+  letter-spacing: 0.015em;
+}
+
+.rf-typo-sans-condensed .rf-spine-title {
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
+  font-stretch: condensed;
+}
+
+.rf-typo-sans-light .rf-spine-title {
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+/* Em espessuras estreitas (< 19px), oculta autor para dar 100% da altura ao título */
+.rf-thin-spine .rf-spine-author {
+  display: none;
+}
+
+/* Em lombadas largas (>= 42px), mantém orientação vertical limpa com auto-fit de 1 ou 2 linhas (zero reticências) */
+.rf-wide-spine .rf-spine-titles {
+  padding: 10px 4px;
+  gap: 8px;
+}
+
+.rf-wide-spine .rf-spine-title {
+  font-size: var(--title-fs, 13px);
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.rf-wide-spine .rf-spine-author {
+  font-size: var(--author-fs, 8px);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+/* Autor pequeno, em sans, na cor contrastante da lombada (sem foil dourado) */
+.rf-spine-author {
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: var(--author-fs, 7.5px);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1.05;
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: var(--txt, var(--rf-linen));
+  opacity: 0.78;
+}
+
+/* Pé da lombada: filetes + monograma da editora em círculo de 1px ou ícone 14px */
+.rf-spine-foot {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.rf-spine-publisher-seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid var(--rf-camel);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 6.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  background: linear-gradient(180deg, var(--rf-fawn) 0%, var(--rf-camel) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.rf-spine-media-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--rf-fawn);
+}
+
+/* ==========================================================================
+   2. FACES DE PÁGINAS CREME (#EFE6D2) — TOPO E LADO OPOSTO
+   Capa dura com beirada saliente de ~2.5mm
+   ========================================================================== */
+/* Em repouso só as lombadas ficam visíveis; as faces laterais/capa aparecem ao girar */
+.rf-face-top-pages,
+.rf-face-fore-edge-pages,
+.rf-face-back-cover,
+.rf-face-side-cover {
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+@media (hover: hover) {
+
+  .rf-book-slot:hover .rf-face-top-pages,
+  .rf-book-slot:hover .rf-face-fore-edge-pages,
+  .rf-book-slot:hover .rf-face-back-cover,
+  .rf-book-slot:hover .rf-face-side-cover {
+    opacity: 1;
+  }
+}
+
+.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-top-pages,
+.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-fore-edge-pages,
+.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-back-cover,
+.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-side-cover,
+.rf-book-slot.is-selected .rf-face-top-pages,
+.rf-book-slot.is-selected .rf-face-fore-edge-pages,
+.rf-book-slot.is-selected .rf-face-back-cover,
+.rf-book-slot.is-selected .rf-face-side-cover,
+.rf-covers-mode .rf-book-slot .rf-face-top-pages,
+.rf-covers-mode .rf-book-slot .rf-face-fore-edge-pages,
+.rf-covers-mode .rf-book-slot .rf-face-back-cover,
+.rf-covers-mode .rf-book-slot .rf-face-side-cover {
+  opacity: 1;
+}
+
+.rf-face-top-pages {
+  position: absolute;
+  top: 0;
+  left: 1px;
+  width: calc(100% - 2px);
+  height: var(--depth, 124px);
+  background: repeating-linear-gradient(90deg,
+      #EFE6D2 0px,
+      #EFE6D2 1.5px,
+      #DDD1BA 1.5px,
+      #DDD1BA 2.5px);
+  transform-origin: top center;
+  transform: rotateX(90deg);
+  box-shadow: inset 0 0 6px rgba(20, 21, 20, 0.38);
+  backface-visibility: hidden;
+  pointer-events: none;
+}
+
+/* Capa dura: beirada saliente de ~2.5px no topo e na frente */
+.rf-format-capa_dura
+
+/* Em repouso só as lombadas ficam visíveis; as faces laterais/capa aparecem ao girar */
+.rf-face-top-pages,
+.rf-face-fore-edge-pages,
+.rf-face-back-cover,
+.rf-face-side-cover {
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+@media (hover: hover) {
+
+  .rf-book-slot:hover .rf-face-top-pages,
+  .rf-book-slot:hover .rf-face-fore-edge-pages,
+  .rf-book-slot:hover .rf-face-back-cover,
+  .rf-book-slot:hover .rf-face-side-cover {
+    opacity: 1;
+  }
+}
+
+.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-top-pages,
+.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-fore-edge-pages,
+.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-back-cover,
+.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-side-cover,
+.rf-book-slot.is-selected .rf-face-top-pages,
+.rf-book-slot.is-selected .rf-face-fore-edge-pages,
+.rf-book-slot.is-selected .rf-face-back-cover,
+.rf-book-slot.is-selected .rf-face-side-cover,
+.rf-covers-mode .rf-book-slot .rf-face-top-pages,
+.rf-covers-mode .rf-book-slot .rf-face-fore-edge-pages,
+.rf-covers-mode .rf-book-slot .rf-face-back-cover,
+.rf-covers-mode .rf-book-slot .rf-face-side-cover {
+  opacity: 1;
+}
+
+.rf-face-top-pages {
+  top: 2.5px;
+  height: calc(var(--depth, 124px) - 2.5px);
+}
+
+/* Lado oposto (corte frontal das páginas creme #EFE6D2) */
+.rf-face-fore-edge-pages {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 100%;
+  height: calc(100% - 4px);
+  background: repeating-linear-gradient(180deg,
+      #EFE6D2 0px,
+      #EFE6D2 1.5px,
+      #DDD1BA 1.5px,
+      #DDD1BA 2.5px);
+  transform: translateZ(calc(-1 * var(--depth, 124px)));
+  box-shadow: inset 0 0 6px rgba(20, 21, 20, 0.42);
+  backface-visibility: hidden;
+  pointer-events: none;
+}
+
+.rf-format-capa_dura .rf-face-fore-edge-pages {
+  top: 2.5px;
+  height: calc(100% - 5px);
+}
+
+/* Contracapa lateral esquerda (fecha geometricamente o prisma 3D) */
+.rf-face-back-cover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--depth, 124px);
+  height: 100%;
+  background-color: var(--c, #51262F);
+  background-image: linear-gradient(90deg,
+      rgba(20, 21, 20, 0.52) 0%,
+      rgba(20, 21, 20, 0.28) 100%);
+  transform-origin: left center;
+  transform: rotateY(90deg);
+  backface-visibility: hidden;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   3. CAPA FRONTAL LATERAL — Acabamento físico + Capa tipográfica + Crossfade da capa real
+   ========================================================================== */
+.rf-face-side-cover {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: var(--depth, 124px);
+  height: 100%;
+  background-color: color-mix(in srgb, var(--c, #51262F) 92%, var(--rf-linen) 8%);
+  transform-origin: left center;
+  transform: rotateY(90deg);
+  border-radius: 0 3px 3px 0;
+  border: 1px solid rgba(20, 21, 20, 0.22);
+  /* Sombra projetada na tábua e profundidade da dobra */
+  box-shadow:
+    inset 4px 0 8px rgb(20 21 20 / 0.36),
+    8px 14px 22px rgb(20 21 20 / 0.42);
+  overflow: hidden;
+  backface-visibility: hidden;
+  pointer-events: none;
+}
+
+/* Sulco da dobradiça perto da lombada */
+.rf-cover-hinge-groove {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 7px;
+  width: 2px;
+  background: linear-gradient(90deg,
+      rgba(20, 21, 20, 0.48) 0%,
+      rgba(255, 255, 255, 0.24) 55%,
+      rgba(20, 21, 20, 0.14) 100%);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.rf-side-cover-sheen {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 14px;
+  background: linear-gradient(90deg,
+      rgba(244, 239, 230, 0.22) 0%,
+      rgba(20, 21, 20, 0.26) 45%,
+      transparent 100%);
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* Reflexo diagonal sutil sobre qualquer capa (real ou tipográfica) */
+.rf-side-cover-diagonal-sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(126deg,
+      rgba(255, 255, 255, 0.2) 0%,
+      rgba(255, 255, 255, 0.06) 28%,
+      transparent 48%,
+      rgba(20, 21, 20, 0.08) 100%);
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* Borda de páginas visível à direita e embaixo da capa */
+.rf-cover-pages-right {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  bottom: 2px;
+  width: 3px;
+  background: repeating-linear-gradient(90deg,
+      #F3ECDD 0px,
+      #F3ECDD 1px,
+      #D8CCB6 1px,
+      #D8CCB6 2px);
+  box-shadow: inset 1px 0 1px rgba(20, 21, 20, 0.24);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.rf-cover-pages-bottom {
+  position: absolute;
+  left: 3px;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: repeating-linear-gradient(180deg,
+      #F3ECDD 0px,
+      #F3ECDD 1px,
+      #D8CCB6 1px,
+      #D8CCB6 2px);
+  box-shadow: inset 0 1px 1px rgba(20, 21, 20, 0.22);
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* Imagem real da capa: começa em opacity 0 sobre a capa tipográfica e faz crossfade ao carregar */
+.rf-side-cover-img {
+  position: absolute;
+  inset: 0 3px 3px 0;
+  width: calc(100% - 3px);
+  height: calc(100% - 3px);
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 240ms ease;
+  z-index: 2;
+}
+
+.rf-side-cover-img.is-loaded {
+  opacity: 1;
+}
+
+/* Capa tipográfica gerada: spineColor + spineAccent, moldura fina, Playfair + sans */
+.rf-side-cover-fallback {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  height: 100%;
+  padding: 20px 14px 16px 16px;
+  box-sizing: border-box;
+  color: var(--txt, var(--rf-linen));
+  background-color: color-mix(in srgb, var(--c, #51262F) 92%, var(--rf-linen) 8%);
+  background-image: linear-gradient(155deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(20, 21, 20, 0.18) 100%);
+  z-index: 1;
+}
+
+.rf-side-cover-noise {
+  position: absolute;
+  inset: 0;
+  background-image: var(--rf-paper-tile);
+  background-repeat: repeat;
+  opacity: 0.06;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.rf-side-cover-accent-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 3px;
+  height: 10px;
+  background-color: color-mix(in srgb, var(--accent, #C8A46E) 92%, var(--rf-linen) 8%);
+  border-bottom: 1px solid rgba(20, 21, 20, 0.18);
+  pointer-events: none;
+}
+
+.rf-side-cover-frame {
+  position: absolute;
+  inset: 14px 10px 10px 12px;
+  border-radius: 2px;
+  border: 1px solid color-mix(in srgb, var(--accent, var(--txt)) 65%, var(--txt) 35%);
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.rf-side-cover-title {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  margin-bottom: auto;
+  padding: 0 4px;
+  font-family: var(--font-serif, "Playfair Display", Georgia, serif);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.22;
+  text-wrap: balance;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--txt, var(--rf-linen));
+}
+
+.rf-side-cover-author {
+  position: relative;
+  z-index: 1;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--accent, var(--txt)) 55%, transparent 45%);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 8.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.84;
+  color: var(--txt, var(--rf-linen));
+}
+
+.rf-side-cover-finished-border {
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.rf-side-cover-progress-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: rgba(20, 21, 20, 0.65);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.rf-side-cover-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--rf-camel);
+  box-shadow: 0 0 6px rgb(200 164 110 / 0.7);
+}
+
+.rf-side-cover-progress-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(200, 164, 110, 0.6);
+  background: rgba(20, 21, 20, 0.88);
+  color: var(--rf-fawn);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 9.5px;
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: 0.03em;
+  opacity: 0;
+  transition: opacity 220ms ease-out;
+  pointer-events: none;
+}
+
+.rf-book-slot:hover .rf-side-cover-progress-badge,
+.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-side-cover-progress-badge,
+.rf-book-slot.is-selected .rf-side-cover-progress-badge,
+.rf-covers-mode .rf-side-cover-progress-badge {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   ACESSIBILIDADE: prefers-reduced-motion — sem rotação, outline 2px Camel + 3px de elevação
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .rf-book-prism {
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .rf-book-slot:hover .rf-book-prism,
+  .rf-book-slot:has(.rf-book-prism:focus-visible) .rf-book-prism,
+  .rf-book-slot.is-selected .rf-book-prism {
+    transition: none !important;
+    transform: translateY(-3px) !important;
+    outline: 2px solid var(--rf-camel) !important;
+    outline-offset: 2px;
+  }
+}
+
+/* ==========================================================================
+   MODO SHOWCASE & DESK (Compatibilidade com vitrines existentes)
+   ========================================================================== */
+.rf-showcase-stage {
+  position: relative;
+  width: 240px;
+  height: 290px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1100px;
+  user-select: none;
+}
+
+.rf-desk-stage {
+  width: 164px;
+  height: 214px;
+}
+
+.rf-showcase-book {
+  position: relative;
+  width: var(--bw, 168px);
+  height: var(--bh, 244px);
+  transform-style: preserve-3d;
+  transform: rotateY(-28deg) rotateX(8deg);
+  transition: transform 360ms ease-out;
+}
+
+.rf-desk-book {
+  transform: rotateY(-24deg) rotateX(6deg);
+}
+
+.rf-face-front-full {
+  position: absolute;
+  inset: 0;
+  transform: translateZ(calc(var(--depth) / 2));
+  background: var(--c, #51262F);
+  border-radius: 2px 5px 5px 2px;
+  overflow: hidden;
+  box-shadow: inset 4px 0 8px rgba(20, 21, 20, 0.45);
+  backface-visibility: hidden;
+}
+
+.rf-cover-img {
+  object-fit: cover;
+}
+
+.rf-cover-art-frame {
+  position: absolute;
+  inset: 8px;
+  border: 1px solid rgba(200, 164, 110, 0.35);
+  border-radius: 3px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  text-align: center;
+  color: var(--txt, var(--rf-linen));
+}
+
+.rf-cover-ornament,
+.rf-cover-footer {
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rf-fawn);
+}
+
+.rf-cover-main-title {
+  font-family: var(--font-serif, "Playfair Display", Georgia, serif);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--rf-linen);
+}
+
+.rf-cover-sub,
+.rf-cover-samples {
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 9.5px;
+  color: var(--rf-fawn);
+}
+
+.rf-face-back-full {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg) translateZ(calc(var(--depth) / 2));
+  background: var(--c, #51262F);
+  border-radius: 5px 2px 2px 5px;
+  backface-visibility: hidden;
+}
+
+.rf-face-spine-full {
+  position: absolute;
+  top: 0;
+  left: calc((var(--bw) - var(--depth)) / 2);
+  width: var(--depth);
+  height: var(--bh);
+  transform: rotateY(-90deg) translateZ(calc(var(--bw) / 2));
+  background: var(--c, #51262F);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: hidden;
+}
+
+.rf-spine-full-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: var(--font-serif, "Playfair Display", Georgia, serif);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rf-linen);
+}
+
+.rf-face-right-pages-full {
+  position: absolute;
+  top: 0;
+  left: calc((var(--bw) - var(--depth)) / 2);
+  width: var(--depth);
+  height: var(--bh);
+  transform: rotateY(90deg) translateZ(calc(var(--bw) / 2));
+  background: repeating-linear-gradient(180deg,
+      #EFE6D2 0 1.5px,
+      #DDD1BA 1.5px 2.5px);
+  backface-visibility: hidden;
+}
+
+.rf-face-top-pages-full {
+  position: absolute;
+  top: calc((var(--bh) - var(--depth)) / 2);
+  left: 0;
+  width: var(--bw);
+  height: var(--depth);
+  transform: rotateX(90deg) translateZ(calc(var(--bh) / 2));
+  background: repeating-linear-gradient(90deg,
+      #EFE6D2 0 1.5px,
+      #DDD1BA 1.5px 2.5px);
+  backface-visibility: hidden;
+}
+
+.rf-face-bottom-pages-full {
+  position: absolute;
+  top: calc((var(--bh) - var(--depth)) / 2);
+  left: 0;
+  width: var(--bw);
+  height: var(--depth);
+  transform: rotateX(-90deg) translateZ(calc(var(--bh) / 2));
+  background: repeating-linear-gradient(90deg,
+      #EFE6D2 0 1.5px,
+      #DDD1BA 1.5px 2.5px);
+  backface-visibility: hidden;
+}
+
+.rf-showcase-shadow {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 190px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center,
+      rgba(20, 21, 20, 0.65) 0%,
+      transparent 70%);
+  pointer-events: none;
+}
+
+/* Lombadas claras: tinta escura (AA) em vez do foil dourado, que não contrasta sobre fundo claro */
+.rf-book-slot.is-ink-dark .rf-spine-author,
+.rf-book-slot.is-ink-dark .rf-spine-publisher-seal {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--txt);
+  opacity: 0.85;
+}
+
+.rf-book-slot.is-ink-dark .rf-spine-publisher-seal {
+  border-color: var(--txt);
+}
+
+.rf-book-slot.is-ink-dark .rf-spine-media-icon {
+  color: var(--txt);
+}

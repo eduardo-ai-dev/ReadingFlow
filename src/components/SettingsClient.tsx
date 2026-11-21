@@ -1,0 +1,362 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import type { UserProfile } from "@/lib/domain";
+import {
+  deleteMyAccountAction,
+  updateProfileAction,
+} from "@/features/auth/actions";
+import { restoreBackupJsonAction } from "@/features/portability/actions";
+import { useTheme } from "@/components/ThemeProvider";
+import { ThemeCardsPicker } from "@/components/ThemeCardsPicker";
+
+export function SettingsClient({ profile }: { profile: UserProfile }) {
+  const router = useRouter();
+  const { themePreference } = useTheme();
+  const [defaultCurrency, setDefaultCurrency] = useState(
+    profile.defaultCurrency
+  );
+  const [threeD, setThreeD] = useState(profile.threeD);
+  const [goalsCountRereads, setGoalsCountRereads] = useState(
+    profile.goalsCountRereads
+  );
+  const [maxSimultaneousReadings, setMaxSimultaneousReadings] = useState(
+    String(profile.maxSimultaneousReadings)
+  );
+  const [telemetryOptOut, setTelemetryOptOut] = useState(
+    profile.telemetryOptOut
+  );
+
+  const [confirmationPhrase, setConfirmationPhrase] = useState("");
+  const [feedback, setFeedback] = useState<{
+    tone: "ok" | "error";
+    text: string;
+  } | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const handleBackupFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const rawJson = await file.text();
+    setFeedback(null);
+    startTransition(async () => {
+      const res = await restoreBackupJsonAction({ rawJson });
+      if (!res.ok) {
+        setFeedback({ tone: "error", text: res.error });
+        return;
+      }
+      setFeedback({
+        tone: "ok",
+        text: `Backup restaurado com sucesso (${res.restoredWorks} obras recuperadas).`,
+      });
+      router.refresh();
+    });
+  };
+
+  return (
+    <div className="space-y-8">
+      {feedback ? (
+        <div
+          role={feedback.tone === "error" ? "alert" : "status"}
+          className={`rounded-[8px] border p-3.5 text-sm font-medium ${
+            feedback.tone === "ok"
+              ? "border-[var(--status-ok)] bg-[var(--status-ok-bg)] text-[var(--status-ok)]"
+              : "border-[var(--status-error)] bg-[var(--status-error-bg)] text-[var(--status-error)]"
+          }`}
+        >
+          {feedback.text}
+        </div>
+      ) : null}
+
+      {/* Conta e Privacidade Estrita */}
+      <div className="rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 sm:p-6">
+        <h2 className="font-serif text-xl font-semibold text-[var(--text-heading)]">
+          Conta e Identificação
+        </h2>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Privacidade estrita por padrão: nenhum nome completo, telefone ou fuso horário pessoal é compartilhado.
+        </p>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-4 py-2.5">
+            <span className="block text-[11px] font-semibold tracking-wide text-[var(--text-muted)] uppercase">
+              E-mail cadastrado
+            </span>
+            <span className="font-mono text-sm font-semibold text-[var(--text-primary)]">
+              {profile.email}
+            </span>
+          </div>
+          <span className="rounded-full border border-[var(--status-ok)] bg-[var(--status-ok-bg)] px-3 py-1 text-xs font-semibold text-[var(--status-ok)]">
+            Conta privada
+          </span>
+        </div>
+      </div>
+
+      {/* Preferências de aparência e leitura */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setFeedback(null);
+          startTransition(async () => {
+            const res = await updateProfileAction({
+              defaultCurrency,
+              theme: themePreference,
+              threeD,
+              goalsCountRereads,
+              maxSimultaneousReadings:
+                Number.parseInt(maxSimultaneousReadings, 10) || 5,
+              telemetryOptOut,
+            });
+            if (!res.ok) {
+              setFeedback({ tone: "error", text: res.error });
+              return;
+            }
+            setFeedback({
+              tone: "ok",
+              text: "Preferências salvas e aplicadas.",
+            });
+            router.refresh();
+          });
+        }}
+        className="space-y-5 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 sm:p-6"
+      >
+        <h2 className="font-serif text-xl font-semibold text-[var(--text-heading)]">
+          Aparência e Preferências do Acervo
+        </h2>
+
+        <ThemeCardsPicker />
+
+        <div className="grid gap-4 border-t border-[var(--rf-divider)] pt-4 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="cfg-currency"
+              className="block text-xs font-semibold text-[var(--text-primary)]"
+            >
+              Moeda padrão (Lista de Desejos)
+            </label>
+            <select
+              id="cfg-currency"
+              value={defaultCurrency}
+              onChange={(e) =>
+                setDefaultCurrency(e.target.value as "BRL" | "USD" | "EUR")
+              }
+              className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)]"
+            >
+              <option value="BRL">Real (BRL)</option>
+              <option value="USD">Dólar (USD)</option>
+              <option value="EUR">Euro (EUR)</option>
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="cfg-max-readings"
+              className="block text-xs font-semibold text-[var(--text-primary)]"
+            >
+              Limite de leituras simultâneas
+            </label>
+            <input
+              id="cfg-max-readings"
+              type="number"
+              min={1}
+              max={20}
+              value={maxSimultaneousReadings}
+              onChange={(e) => setMaxSimultaneousReadings(e.target.value)}
+              className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)]"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="cfg-3d"
+              className="block text-xs font-semibold text-[var(--text-primary)]"
+            >
+              Estante 3D (R1)
+            </label>
+            <select
+              id="cfg-3d"
+              value={threeD}
+              onChange={(e) =>
+                setThreeD(e.target.value as "auto" | "on" | "off")
+              }
+              className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)]"
+            >
+              <option value="auto">Automático (ativa se WebGL rápido)</option>
+              <option value="on">Sempre ativar</option>
+              <option value="off">Desativar (economizar bateria/dados)</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-3 pt-2">
+          <label className="flex min-h-[44px] cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={goalsCountRereads}
+              onChange={(e) => setGoalsCountRereads(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-primary)]"
+            />
+            <span className="text-xs text-[var(--text-primary)]">
+              <strong className="block font-semibold">
+                Contar releituras nas metas de leitura
+              </strong>
+              Quando desativado, apenas a primeira leitura da obra entra no cômputo anual.
+            </span>
+          </label>
+
+          <label className="flex min-h-[44px] cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={telemetryOptOut}
+              onChange={(e) => setTelemetryOptOut(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-primary)]"
+            />
+            <span className="text-xs text-[var(--text-primary)]">
+              <strong className="block font-semibold">
+                Não enviar telemetria anônima agregada
+              </strong>
+              O ReadingFlow não usa cookies de rastreio nem envia dados a redes sociais.
+            </span>
+          </label>
+        </div>
+
+        <div className="pt-2">
+          <button
+            type="submit"
+            disabled={isPending}
+            className="inline-flex min-h-[44px] items-center rounded-[8px] bg-[var(--accent-primary)] px-5 text-sm font-semibold text-[var(--on-primary)] hover:bg-[var(--accent-primary-hover)] disabled:opacity-60"
+          >
+            {isPending ? "Salvando..." : "Salvar preferências"}
+          </button>
+        </div>
+      </form>
+
+      {/* Portabilidade dos dados */}
+      <section
+        aria-labelledby="export-titulo"
+        className="space-y-4 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 sm:p-6"
+      >
+        <h2
+          id="export-titulo"
+          className="font-serif text-xl font-semibold text-[var(--text-heading)]"
+        >
+          Portabilidade e Backup dos Dados
+        </h2>
+        <p className="text-xs text-[var(--text-muted)]">
+          Seus dados pertencem a você. Exporte seu acervo completo em JSON estruturado
+          (pronto para restaurar a qualquer momento) ou em planilhas CSV.
+        </p>
+
+        <div className="flex flex-wrap gap-3">
+          <a
+            href="/api/export?format=json"
+            download
+            className="inline-flex min-h-[44px] items-center rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-4 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+          >
+            Baixar Backup Completo (.json)
+          </a>
+          <a
+            href="/api/export?format=csv&entity=books"
+            download
+            className="inline-flex min-h-[44px] items-center rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-4 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+          >
+            Exportar Livros (.csv)
+          </a>
+          <a
+            href="/api/export?format=csv&entity=readings"
+            download
+            className="inline-flex min-h-[44px] items-center rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-4 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+          >
+            Exportar Leituras (.csv)
+          </a>
+          <a
+            href="/api/export?format=csv&entity=wishlist"
+            download
+            className="inline-flex min-h-[44px] items-center rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-4 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+          >
+            Exportar Desejos (.csv)
+          </a>
+        </div>
+
+        <div className="border-t border-[var(--border-subtle)] pt-4">
+          <label
+            htmlFor="restore-backup-file"
+            className="block text-xs font-semibold text-[var(--text-primary)]"
+          >
+            Restaurar a partir de backup (.json)
+          </label>
+          <input
+            id="restore-backup-file"
+            type="file"
+            accept=".json,application/json"
+            onChange={handleBackupFile}
+            className="mt-1.5 block text-xs text-[var(--text-muted)]"
+          />
+        </div>
+      </section>
+
+      {/* Zona de Perigo — Exclusão definitiva */}
+      <section
+        aria-labelledby="danger-zone-titulo"
+        className="space-y-4 rounded-[12px] border border-[var(--status-error)]/40 bg-[var(--bg-surface)] p-5 sm:p-6"
+      >
+        <h2
+          id="danger-zone-titulo"
+          className="font-serif text-xl font-semibold text-[var(--status-error)]"
+        >
+          Excluir Conta e Biblioteca Definitivamente
+        </h2>
+        <p className="text-xs text-[var(--text-muted)]">
+          Esta ação é irreversível. Todos os seus livros, histórico de leitura,
+          avaliações e metas serão apagados permanentemente dos nossos servidores.
+        </p>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (confirmationPhrase !== "EXCLUIR MINHA CONTA") return;
+            setFeedback(null);
+            startTransition(async () => {
+              const res = await deleteMyAccountAction({
+                confirmationPhrase: "EXCLUIR MINHA CONTA",
+              });
+              if (!res.ok) {
+                setFeedback({ tone: "error", text: res.error });
+                return;
+              }
+              router.push("/");
+              router.refresh();
+            });
+          }}
+          className="space-y-3"
+        >
+          <div>
+            <label
+              htmlFor="confirm-delete"
+              className="block text-xs font-semibold text-[var(--text-primary)]"
+            >
+              Digite exatamente <span className="font-mono text-[var(--rf-status-error)]">EXCLUIR MINHA CONTA</span> para confirmar:
+            </label>
+            <input
+              id="confirm-delete"
+              type="text"
+              value={confirmationPhrase}
+              onChange={(e) => setConfirmationPhrase(e.target.value)}
+              placeholder="EXCLUIR MINHA CONTA"
+              className="mt-1 min-h-[44px] w-full max-w-md rounded-[var(--rf-radius-md)] border border-[var(--rf-border-strong)] bg-[var(--rf-surface-elevated)] px-3 text-sm font-mono text-[var(--rf-text-primary)]"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={confirmationPhrase !== "EXCLUIR MINHA CONTA" || isPending}
+            className="inline-flex min-h-[44px] items-center rounded-[var(--rf-radius-md)] border border-[var(--rf-status-error)] bg-[var(--rf-status-error-bg)] px-4 text-xs font-semibold text-[var(--rf-status-error)] hover:opacity-90 disabled:opacity-40"
+          >
+            {isPending ? "Excluindo..." : "Confirmar exclusão definitiva"}
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}

@@ -1,0 +1,187 @@
+/* ==========================================================================
+   ReadingFlow · Quarto Noturno Interativo (Inspirado em Interaction Library)
+   100dvh fixo · Sem scroll · Iluminação dinâmica · Lombadas cilíndricas 2.5D/3D
+   ========================================================================== */
+
+/* 1. Foco de luz quente saindo do bocal da luminária */
+.lamp-glow {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(255, 235, 190, 0.46) 0%,
+    rgba(255, 195, 130, 0.16) 42%,
+    transparent 74%
+  );
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+/* 2. Painéis arquitetônicos estilo Boiserie (#181c1b) */
+.boiserie-panel {
+  position: relative;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #161a19 0%, #181c1b 100%);
+  border: 1px solid #242a29;
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.58),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.boiserie-panel::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(10, 13, 12, 0.65);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  pointer-events: none;
+}
+
+/* 3. Reflexo e sombra inclinada da janela projetada na parede direita */
+.window-wall-reflection {
+  pointer-events: none;
+  transform: perspective(680px) rotateY(-18deg) skewY(-11deg);
+  filter: blur(7px);
+}
+
+/* 4. Moldura de madeira nobre e nichos profundos da estante */
+.wooden-shelf-frame {
+  background-color: #3d2618;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgba(22, 11, 5, 0.09) 0px,
+      rgba(22, 11, 5, 0.09) 2px,
+      transparent 2px,
+      transparent 9px
+    ),
+    linear-gradient(180deg, #4b301f 0%, #382215 52%, #29180e 100%);
+  box-shadow:
+    0 26px 52px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 226, 182, 0.22),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.65);
+}
+
+.wooden-shelf-cornice {
+  background: linear-gradient(180deg, #5a3a26 0%, #3e2618 65%, #26160d 100%);
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.72),
+    inset 0 1px 0 rgba(255, 232, 195, 0.28);
+}
+
+/* Sombreamento profundo realista em cada nicho (conforme especificação) */
+.shelf-niche {
+  position: relative;
+  min-height: 0;
+  max-height: 100%;
+  background-color: #1c110b;
+  background-image: linear-gradient(
+    180deg,
+    #130b07 0%,
+    #1f130c 62%,
+    #170e09 100%
+  );
+  box-shadow:
+    inset 0 16px 26px rgba(0, 0, 0, 0.88),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.65),
+    inset 8px 0 16px rgba(0, 0, 0, 0.48),
+    inset -8px 0 16px rgba(0, 0, 0, 0.48);
+}
+
+/* 5. Lombada de livro com volume cilíndrico realista */
+.book-spine {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  max-height: 100%;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  border-radius: 2px 2px 1px 1px;
+  background-image: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.28) 0%,
+    rgba(255, 255, 255, 0.2) 22%,
+    rgba(0, 0, 0, 0) 76%,
+    rgba(0, 0, 0, 0.34) 100%
+  );
+  box-shadow:
+    -2px 0 5px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.38);
+  cursor: pointer;
+  user-select: none;
+  transform-origin: bottom center;
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+/* Frisos clássicos de encadernação no topo e na base da lombada */
+.book-spine::before,
+.book-spine::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  height: 1px;
+  background-color: currentColor;
+  opacity: 0.36;
+  pointer-events: none;
+}
+
+.book-spine::before {
+  top: 7px;
+}
+
+.book-spine::after {
+  bottom: 7px;
+}
+
+.book-spine:hover,
+.book-spine:focus-visible {
+  transform: translateY(-10px) scale(1.04);
+  filter: brightness(1.12);
+  box-shadow:
+    0 10px 18px rgba(0, 0, 0, 0.65),
+    0 -2px 12px rgba(255, 224, 166, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.48);
+  /* Explicit z-index so hovered spine is always above niche siblings */
+  z-index: 10;
+}
+
+.book-spine.is-leaning {
+  margin-left: 8px;
+  transform-origin: bottom left;
+  transform: rotate(7deg) translateY(1px);
+}
+
+.book-spine.is-leaning:hover,
+.book-spine.is-leaning:focus-visible {
+  transform: rotate(3deg) translateY(-10px) scale(1.04);
+  z-index: 20;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .book-spine,
+  .book-spine.is-leaning {
+    transition: none !important;
+  }
+
+  .book-spine:hover,
+  .book-spine:focus-visible {
+    transform: translateY(-4px);
+  }
+
+  .book-spine.is-leaning:hover,
+  .book-spine.is-leaning:focus-visible {
+    transform: rotate(4deg) translateY(-4px);
+  }
+}

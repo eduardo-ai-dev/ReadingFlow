@@ -1,0 +1,250 @@
+/* ==========================================================================
+   Tema 3: Escandinavo (Claro · Navegação clara + borda · Títulos sans 500-600)
+   Material da estante: Minimalista (carvalho claro)
+   Nota: cores de lombadas/capas de livros ficam fora do escopo dos tokens.
+   ========================================================================== */
+
+[data-theme="escandinavo"] {
+  color-scheme: light;
+
+  /* 1. Superfícies */
+  --rf-surface-canvas: #F5F6F4;
+  --rf-surface-desk: #ECEEEA;
+  --rf-surface-subtle: #E7EBE6;
+  --rf-surface-elevated: #FFFFFF;
+  --rf-surface-card: rgba(252, 252, 251, 0.94);
+  --rf-surface-card-solid: #FCFCFB;
+  --rf-surface-overlay: rgba(24, 34, 38, 0.56);
+  --rf-surface-contrast: #1F2A2E;
+  --rf-surface-contrast-elevated: #2A373C;
+  --rf-surface-contrast-hover: #35454B;
+  --rf-surface-header-translucent: rgba(252, 252, 251, 0.94);
+  --rf-surface-mobile-item: #ECEEEA;
+  --rf-surface-mobile-item-hover: #E1E6E2;
+
+  /* 1.1 Navegação clara + borda */
+  --rf-nav-bg: #FCFCFB;
+  --rf-nav-bg-marketing: #FCFCFB;
+  --rf-nav-bg-translucent: rgba(252, 252, 251, 0.96);
+  --rf-nav-surface: #ECEEEA;
+  --rf-nav-surface-alt: #E5E9E4;
+  --rf-nav-surface-elevated: #FCFCFB;
+  --rf-nav-surface-hover: #E5EAE6;
+  --rf-nav-border: #C5CECA;
+  --rf-nav-border-accent: rgba(47, 107, 107, 0.24);
+  --rf-nav-border-accent-hover: rgba(47, 107, 107, 0.52);
+  --rf-nav-border-accent-strong: rgba(47, 107, 107, 0.72);
+  --rf-nav-text: #1F2A2E;
+  --rf-nav-text-muted: #4A555B;
+  --rf-nav-text-marketing: #38444A;
+  --rf-nav-text-subtle: #566066;
+  --rf-nav-text-email: #4A555B;
+  --rf-nav-accent: #2F6B6B;
+  --rf-nav-accent-soft: #2F6B6B;
+  --rf-nav-accent-hover: #214F4F;
+  --rf-nav-accent-subtle: rgba(47, 107, 107, 0.14);
+  --rf-nav-accent-ring: rgba(47, 107, 107, 0.28);
+  --rf-nav-danger: #A63232;
+  --rf-nav-shadow: 0 2px 12px rgba(31, 42, 46, 0.06);
+  --rf-nav-shadow-scrolled: 0 6px 20px rgba(31, 42, 46, 0.1);
+  --rf-nav-popover-shadow: 0 12px 30px rgba(31, 42, 46, 0.14);
+  --rf-nav-toast-shadow: 0 14px 32px rgba(31, 42, 46, 0.18);
+  --rf-nav-modal-shadow: 0 20px 48px rgba(31, 42, 46, 0.22);
+  --rf-nav-pill-glow: 0 2px 8px rgba(47, 107, 107, 0.2);
+  --rf-nav-cta-shadow: 0 2px 8px rgba(47, 107, 107, 0.22);
+  --rf-nav-mobile-shadow: 0 12px 28px rgba(31, 42, 46, 0.12);
+
+  --rf-footer-bg-from: #ECEEEA;
+  --rf-footer-bg-via: #E7EBE7;
+  --rf-footer-bg-to: #E1E6E2;
+  --rf-footer-border: rgba(121, 132, 137, 0.32);
+  --rf-footer-inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --rf-footer-glow: radial-gradient(ellipse at top, rgba(47, 107, 107, 0.06) 0%, transparent 70%);
+
+  --rf-cursor-dot: #2F6B6B;
+  --rf-cursor-ring: rgba(47, 107, 107, 0.35);
+  --rf-cursor-ring-hover: rgba(47, 107, 107, 0.75);
+  --rf-cursor-glow: 0 0 6px rgba(47, 107, 107, 0.4);
+  --rf-cursor-ring-glow: 0 0 10px rgba(47, 107, 107, 0.2);
+
+  /* 2. Texto (WCAG AA >= 4.5:1 sobre #F5F6F4, #ECEEEA e #FCFCFB) */
+  --rf-text-primary: #1F2A2E;
+  --rf-text-heading: #1F2A2E;
+  --rf-text-secondary: #566066;
+  --rf-text-tertiary: #606B70; /* 5.05:1 em #F5F6F4 e 4.70:1 em #ECEEEA */
+  --rf-text-on-contrast: #F5F6F4;
+  --rf-text-on-contrast-muted: #B8D8D8;
+  --rf-text-accent-secondary: #2F6B6B;
+
+  /* 3. Destaques (Primário: Petróleo #2F6B6B / branco · Secundário: Barro #9C5238 / branco) */
+  --rf-accent-primary: #2F6B6B;
+  --rf-accent-primary-hover: #245555;
+  --rf-accent-primary-subtle: rgba(47, 107, 107, 0.12);
+  --rf-accent-on-primary: #FFFFFF;
+  --rf-accent-on-primary-muted: rgba(255, 255, 255, 0.88);
+
+  --rf-accent-secondary: #9C5238;
+  --rf-accent-secondary-hover: #81412B;
+  --rf-accent-secondary-subtle: rgba(156, 82, 56, 0.1);
+  --rf-accent-on-secondary: #FFFFFF;
+  --rf-accent-on-secondary-muted: rgba(255, 255, 255, 0.9);
+  --rf-accent-secondary-on-dark-hover: #B46042;
+
+  /* 4. Bordas e divisores (bordas de campo >= 3:1) */
+  --rf-border-default: rgba(121, 132, 137, 0.42);
+  --rf-border-subtle: rgba(121, 132, 137, 0.22);
+  --rf-border-strong: #798489; /* 3.54:1 em #F5F6F4 */
+  --rf-border-accent: #2F6B6B;
+  --rf-border-accent-soft: rgba(47, 107, 107, 0.35);
+  --rf-border-secondary: rgba(156, 82, 56, 0.55);
+  --rf-divider: rgba(121, 132, 137, 0.2);
+
+  /* 5. Estados semânticos (texto / fundo >= 4.5:1) */
+  --rf-status-success: #1F5B42;
+  --rf-status-success-bg: #DCECE4;
+  --rf-status-warning: #754C16;
+  --rf-status-warning-bg: #F4E9D6;
+  --rf-status-error: #9B2C2C;
+  --rf-status-error-bg: #F6DFDF;
+  --rf-status-info: #23506E;
+  --rf-status-info-bg: #DFECF5;
+
+  /* 6. Anel de foco (>= 3:1 sobre canvas e cards) */
+  --rf-focus-ring-color: #2F6B6B;
+  --rf-focus-ring: 0 0 0 2px #2F6B6B;
+  --rf-focus-ring-input: 0 0 0 4px rgba(47, 107, 107, 0.16);
+
+  /* 7. Sombras suaves & Raios generosos (card 16px / botão 12px) */
+  --rf-shadow-none: none;
+  --rf-shadow-xs: 0 1px 2px rgba(31, 42, 46, 0.05);
+  --rf-shadow-sm: 0 2px 6px rgba(31, 42, 46, 0.06);
+  --rf-shadow-md: 0 10px 24px -8px rgba(31, 42, 46, 0.12), 0 2px 6px rgba(31, 42, 46, 0.05);
+  --rf-shadow-lg: 0 14px 32px -10px rgba(31, 42, 46, 0.14);
+  --rf-shadow-card: 0 4px 18px -10px rgba(31, 42, 46, 0.08);
+  --rf-shadow-spotlight: 0 14px 32px -14px rgba(31, 42, 46, 0.3);
+
+  --rf-radius-xs: 6px;
+  --rf-radius-sm: 8px;
+  --rf-radius-md: 12px;
+  --rf-radius-lg: 16px;
+  --rf-radius-xl: 16px;
+  --rf-card-radius: 16px;
+
+  /* 8. Tipografia — Títulos SANS (peso 500–600) */
+  --rf-font-heading: var(--font-sans, system-ui, -apple-system, sans-serif);
+  --rf-font-heading-weight: 600;
+  --rf-font-body: var(--font-sans, system-ui, -apple-system, sans-serif);
+  --rf-font-numeric: var(--font-sans, system-ui, -apple-system, sans-serif);
+  --rf-font-mono: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  --rf-label-transform: uppercase;
+  --rf-label-tracking: 0.08em;
+
+  /* 9. Material da estante — Minimalista (carvalho claro) */
+  --rf-frame: #C8B498;
+  --rf-plank: #D5C1A3;
+  --rf-plank-top: #E6D7BE;
+  --rf-plank-top-mid: #DCC9AB;
+  --rf-plank-bevel: #B8A07E;
+  --rf-plank-light: #DFCEB3;
+  --rf-plank-deep: #BFA785;
+  --rf-back: #EAECE8;
+  --rf-line: rgba(121, 132, 137, 0.34);
+  --rf-spine-edge-highlight: rgba(31, 42, 46, 0.14);
+
+  /* 10. Paleta de gráficos — 6 cores categóricas (distinguíveis em daltonismo, ΔE >= 8.6) */
+  --rf-chart-1: #2F6B6B; /* Petróleo Nórdico */
+  --rf-chart-2: #A64B2A; /* Barro Escandinavo */
+  --rf-chart-3: #1B4978; /* Azul Fiorde */
+  --rf-chart-4: #D8A226; /* Âmbar Bétula */
+  --rf-chart-5: #6D438E; /* Urze */
+  --rf-chart-6: #4EA4C6; /* Gelo Claro */
+
+  /* 11. Escala sequencial de intensidade (5 passos — calendário) */
+  --rf-cal-0-bg: #F5F6F4;
+  --rf-cal-0-text: #566066;
+  --rf-cal-0-border: rgba(121, 132, 137, 0.35);
+
+  --rf-cal-1-bg: #DAE5E4;
+  --rf-cal-1-text: #1F2A2E;
+  --rf-cal-1-border: rgba(47, 107, 107, 0.32);
+
+  --rf-cal-2-bg: #B5CECD;
+  --rf-cal-2-text: #1F2A2E;
+  --rf-cal-2-border: rgba(47, 107, 107, 0.48);
+
+  --rf-cal-3-bg: #477E7E;
+  --rf-cal-3-text: #FFFFFF;
+  --rf-cal-3-border: #2F6B6B;
+
+  --rf-cal-4-bg: #2F6B6B;
+  --rf-cal-4-text: #FFFFFF;
+  --rf-cal-4-border: #214F4F;
+
+  /* 12. Compatibilidade com variáveis legadas */
+  --color-onyx: #1F2A2E;
+  --color-carbon-black: #2A373C;
+  --color-coffee-bean: #1F2A2E;
+  --color-charcoal-brown: #566066;
+  --color-camel: #2F6B6B;
+  --color-soft-fawn: #477E7E;
+  --color-wine-plum: #9C5238;
+  --color-hunter-green: #2F6B6B;
+  --color-slate-grey: #566066;
+  --color-soft-linen: #F5F6F4;
+  --color-silver: #606B70;
+
+  --espresso: #1F2A2E;
+  --reading: #2A373C;
+  --paper: #F5F6F4;
+  --gold: #2F6B6B;
+
+  --bg-canvas: var(--rf-surface-canvas);
+  --bg-surface: var(--rf-surface-subtle);
+  --bg-elevated: var(--rf-surface-elevated);
+  --bg-subtle: #E5E9E4;
+  --bg-contrast: var(--rf-surface-contrast);
+
+  --text-primary: var(--rf-text-primary);
+  --text-heading: var(--rf-text-heading);
+  --text-muted: var(--rf-text-secondary);
+
+  --accent-primary: var(--rf-accent-primary);
+  --accent-primary-hover: var(--rf-accent-primary-hover);
+  --on-primary: var(--rf-accent-on-primary);
+  --on-navy: var(--rf-accent-on-primary);
+  --accent-text: var(--rf-text-heading);
+  --accent-secondary: var(--rf-accent-secondary);
+  --accent-brass: var(--rf-accent-primary);
+  --accent-brass-decorative: var(--rf-accent-primary);
+  --accent-straw: #D5DCD8;
+
+  --accent-gold: var(--rf-accent-primary);
+  --accent-gold-hover: var(--rf-accent-primary-hover);
+  --accent-gold-text: var(--rf-accent-on-primary);
+  --accent-gold-border: rgba(47, 107, 107, 0.42);
+  --accent-gold-subtle: rgba(47, 107, 107, 0.14);
+  --focus-ring: var(--rf-focus-ring-color);
+
+  --status-ok: var(--rf-status-success);
+  --status-ok-bg: var(--rf-status-success-bg);
+  --status-warn: var(--rf-status-warning);
+  --status-warn-bg: var(--rf-status-warning-bg);
+  --status-error: var(--rf-status-error);
+  --status-error-bg: var(--rf-status-error-bg);
+
+  --border-ui: var(--rf-border-strong);
+  --border-subtle: #CDD5D1;
+  --shadow-card: var(--rf-shadow-sm);
+  --shadow-elevated: var(--rf-shadow-lg);
+  --shadow-btn-hover: var(--rf-shadow-md);
+  --ring-focus-gold: var(--rf-focus-ring);
+
+  --rf-card-bg: var(--rf-surface-card);
+  --rf-card-border: var(--rf-border-subtle);
+  --rf-card-shadow: var(--rf-shadow-card);
+
+  /* 13. Barra de rolagem (contraste >= 3:1 contra --scrollbar-track) */
+  --scrollbar-track: #ECEEEA;
+  --scrollbar-thumb: rgba(31, 42, 46, 0.55);
+  --scrollbar-thumb-hover: #2F6B6B;
+}

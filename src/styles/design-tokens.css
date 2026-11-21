@@ -1,0 +1,129 @@
+/* ==========================================================================
+   ReadingFlow · Design Tokens Semânticos (Estruturais + Temas)
+   Este arquivo define escalas estruturais (raios, espaçamentos/densidade,
+   movimento, tipografia e geometria) e importa os temas de variáveis.
+   Proibido declarar cores literais (hex/rgb/hsl) aqui: cores pertencem aos
+   arquivos em `src/styles/themes/*.css`.
+   ========================================================================== */
+
+@import "./themes/caderno.css";
+@import "./themes/dark-academia.css";
+@import "./themes/escandinavo.css";
+@import "./themes/gotico.css";
+
+:root {
+  /* Curvas e tempos de transição */
+  --ease-editorial: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 180ms;
+  --duration-normal: 220ms;
+
+  /* Escala de raios */
+  --rf-radius-xs: 4px;
+  --rf-radius-sm: 6px;
+  --rf-radius-md: 8px;
+  --rf-radius-lg: 12px;
+  --rf-radius-xl: 16px;
+  --rf-radius-full: 9999px;
+
+  /* Compatibilidade legada de raios */
+  --radius-sm: var(--rf-radius-xs);
+  --radius-md: var(--rf-radius-sm);
+  --radius-lg: 10px;
+
+  /* Escala de espaçamentos base (densidade padrão: comfortable) */
+  --rf-space-1: 4px;
+  --rf-space-2: 8px;
+  --rf-space-3: 12px;
+  --rf-space-4: 16px;
+  --rf-space-5: 20px;
+  --rf-space-6: 24px;
+  --rf-space-8: 32px;
+  --rf-space-12: 48px;
+
+  /* Dimensões de controles e cartões (ajustáveis por data-density) */
+  --rf-control-h-sm: 36px;
+  --rf-control-h-md: 40px;
+  --rf-control-h-lg: 44px;
+  --rf-control-px-sm: 12px;
+  --rf-control-px-md: 16px;
+  --rf-control-px-lg: 20px;
+  --rf-chip-px: 14px;
+  --rf-chip-py: 6px;
+
+  --rf-panel-max-width: 1360px;
+  --rf-panel-grid-gap: 24px;
+  --rf-panel-section-gap: 48px;
+
+  --rf-card-padding-sm: 20px;
+  --rf-card-padding: 24px;
+  --rf-card-radius: var(--rf-radius-xl);
+
+  /* Escala tipográfica */
+  --rf-type-page-title: clamp(1.875rem, 3.2vw, 2.75rem);
+  --rf-type-section-title: 1.25rem;
+  --rf-type-kpi: clamp(2rem, 3vw, 2.75rem);
+  --rf-type-label: 0.6875rem;
+  /* 11px caixa alta */
+  --rf-type-body: 0.875rem;
+  /* 14px */
+  --rf-type-caption: 0.8125rem;
+  /* 13px texto funcional mínimo */
+
+  /* Textura única de papel para todo o aplicativo */
+  --rf-paper-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='cotton'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23cotton)'/%3E%3C/svg%3E");
+}
+
+/* ==========================================================================
+   DENSIDADE (`data-density="compact" | "comfortable" | "spacious"`)
+   ========================================================================== */
+
+[data-density="compact"] {
+  --rf-control-h-sm: 32px;
+  --rf-control-h-md: 36px;
+  --rf-control-h-lg: 40px;
+  --rf-control-px-sm: 10px;
+  --rf-control-px-md: 12px;
+  --rf-control-px-lg: 16px;
+  --rf-chip-px: 10px;
+  --rf-chip-py: 4px;
+  --rf-card-padding-sm: 14px;
+  --rf-card-padding: 18px;
+  --rf-panel-grid-gap: 16px;
+  --rf-panel-section-gap: 32px;
+}
+
+[data-density="spacious"] {
+  --rf-control-h-sm: 40px;
+  --rf-control-h-md: 44px;
+  --rf-control-h-lg: 48px;
+  --rf-control-px-sm: 16px;
+  --rf-control-px-md: 20px;
+  --rf-control-px-lg: 24px;
+  --rf-chip-px: 18px;
+  --rf-chip-py: 8px;
+  --rf-card-padding-sm: 24px;
+  --rf-card-padding: 30px;
+  --rf-panel-grid-gap: 28px;
+  --rf-panel-section-gap: 56px;
+}
+
+/* ==========================================================================
+   MOVIMENTO (`data-motion="reduced"`)
+   ========================================================================== */
+
+[data-motion="reduced"] *,
+[data-motion="reduced"] *::before,
+[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Troca instantânea de tema sem flash nem defasagem de transição entre botões/links e superfícies */
+[data-theme-switching="true"] *,
+[data-theme-switching="true"] *::before,
+[data-theme-switching="true"] *::after {
+  transition-duration: 0ms !important;
+  animation-duration: 0ms !important;
+}

@@ -1,0 +1,2 @@
+/* Camada de compatibilidade: todos os tokens agora vivem em design-tokens.css e themes/*.css */
+@import "./design-tokens.css";

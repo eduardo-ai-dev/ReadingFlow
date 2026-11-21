@@ -1,0 +1,2138 @@
+/* ==========================================================================
+   ReadingFlow · VirtualBookshelf.module.css
+   Móvel único de biblioteca clássica em madeira com iluminação indireta:
+   - Paleta: Onyx var(--rf-onyx), Carbon Black var(--rf-carbon), Coffee Bean var(--rf-coffee),
+     Soft Linen var(--rf-linen), Camel var(--rf-camel), Soft Fawn var(--rf-fawn). Sem #FFF nem #000.
+   - Orçamento: máx. 3 camadas de gradiente/imagem por superfície, máx. 2 sombras
+     por elemento, blur <= 24px, sem backdrop-filter, will-change só no hover.
+   ========================================================================== */
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 4px 0 24px;
+  background-color: transparent;
+  color: var(--rf-text-primary);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.kicker {
+  margin: 0;
+  font-family: var(--rf-font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: var(--rf-label-tracking, 0.1em);
+  text-transform: var(--rf-label-transform, uppercase);
+  color: var(--rf-text-accent-secondary);
+}
+
+.heading {
+  margin: 4px 0 0;
+  font-family: var(--rf-font-heading);
+  font-size: 22px;
+  font-weight: var(--rf-font-heading-weight, 600);
+  line-height: 1.25;
+  color: var(--rf-text-heading);
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-family: var(--rf-font-body);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--rf-text-secondary);
+}
+
+.summaryPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--rf-radius-full);
+  border: 1px solid var(--rf-border-default);
+  background-color: var(--rf-surface-subtle);
+  font-family: var(--rf-font-body);
+  font-size: 12px;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.summaryHighlight {
+  font-weight: 700;
+  color: var(--rf-text-heading);
+}
+
+.summaryDivider {
+  width: 1px;
+  height: 12px;
+  background-color: var(--rf-divider);
+}
+
+.summaryMuted {
+  font-weight: 500;
+  color: var(--rf-text-secondary);
+}
+
+/* ==========================================================================
+   LAYOUT 2 COLUNAS (>= 1024px): ESTANTE FIXA ~640px + BOOKQUICKPANEL STICKY
+   ABAIXO DE 1024px: BOOKQUICKPANEL VIRA BARRA FIXA INFERIOR
+   ========================================================================== */
+.shelfLayoutWithPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 20px;
+  width: 100%;
+  padding-bottom: 92px;
+}
+
+@media (min-width: 1024px) {
+  .shelfLayoutWithPanel {
+    display: grid;
+    grid-template-columns: 640px minmax(280px, 1fr);
+    gap: 24px;
+    align-items: start;
+    padding-bottom: 0;
+  }
+}
+
+/* ==========================================================================
+   ARQUITETURA DE BIBLIOTECA (.bookcase) — Largura fixa ~640px igual em todas
+   as prateleiras, madeira quente e sombras internas suaves
+   ========================================================================== */
+.bookcase {
+  --wood-top-light: var(--rf-plank-top);
+  --wood-top-mid: var(--rf-plank-top-mid);
+  --wood-bevel: var(--rf-plank-bevel);
+  --wood-front-light: var(--rf-plank-light);
+  --wood-front-mid: var(--rf-plank);
+  --wood-front-deep: var(--rf-plank-deep);
+  --mm: clamp(1.04px, 0.038vw + 0.94px, 1.35px);
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  margin-inline: 0;
+  padding: 20px 14px 24px;
+  border-radius: var(--rf-card-radius);
+  border: 1px solid var(--rf-line);
+  background-color: var(--rf-back);
+  background-image:
+    radial-gradient(ellipse 68% 24% at 50% 0%, var(--rf-accent-primary-subtle), transparent 72%);
+  box-shadow:
+    inset 0 0 0 1px var(--rf-border-subtle),
+    var(--rf-shadow-card);
+  overflow: visible;
+  transform: perspective(1200px) rotateX(var(--shelf-rx, 0deg)) rotateY(var(--shelf-ry, 0deg));
+  transform-style: flat;
+  transition: transform 240ms ease-out;
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .bookcase {
+    padding: 22px 18px 26px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .bookcase {
+    width: 640px;
+    max-width: 640px;
+  }
+}
+
+:global([data-theme="dark-academia"]) .bookcase,
+:global([data-theme="gotico"]) .bookcase,
+:global([data-theme="dark"]) .bookcase,
+:global([data-theme="editorial-dark"]) .bookcase,
+:global([data-shelf-theme="dark"]) .bookcase {
+  border-color: var(--rf-line);
+  background-color: var(--rf-back);
+  box-shadow:
+    inset 0 1px 0 var(--rf-border-accent-soft),
+    var(--rf-shadow-lg);
+}
+
+:global([data-theme="gotico"]) .bookcase .shelfPlank {
+  border-top: 1.5px solid var(--rf-line);
+}
+
+:global([data-theme="dark-academia"]) .bookcase .shelfPlank {
+  border-top: 1px solid var(--rf-line);
+}
+
+.cornice {
+  display: none;
+}
+
+/* Coluna de prateleiras empilhadas com ~20px de espaçamento vertical */
+.shelvesColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.shelfSection {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding-bottom: 12px;
+  overflow: visible;
+}
+
+/* Fileira aberta sobre o fundo creme (sem nicho escuro) */
+.shelfTier {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  background: transparent;
+  box-shadow: none;
+}
+
+.shelfScroller {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  overflow: visible;
+  padding: 0;
+}
+
+@media (max-width: 640px) {
+  .shelfScroller {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  .shelfTrack {
+    min-width: max-content;
+  }
+}
+
+.shelfScroller:focus-visible {
+  outline: 2px solid var(--rf-camel);
+  outline-offset: 2px;
+}
+
+.shelfTrack {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Altura da fileira = livro mais alto + 14px; padding-inline de 12px faz a tábua avançar ~12px além dos livros */
+.booksRow {
+  --mm: clamp(1.04px, 0.038vw + 0.94px, 1.35px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: var(--books-gap, 3px);
+  height: calc(var(--row-h, 196px) * var(--rf-shelf-scale, 1));
+  list-style: none;
+  margin: 0;
+  padding: 0 12px;
+  width: 100%;
+  box-sizing: border-box;
+  perspective: 1100px;
+  perspective-origin: 50% 88%;
+}
+
+/* ==========================================================================
+   TÁBUA DA PRATELEIRA (.shelfPlank ~16px: face superior marrom clara + frente
+   marrom escura quente com veio sutil + ruído do tile compartilhado --rf-paper-tile)
+   ========================================================================== */
+.shelfPlank {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  width: 100%;
+  height: 16px;
+  background-color: var(--wood-front-mid);
+  background-image:
+    var(--rf-paper-tile),
+    repeating-linear-gradient(180deg,
+      rgba(246, 228, 200, 0.06) 0px,
+      rgba(246, 228, 200, 0.06) 1.5px,
+      transparent 1.5px,
+      transparent 3.5px,
+      rgba(42, 22, 10, 0.09) 3.5px,
+      rgba(42, 22, 10, 0.09) 5px),
+    linear-gradient(90deg,
+      rgba(52, 29, 14, 0.14) 0%,
+      rgba(246, 228, 200, 0.08) 24%,
+      rgba(52, 29, 14, 0.06) 52%,
+      rgba(246, 228, 200, 0.07) 78%,
+      rgba(52, 29, 14, 0.15) 100%),
+    linear-gradient(180deg,
+      var(--wood-top-light) 0px,
+      var(--wood-top-mid) 5px,
+      var(--wood-bevel) 5.5px,
+      var(--wood-front-light) 7px,
+      var(--wood-front-mid) 13px,
+      var(--wood-front-deep) 100%);
+  background-blend-mode: soft-light, normal, normal, normal;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(246, 228, 200, 0.44),
+    inset 0 -1px 0 rgba(42, 22, 10, 0.34),
+    0 8px 16px -4px rgba(56, 33, 18, 0.28),
+    0 3px 6px -2px rgba(56, 33, 18, 0.16);
+}
+
+/* Dois suportes triangulares visíveis sob as pontas da tábua em madeira quente */
+.shelfBracket {
+  position: absolute;
+  top: 100%;
+  width: 18px;
+  height: 13px;
+  background: linear-gradient(180deg, var(--wood-front-mid) 0%, var(--wood-front-deep) 100%);
+  filter: drop-shadow(0 3px 4px rgba(56, 33, 18, 0.22));
+  pointer-events: none;
+}
+
+.shelfBracketLeft {
+  left: 18px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
+.shelfBracketRight {
+  right: 18px;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+/* ==========================================================================
+   APARADOR DE LIVROS EM L (.bookendSlot) — CSS puro, Coffee Bean + latão
+   ========================================================================== */
+.bookendSlot {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-end;
+  width: 36px;
+  height: calc(114px * var(--rf-shelf-scale, 1));
+  margin-left: 1px;
+  flex: 0 0 36px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.bookendUpright {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 11px;
+  height: 100%;
+  border-radius: 2px 3px 0 0;
+  background: linear-gradient(90deg,
+      #3A2D27 0%,
+      var(--rf-coffee, #2C221E) 52%,
+      #1B1411 100%);
+  box-shadow:
+    inset 1px 0 0 rgba(223, 190, 136, 0.32),
+    inset 0 1px 0 rgba(223, 190, 136, 0.28),
+    2px 0 6px rgba(20, 21, 20, 0.22);
+}
+
+.bookendBrassTrim {
+  position: absolute;
+  top: 10px;
+  bottom: 12px;
+  left: 4px;
+  width: 2.5px;
+  border-radius: 999px;
+  background: linear-gradient(180deg,
+      var(--rf-fawn, #DFBE88) 0%,
+      var(--rf-camel, #C8A46E) 55%,
+      #9C7A47 100%);
+  box-shadow: 0 0 3px rgba(200, 164, 110, 0.45);
+}
+
+.bookendFoot {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 2;
+  display: block;
+  width: 36px;
+  height: 7px;
+  border-radius: 1px 3px 1px 1px;
+  background: linear-gradient(180deg,
+      var(--rf-camel, #C8A46E) 0%,
+      #9B7B49 32%,
+      var(--rf-coffee, #2C221E) 36%,
+      #1B1411 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(244, 239, 230, 0.35),
+    2px 2px 5px rgba(20, 21, 20, 0.28);
+}
+
+.bookendShadow {
+  position: absolute;
+  left: -2px;
+  bottom: -2px;
+  z-index: 1;
+  width: 40px;
+  height: 4px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 38% 50%,
+      rgba(20, 21, 20, 0.32) 0%,
+      rgba(20, 21, 20, 0.12) 55%,
+      transparent 80%);
+}
+
+/* ==========================================================================
+   ESTILOS DE ESTANTE (data-shelf-material)
+   - classic-wood (padrão): Madeira escura nogueira com suportes clássicos
+   - minimal-modern: Grafite contemporâneo (#141514 / #1E1F1E) de linha fina
+   - editorial-bordeaux: Bordô editorial (#722F3E) com filetes dourados (#C4A77D)
+   ========================================================================== */
+
+/* 1. Minimalista / Moderna */
+.bookcase[data-shelf-material="minimal-modern"] .shelfPlank {
+  height: 10px;
+  background-color: #141514;
+  background-image: linear-gradient(180deg,
+      #2E302E 0px,
+      #1E1F1E 2.5px,
+      #141514 100%);
+  border-radius: 1px;
+  box-shadow:
+    inset 0 1px 0 rgba(244, 239, 230, 0.14),
+    0 5px 12px rgba(20, 21, 20, 0.2);
+}
+
+.bookcase[data-shelf-material="minimal-modern"] .shelfBracket {
+  width: 10px;
+  height: 8px;
+  background: #1E1F1E;
+  clip-path: none;
+  border-radius: 0 0 2px 2px;
+  box-shadow: 0 2px 4px rgba(20, 21, 20, 0.22);
+}
+
+.bookcase[data-shelf-material="minimal-modern"] .bookendUpright {
+  width: 9px;
+  border-radius: 1px 1px 0 0;
+  background: linear-gradient(90deg, #272927 0%, #141514 60%, #0E0F0E 100%);
+  box-shadow:
+    inset 1px 0 0 rgba(244, 239, 230, 0.16),
+    2px 0 5px rgba(20, 21, 20, 0.2);
+}
+
+.bookcase[data-shelf-material="minimal-modern"] .bookendBrassTrim {
+  width: 1.5px;
+  left: 3.5px;
+  background: linear-gradient(180deg, #8E918E 0%, #4E514E 100%);
+  box-shadow: none;
+}
+
+.bookcase[data-shelf-material="minimal-modern"] .bookendFoot {
+  height: 5px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, #2E302E 0%, #141514 100%);
+}
+
+/* 2. Editorial Bordô (#722F3E + detalhes dourados #C4A77D / #D4AF37) */
+.bookcase[data-shelf-material="editorial-bordeaux"] .shelfPlank {
+  height: 16px;
+  background-color: #722F3E;
+  background-image:
+    var(--rf-paper-tile),
+    linear-gradient(180deg,
+      #8D4052 0px,
+      #722F3E 5px,
+      #59212E 5.5px,
+      #3E151F 100%);
+  background-blend-mode: soft-light, normal;
+  border-top: 1.5px solid #C4A77D;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 -1px 0 rgba(212, 175, 55, 0.32),
+    0 6px 16px rgba(62, 21, 31, 0.28);
+}
+
+.bookcase[data-shelf-material="editorial-bordeaux"] .shelfBracket {
+  background: linear-gradient(180deg, #722F3E 0%, #3E151F 100%);
+  border-top: 1px solid rgba(196, 167, 125, 0.55);
+}
+
+.bookcase[data-shelf-material="editorial-bordeaux"] .bookendUpright {
+  background: linear-gradient(90deg, #8A3C4E 0%, #722F3E 52%, #471A25 100%);
+  box-shadow:
+    inset 1px 0 0 rgba(212, 175, 55, 0.48),
+    inset 0 1px 0 rgba(212, 175, 55, 0.4),
+    2px 0 6px rgba(62, 21, 31, 0.24);
+}
+
+.bookcase[data-shelf-material="editorial-bordeaux"] .bookendBrassTrim {
+  background: linear-gradient(180deg, #E7C983 0%, #D4AF37 52%, #B59249 100%);
+  box-shadow: 0 0 4px rgba(212, 175, 55, 0.55);
+}
+
+.bookcase[data-shelf-material="editorial-bordeaux"] .bookendFoot {
+  background: linear-gradient(180deg,
+      #D4AF37 0%,
+      #C4A77D 34%,
+      #722F3E 38%,
+      #3E151F 100%);
+}
+
+.bookcase[data-shelf-material="editorial-bordeaux"] .colorDotsPill,
+.bookcase[data-shelf-material="editorial-bordeaux"] .categoryPill,
+.bookcase[data-shelf-material="editorial-bordeaux"] .shelfActionGroup {
+  border-color: rgba(114, 47, 62, 0.28);
+  box-shadow:
+    0 1px 3px rgba(62, 21, 31, 0.1),
+    inset 0 1px 0 rgba(212, 175, 55, 0.25);
+}
+
+.shelfCaption {
+  display: none;
+}
+
+.plankLip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  width: 100%;
+}
+
+.genreLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  color: var(--rf-linen);
+}
+
+.genreDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  transform: rotate(45deg);
+  background: linear-gradient(135deg, var(--rf-fawn) 0%, var(--rf-camel) 100%);
+  flex-shrink: 0;
+}
+
+.genreCount {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--rf-fawn);
+}
+
+/* Botão secundário contornado; Camel apenas no hover/foco, transição <= 180ms */
+.addInGenreLink {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-height: 24px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid rgb(244 239 230 / 0.42);
+  background-color: transparent;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--rf-linen);
+  text-decoration: none;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.addInGenreLink:hover {
+  border-color: var(--rf-camel);
+  color: var(--rf-onyx);
+  background-color: var(--rf-camel);
+}
+
+.addInGenreLink:focus-visible {
+  border-color: var(--rf-camel);
+  color: var(--rf-onyx);
+  background-color: var(--rf-camel);
+  outline: 2px solid var(--rf-camel);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   BARRA DE INSPEÇÃO / ACESSO RÁPIDO DO LIVRO SELECIONADO
+   ========================================================================== */
+.inspectorBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding: 16px 20px;
+  border-radius: 10px;
+  border: 1px solid rgb(200 164 110 / 0.32);
+  background:
+    radial-gradient(ellipse 70% 100% at 50% 0%,
+      rgb(255 176 100 / 0.08) 0%,
+      transparent 72%),
+    linear-gradient(180deg, var(--rf-coffee) 0%, var(--rf-carbon) 100%);
+  box-shadow: 0 10px 22px rgb(20 21 20 / 0.55);
+}
+
+.inspectorGenre {
+  margin: 0;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--rf-fawn);
+}
+
+.inspectorTitle {
+  margin: 3px 0 0;
+  font-family: var(--font-serif, "Playfair Display", Georgia, serif);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--rf-linen);
+}
+
+.inspectorMeta {
+  margin: 4px 0 0;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12.5px;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--rf-fawn);
+}
+
+.inspectorActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.primaryActionBtn {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border-radius: 6px;
+  background-color: var(--rf-camel);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--rf-onyx);
+  text-decoration: none;
+  transition: background-color 160ms ease;
+}
+
+.primaryActionBtn:hover {
+  background-color: var(--rf-fawn);
+}
+
+.primaryActionBtn:focus-visible {
+  outline: 2px solid var(--rf-camel);
+  outline-offset: 2px;
+}
+
+.secondaryActionBtn {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 1.5px solid var(--rf-camel);
+  background-color: transparent;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rf-linen);
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.secondaryActionBtn:hover {
+  background-color: rgb(200 164 110 / 0.16);
+  border-color: var(--rf-fawn);
+}
+
+.secondaryActionBtn:focus-visible {
+  outline: 2px solid var(--rf-camel);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .wrapper {
+    padding: 14px;
+  }
+
+  .shelvesColumn {
+    border-inline-width: 6px;
+    border-bottom-width: 6px;
+  }
+
+  .shelfScroller {
+    padding-inline: 12px;
+  }
+
+  .shelfPlank {
+    padding-inline: 12px;
+  }
+}
+
+/* ==========================================================================
+   LIVROS FANTASMA (Placeholders translúcidos var(--rf-coffee) @ 0.15)
+   ========================================================================== */
+.ghostSlot {
+  position: relative;
+  flex: 0 0 clamp(18px, calc(var(--ghost-w, 23) * 1.1px), 34px);
+  width: clamp(18px, calc(var(--ghost-w, 23) * 1.1px), 34px);
+  height: clamp(162px, calc(var(--ghost-h, 206) * 0.88px), 194px);
+  scroll-snap-align: start;
+}
+
+.ghostBook {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px 2px 1px 1px;
+  text-decoration: none;
+  color: var(--rf-fawn);
+}
+
+.ghostBook:focus-visible {
+  outline: 2px solid var(--rf-camel);
+  outline-offset: 2px;
+}
+
+.ghostSilhouette {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-color: var(--rf-coffee);
+  opacity: 0.15;
+  border: 1px dashed rgb(200 164 110 / 0.26);
+  box-shadow: inset 0 1px 4px rgb(20 21 20 / 0.45);
+  transition:
+    opacity 180ms ease-out,
+    border-color 180ms ease-out,
+    transform 180ms ease-out;
+}
+
+.ghostBook:hover .ghostSilhouette,
+.ghostBook:focus-visible .ghostSilhouette {
+  opacity: 0.36;
+  border-color: rgb(200 164 110 / 0.68);
+  transform: translateY(-2px);
+}
+
+.ghostPlus {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--rf-fawn);
+  opacity: 0.28;
+  transition: opacity 180ms ease-out;
+}
+
+.ghostBook:hover .ghostPlus,
+.ghostBook:focus-visible .ghostPlus {
+  opacity: 1;
+}
+
+.ghostLabel {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgb(200 164 110 / 0.55);
+  background-color: var(--rf-onyx);
+  color: var(--rf-fawn);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 8px 18px rgb(20 21 20 / 0.78);
+  transition: opacity 160ms ease-out, transform 160ms ease-out;
+}
+
+.ghostSlot:last-child .ghostLabel,
+.ghostSlot:nth-last-child(2) .ghostLabel {
+  left: auto;
+  right: 0;
+  transform: translateX(0) translateY(4px);
+}
+
+.ghostBook:hover .ghostLabel,
+.ghostBook:focus-visible .ghostLabel {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.ghostSlot:last-child .ghostBook:hover .ghostLabel,
+.ghostSlot:nth-last-child(2) .ghostBook:hover .ghostLabel,
+.ghostSlot:last-child .ghostBook:focus-visible .ghostLabel,
+.ghostSlot:nth-last-child(2) .ghostBook:focus-visible .ghostLabel {
+  transform: translateX(0) translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bookcase {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .ghostSilhouette,
+  .ghostPlus,
+  .ghostLabel {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   PAINEL DE FILTROS RÁPIDOS & COMPACTAÇÃO DINÂMICA
+   ========================================================================== */
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+
+.filterPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 1px solid rgb(200 164 110 / 0.34);
+  background-color: var(--rf-carbon);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rf-linen);
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.filterPill:hover {
+  border-color: var(--rf-camel);
+  background-color: var(--rf-coffee);
+}
+
+.filterPill:focus-visible {
+  outline: 2px solid var(--rf-camel);
+  outline-offset: 2px;
+}
+
+.filterPillActive {
+  border-color: var(--rf-camel);
+  background-color: var(--rf-camel);
+  color: var(--rf-onyx);
+}
+
+.filterPillActive:hover {
+  background-color: var(--rf-fawn);
+  border-color: var(--rf-fawn);
+}
+
+.filterCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background-color: rgb(20 21 20 / 0.38);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--rf-fawn);
+}
+
+.filterPillActive .filterCount {
+  background-color: rgb(20 21 20 / 0.16);
+  color: var(--rf-onyx);
+}
+
+.bookcaseCompact {
+  max-width: 640px;
+}
+
+.filterEmptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 36px 20px;
+  border-radius: 10px;
+  border: 1px dashed rgb(200 164 110 / 0.35);
+  background-color: var(--rf-onyx);
+  text-align: center;
+}
+
+.filterEmptyText {
+  margin: 0;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 13px;
+  color: var(--rf-linen);
+}
+
+.filterResetBtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--rf-camel);
+  background-color: transparent;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rf-fawn);
+  cursor: pointer;
+}
+
+.filterResetBtn:hover {
+  background-color: rgb(200 164 110 / 0.16);
+}
+
+.filterResetBtn:focus-visible {
+  outline: 2px solid var(--rf-camel);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   CABEÇALHO DE PRATELEIRA (PILL BADGES: BOLINHAS DE CORES 12px + TAG CATEGORIA)
+   ========================================================================== */
+.shelfHeaderRail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 0 4px 4px;
+  background-color: transparent;
+  border: none;
+}
+
+.shelfHeaderBadges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.colorDotsPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 11px;
+  border-radius: var(--rf-radius-full);
+  border: 1px solid var(--rf-border-default);
+  background-color: var(--rf-surface-card-solid);
+  box-shadow: var(--rf-shadow-xs);
+}
+
+.colorDotItem {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--rf-border-default);
+  flex-shrink: 0;
+}
+
+.categoryPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: var(--rf-radius-full);
+  border: 1px solid var(--rf-border-default);
+  background-color: var(--rf-surface-card-solid);
+  font-family: var(--rf-font-body);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--rf-text-heading);
+  box-shadow: var(--rf-shadow-xs);
+}
+
+.categoryPillCount {
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--rf-text-secondary);
+}
+
+.categoryEditBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  margin-right: -4px;
+  border-radius: var(--rf-radius-full);
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: var(--rf-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.categoryEditBtn:hover {
+  background-color: var(--rf-surface-subtle);
+  border-color: var(--rf-border-default);
+  color: var(--rf-text-primary);
+}
+
+.categoryEditBtn:focus-visible {
+  outline: 2px solid var(--rf-focus-ring-color);
+  outline-offset: 2px;
+}
+
+.shelfHeaderEditPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 18px;
+  background-color: var(--rf-carbon);
+  border-bottom: 1px solid rgb(200 164 110 / 0.25);
+}
+
+.shelfEditRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.shelfEditInput {
+  min-width: 190px;
+  flex: 1 1 220px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid rgb(200 164 110 / 0.45);
+  background-color: var(--rf-onyx);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12.5px;
+  color: var(--rf-linen);
+}
+
+.shelfEditInput:focus-visible {
+  outline: 2px solid var(--rf-camel);
+  outline-offset: 1px;
+}
+
+.colorPresetBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgb(200 164 110 / 0.3);
+  background-color: var(--rf-carbon);
+  color: var(--rf-linen);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.colorPresetBtnActive {
+  border-color: var(--rf-camel);
+  background-color: rgb(200 164 110 / 0.2);
+}
+
+.colorPresetBtn:focus-visible,
+.shelfSuggestionChip:focus-visible {
+  outline: 2px solid var(--rf-camel);
+  outline-offset: 2px;
+}
+
+.shelfSuggestionChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgb(244 239 230 / 0.22);
+  background-color: var(--rf-onyx);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  color: var(--rf-linen);
+  cursor: pointer;
+}
+
+.shelfSuggestionChip:hover {
+  border-color: var(--rf-camel);
+  color: var(--rf-linen);
+}
+
+/* ==========================================================================
+   MODO "ARRUMAR ESTANTE" INTEGRADO À PRÓPRIA ESTANTE DE MADEIRA
+   ========================================================================== */
+.organizeBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid rgb(200 164 110 / 0.42);
+  background-color: var(--rf-carbon);
+}
+
+.organizeBannerText {
+  margin: 0;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--rf-linen);
+}
+
+.organizeBannerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.shelfSectionDropActive .shelfTier {
+  box-shadow:
+    inset 0 0 0 2px rgb(200 164 110 / 0.72),
+    inset 0 14px 20px rgb(20 21 20 / 0.72);
+}
+
+.organizeQuickMoveStrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid rgb(200 164 110 / 0.22);
+  background-color: var(--rf-onyx);
+}
+
+.organizeMoveLabel {
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rf-fawn);
+}
+
+.organizeMoveControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.organizeShelfSelect {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid rgb(200 164 110 / 0.45);
+  background-color: var(--rf-onyx);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12px;
+  color: var(--rf-linen);
+}
+
+.organizeMiniBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid rgb(200 164 110 / 0.4);
+  background-color: var(--rf-carbon);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--rf-linen);
+  cursor: pointer;
+}
+
+.organizeMiniBtn:hover {
+  border-color: var(--rf-camel);
+  background-color: var(--rf-coffee);
+}
+
+.organizeMiniBtn:focus-visible,
+.organizeShelfSelect:focus-visible {
+  outline: 2px solid var(--rf-camel);
+  outline-offset: 2px;
+}
+
+
+/* ==========================================================================
+   MODO EDIÇÃO ("Arrumar estante") — mesma cena, controles extras
+   ========================================================================== */
+.headerActionsPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgb(44 34 30 / 0.14);
+  background-color: rgb(221 214 198 / 0.86);
+  box-shadow: 0 1px 2px rgb(20 21 20 / 0.08);
+}
+
+:global([data-shelf-theme="dark"]) .headerActionsPill {
+  border-color: rgb(200 164 110 / 0.3);
+  background-color: var(--rf-carbon);
+}
+
+.headerIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--rf-coffee);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+:global([data-shelf-theme="dark"]) .headerIconBtn {
+  color: var(--rf-fawn);
+}
+
+.headerIconBtn:hover:not(:disabled) {
+  background-color: rgb(44 34 30 / 0.1);
+  color: var(--rf-onyx);
+}
+
+:global([data-shelf-theme="dark"]) .headerIconBtn:hover:not(:disabled) {
+  background-color: rgb(200 164 110 / 0.18);
+  color: var(--rf-linen);
+}
+
+.headerIconBtn:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.headerIconBtn:focus-visible,
+.dotsSortBtn:focus-visible,
+.addRoundBtn:focus-visible,
+.confirmDeleteBtn:focus-visible,
+.cancelDeleteBtn:focus-visible {
+  outline: 2px solid var(--rf-camel);
+  outline-offset: 2px;
+}
+
+.dotsSortBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 3px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.confirmDeleteBtn {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--rf-camel);
+  background-color: var(--rf-camel);
+  color: var(--rf-onyx);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cancelDeleteBtn {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgb(244 239 230 / 0.35);
+  background: transparent;
+  color: var(--rf-linen);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addRoundSlot {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  flex: 0 0 auto;
+  margin-left: 10px;
+  list-style: none;
+}
+
+.addRoundBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgb(200 164 110 / 0.5);
+  background-color: var(--rf-linen);
+  color: var(--rf-onyx);
+  box-shadow: 0 2px 6px rgb(20 21 20 / 0.5);
+  cursor: pointer;
+  transition: transform 150ms ease;
+}
+
+.addRoundBtn:hover {
+  transform: scale(1.06);
+}
+
+/* ==========================================================================
+   BOOKQUICKPANEL — Ficha rápida sticky à direita (>= 1024px) e barra fixa
+   inferior compacta (< 1024px)
+   ========================================================================== */
+.quickPanel {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: 60px;
+  z-index: 40;
+  border-radius: var(--rf-card-radius);
+  border: 1px solid var(--rf-border-default);
+  background-color: var(--rf-surface-card-solid);
+  color: var(--rf-text-primary);
+  box-shadow: var(--rf-shadow-lg);
+}
+
+.quickPanelDesktop {
+  display: none;
+}
+
+.quickPanelMobile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+}
+
+.quickPanelMobileInfo {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.quickPanelMobileTitle {
+  margin: 0;
+  font-family: var(--rf-font-heading);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--rf-text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quickPanelMobileMeta {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--rf-font-body);
+  font-size: 11px;
+  color: var(--rf-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quickPanelMobileActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.quickPanelMobileBtnPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 11px;
+  border-radius: var(--rf-radius-md);
+  background-color: var(--rf-accent-secondary);
+  color: var(--rf-accent-on-secondary);
+  font-family: var(--rf-font-body);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.quickPanelMobileBtnSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border-default);
+  background-color: var(--rf-surface-subtle);
+  color: var(--rf-text-primary);
+  font-family: var(--rf-font-body);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+@media (min-width: 1024px) {
+  .quickPanel {
+    position: sticky;
+    top: 84px;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    z-index: 20;
+    border-radius: var(--rf-card-radius);
+    box-shadow: var(--rf-shadow-card);
+  }
+
+  .quickPanelMobile {
+    display: none;
+  }
+
+  .quickPanelDesktop {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 22px 22px 24px;
+  }
+}
+
+.quickPanelTopMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--rf-divider);
+  padding-bottom: 12px;
+}
+
+.quickPanelKicker {
+  font-family: var(--rf-font-body);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: var(--rf-label-tracking, 0.14em);
+  text-transform: var(--rf-label-transform, uppercase);
+  color: var(--rf-text-accent-secondary);
+}
+
+.quickPanelStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--rf-radius-full);
+  border: 1px solid var(--rf-border-default);
+  background-color: var(--rf-surface-subtle);
+  font-family: var(--rf-font-body);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rf-text-primary);
+}
+
+.quickPanelStatusReading {
+  border-color: var(--rf-border-accent);
+  background-color: var(--rf-status-warning-bg);
+  color: var(--rf-status-warning);
+}
+
+.quickPanelStatusFinished {
+  border-color: var(--rf-status-success);
+  background-color: var(--rf-status-success-bg);
+  color: var(--rf-status-success);
+}
+
+.quickPanelCoverWrap {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 2px;
+}
+
+.quickPanelIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.quickPanelTitle {
+  margin: 0;
+  font-family: var(--rf-font-heading);
+  font-size: 21px;
+  font-weight: var(--rf-font-heading-weight, 600);
+  line-height: 1.22;
+  color: var(--rf-text-heading);
+  text-wrap: balance;
+}
+
+.quickPanelAuthor {
+  margin: 0;
+  font-family: var(--rf-font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--rf-text-accent-secondary);
+}
+
+.quickPanelSubmeta {
+  margin: 2px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--rf-font-body);
+  font-size: 11.5px;
+  color: var(--rf-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.quickPanelProgressBox {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 14px;
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-border-subtle);
+  background-color: var(--rf-surface-canvas);
+}
+
+.quickPanelProgressHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quickPanelProgressLabel {
+  font-family: var(--rf-font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: var(--rf-label-tracking, 0.08em);
+  text-transform: var(--rf-label-transform, uppercase);
+  color: var(--rf-text-secondary);
+}
+
+.quickPanelProgressValue {
+  font-family: var(--rf-font-numeric);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--rf-text-accent-secondary);
+}
+
+.quickPanelGoldTrack {
+  width: 100%;
+  height: 7px;
+  border-radius: var(--rf-radius-full);
+  background-color: var(--rf-surface-subtle);
+  overflow: hidden;
+}
+
+.quickPanelGoldFill {
+  height: 100%;
+  border-radius: var(--rf-radius-full);
+  background-color: var(--rf-accent-primary);
+  transition: width 260ms ease-out;
+}
+
+.quickPanelError {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--rf-radius-md);
+  border: 1px solid var(--rf-status-error);
+  background-color: var(--rf-status-error-bg);
+  color: var(--rf-status-error);
+  font-family: var(--rf-font-body);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.quickPanelActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.quickPanelBtnPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--rf-radius-md);
+  background-color: var(--rf-accent-secondary);
+  color: var(--rf-accent-on-secondary);
+  font-family: var(--rf-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 160ms ease;
+}
+
+.quickPanelBtnPrimary:hover {
+  background-color: var(--rf-accent-secondary-hover);
+}
+
+.quickPanelBtnPrimary:focus-visible,
+.quickPanelBtnSecondary:focus-visible,
+.quickPanelMobileBtnPrimary:focus-visible,
+.quickPanelMobileBtnSecondary:focus-visible {
+  outline: 2px solid var(--rf-focus-ring-color);
+  outline-offset: 2px;
+}
+
+.quickPanelBtnSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--rf-radius-md);
+  border: 1.5px solid var(--rf-border-secondary);
+  background-color: var(--rf-surface-canvas);
+  color: var(--rf-text-heading);
+  font-family: var(--rf-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.quickPanelBtnSecondary:hover:not(:disabled) {
+  border-color: var(--rf-accent-secondary);
+  background-color: var(--rf-surface-subtle);
+}
+
+.quickPanelBtnSecondary:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* ==========================================================================
+   ESTÚDIO DE PERSONALIZAÇÃO DA ESTANTE (5 materiais, 3 suportes, 5 fundos,
+   LED 3000K, Spots Superiores, Densidade, Capas de Frente, Inclinados & Objetos)
+   ========================================================================== */
+
+/* --- 1. Materiais da tábua (5 acabamentos físicos) --- */
+.bookcase[data-shelf-material-v2="nogueira"] {
+  --wood-top-light: #7c563a;
+  --wood-top-mid: #614029;
+  --wood-bevel: #3a2417;
+  --wood-front-light: #563825;
+  --wood-front-mid: #3e2618;
+  --wood-front-deep: #25150c;
+}
+
+.bookcase[data-shelf-material-v2="carvalho"] {
+  --wood-top-light: #d7b484;
+  --wood-top-mid: #c09866;
+  --wood-bevel: #8b653c;
+  --wood-front-light: #b68c58;
+  --wood-front-mid: #9a7142;
+  --wood-front-deep: #6e4e2a;
+}
+
+.bookcase[data-shelf-material-v2="grafite"] {
+  --wood-top-light: #444744;
+  --wood-top-mid: #323532;
+  --wood-bevel: #1c1e1c;
+  --wood-front-light: #2d302d;
+  --wood-front-mid: #1e201e;
+  --wood-front-deep: #121412;
+}
+
+.bookcase[data-shelf-material-v2="bordo"] {
+  --wood-top-light: #933c4c;
+  --wood-top-mid: #782b3a;
+  --wood-bevel: #491620;
+  --wood-front-light: #6e2230;
+  --wood-front-mid: #531723;
+  --wood-front-deep: #340c14;
+}
+
+.bookcase[data-shelf-material-v2="bordo"] .shelfPlank {
+  border-top: 1px solid rgba(212, 175, 122, 0.55);
+}
+
+.bookcase[data-shelf-material-v2="pedra"] {
+  --wood-top-light: #e7dfd1;
+  --wood-top-mid: #d7ccbc;
+  --wood-bevel: #aba08f;
+  --wood-front-light: #cfc4b3;
+  --wood-front-mid: #b9ad9b;
+  --wood-front-deep: #8c8170;
+}
+
+.bookcase[data-shelf-material-v2="pedra"] .shelfPlank {
+  background-blend-mode: multiply, normal, normal, normal;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 245, 0.72),
+    inset 0 -1px 0 rgba(88, 78, 65, 0.35),
+    0 5px 12px rgba(34, 28, 22, 0.16);
+}
+
+/* --- 2. Suportes / Mãos-francesas (3 estilos) --- */
+.bookcase[data-shelf-brackets="classico"] .shelfBracket {
+  background: linear-gradient(180deg, #3c342e 0%, #241e1a 100%);
+  border-color: rgba(244, 239, 230, 0.14);
+}
+
+.bookcase[data-shelf-brackets="dourado"] .shelfBracket {
+  background: linear-gradient(180deg, #e0c187 0%, #b58d4d 55%, #7c5c2b 100%);
+  border-color: rgba(255, 242, 212, 0.45);
+  box-shadow: 0 3px 6px rgba(24, 16, 8, 0.32);
+}
+
+.bookcase[data-shelf-brackets="flutuante"] .shelfBracket {
+  display: none;
+}
+
+.bookcase[data-shelf-brackets="flutuante"] .shelfPlank {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 248, 238, 0.3),
+    0 9px 18px rgba(20, 16, 12, 0.24);
+}
+
+/* --- 3. Fundos de nicho (5 acabamentos) --- */
+.bookcase[data-shelf-backdrop="madeira"] {
+  background-color: #462f22;
+  background-image:
+    repeating-linear-gradient(90deg,
+      rgba(255, 232, 200, 0.035) 0px,
+      rgba(255, 232, 200, 0.035) 2px,
+      transparent 2px,
+      transparent 26px),
+    radial-gradient(ellipse 74% 32% at 50% 0%, rgba(212, 165, 108, 0.16), transparent 72%);
+  border-color: rgba(212, 175, 122, 0.24);
+}
+
+.bookcase[data-shelf-backdrop="verde_biblioteca"] {
+  background-color: #192d24;
+  background-image:
+    radial-gradient(ellipse 75% 36% at 50% 0%, rgba(200, 164, 110, 0.16), transparent 74%),
+    linear-gradient(180deg, rgba(16, 30, 23, 0.2) 0%, rgba(10, 20, 15, 0.45) 100%);
+  border-color: rgba(200, 164, 110, 0.26);
+}
+
+.bookcase[data-shelf-backdrop="bordo_profundo"] {
+  background-color: #2b1319;
+  background-image:
+    radial-gradient(ellipse 75% 34% at 50% 0%, rgba(224, 168, 120, 0.15), transparent 72%),
+    linear-gradient(180deg, rgba(43, 19, 25, 0.15) 0%, rgba(20, 8, 11, 0.45) 100%);
+  border-color: rgba(212, 175, 122, 0.26);
+}
+
+.bookcase[data-shelf-backdrop="preto_fosco"] {
+  background-color: #151516;
+  background-image:
+    radial-gradient(ellipse 70% 30% at 50% 0%, rgba(244, 239, 230, 0.08), transparent 70%);
+  border-color: rgba(244, 239, 230, 0.14);
+}
+
+/* Contraste AA garantido nas pílulas de cabeçalho sobre nichos escuros */
+.bookcase[data-shelf-backdrop="madeira"] .categoryPill,
+.bookcase[data-shelf-backdrop="verde_biblioteca"] .categoryPill,
+.bookcase[data-shelf-backdrop="bordo_profundo"] .categoryPill,
+.bookcase[data-shelf-backdrop="preto_fosco"] .categoryPill,
+.bookcase[data-shelf-backdrop="madeira"] .colorDotsPill,
+.bookcase[data-shelf-backdrop="verde_biblioteca"] .colorDotsPill,
+.bookcase[data-shelf-backdrop="bordo_profundo"] .colorDotsPill,
+.bookcase[data-shelf-backdrop="preto_fosco"] .colorDotsPill,
+.bookcase[data-shelf-backdrop="madeira"] .headerActionsPill,
+.bookcase[data-shelf-backdrop="verde_biblioteca"] .headerActionsPill,
+.bookcase[data-shelf-backdrop="bordo_profundo"] .headerActionsPill,
+.bookcase[data-shelf-backdrop="preto_fosco"] .headerActionsPill {
+  background-color: rgba(24, 20, 18, 0.78);
+  border-color: rgba(232, 213, 181, 0.28);
+  color: #f4efe6;
+}
+
+.bookcase[data-shelf-backdrop="madeira"] .categoryEditBtn,
+.bookcase[data-shelf-backdrop="verde_biblioteca"] .categoryEditBtn,
+.bookcase[data-shelf-backdrop="bordo_profundo"] .categoryEditBtn,
+.bookcase[data-shelf-backdrop="preto_fosco"] .categoryEditBtn,
+.bookcase[data-shelf-backdrop="madeira"] .headerIconBtn,
+.bookcase[data-shelf-backdrop="verde_biblioteca"] .headerIconBtn,
+.bookcase[data-shelf-backdrop="bordo_profundo"] .headerIconBtn,
+.bookcase[data-shelf-backdrop="preto_fosco"] .headerIconBtn {
+  color: #f4efe6;
+}
+
+/* --- 4. Iluminação LED Quente 3000K embutida sob as prateleiras --- */
+.shelfLedStrip {
+  display: none;
+}
+
+.bookcase[data-shelf-led="on"] .shelfLedStrip {
+  display: block;
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 100%;
+  height: 2.5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+      rgba(255, 224, 170, 0.25) 0%,
+      rgba(255, 228, 176, 0.96) 18%,
+      rgba(255, 236, 198, 1) 50%,
+      rgba(255, 228, 176, 0.96) 82%,
+      rgba(255, 224, 170, 0.25) 100%);
+  box-shadow:
+    0 3px 10px rgba(255, 196, 112, 0.62),
+    0 12px 24px rgba(255, 182, 92, 0.34);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.bookcase[data-shelf-led="on"] .shelfSection {
+  position: relative;
+}
+
+.bookcase[data-shelf-led="on"] .shelfTier::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: -8px;
+  height: 54px;
+  background: radial-gradient(ellipse 86% 78% at 50% 0%,
+      rgba(255, 206, 132, 0.22),
+      rgba(255, 194, 108, 0.06) 58%,
+      transparent 88%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* --- 5. Spots Superiores Arquitetônicos (2 focos quentes) --- */
+.topSpotlightsLayer {
+  display: none;
+}
+
+.bookcase[data-shelf-spotlights="on"] .topSpotlightsLayer {
+  display: block;
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 220px;
+  border-radius: var(--rf-card-radius) var(--rf-card-radius) 0 0;
+  pointer-events: none;
+  z-index: 1;
+  background-image:
+    radial-gradient(ellipse 34% 72% at 28% 0%,
+      rgba(255, 220, 158, 0.24),
+      rgba(255, 204, 130, 0.06) 54%,
+      transparent 78%),
+    radial-gradient(ellipse 34% 72% at 72% 0%,
+      rgba(255, 220, 158, 0.24),
+      rgba(255, 204, 130, 0.06) 54%,
+      transparent 78%);
+}
+
+.topSpotFixtures {
+  display: none;
+}
+
+.bookcase[data-shelf-spotlights="on"] .topSpotFixtures {
+  display: flex;
+  justify-content: space-around;
+  position: absolute;
+  top: 4px;
+  left: 14%;
+  right: 14%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.topSpotDot {
+  width: 22px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 214, 150, 0.4), #ffedc9, rgba(255, 214, 150, 0.4));
+  box-shadow: 0 2px 10px rgba(255, 204, 128, 0.85);
+}
+
+/* --- 6. Densidade (espaçamento entre volumes) --- */
+.bookcase[data-shelf-density="compacta"] .booksRow {
+  --books-gap: 1px;
+}
+
+.bookcase[data-shelf-density="padrao"] .booksRow {
+  --books-gap: 3px;
+}
+
+.bookcase[data-shelf-density="vitrine"] .booksRow {
+  --books-gap: 8px;
+}
+
+/* --- 7. Modos individuais de exibição do livro --- */
+.bookFrontSlot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-inline: 3px;
+  padding-bottom: 1px;
+}
+
+.bookFrontButton {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transform-origin: bottom center;
+  transform: perspective(640px) rotateX(4deg) translateZ(4px);
+  transition: transform 200ms ease, filter 200ms ease;
+  filter: drop-shadow(0 6px 8px rgba(18, 12, 8, 0.34));
+  border-radius: 3px;
+}
+
+.bookFrontButton:hover,
+.bookFrontButton:focus-visible {
+  transform: perspective(640px) rotateX(1deg) translateY(-5px) scale(1.03);
+  filter: drop-shadow(0 12px 14px rgba(18, 12, 8, 0.42));
+  outline: 2px solid var(--rf-focus-ring-color);
+  outline-offset: 2px;
+}
+
+.bookFrontSelected .bookFrontButton {
+  outline: 2px solid var(--rf-accent-primary);
+  outline-offset: 3px;
+  transform: perspective(640px) rotateX(1deg) translateY(-4px);
+}
+
+.bookFrontCoverFrame {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 2px 4px 4px 2px;
+  box-shadow:
+    inset 3px 0 5px rgba(0, 0, 0, 0.24),
+    inset -1px 0 2px rgba(255, 255, 255, 0.18);
+}
+
+.bookFrontDropBefore::before,
+.bookFrontDropAfter::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 0;
+  width: 3px;
+  border-radius: 999px;
+  background-color: var(--rf-accent-primary);
+  box-shadow: 0 0 8px var(--rf-accent-primary);
+  z-index: 6;
+}
+
+.bookFrontDropBefore::before {
+  left: -4px;
+}
+
+.bookFrontDropAfter::after {
+  right: -4px;
+}
+
+.bookTiltedWrap {
+  margin-inline: 11px;
+  transform-origin: bottom center;
+  transition: transform 200ms ease;
+}
+
+.bookTiltedLeft {
+  transform: rotate(-10.5deg);
+}
+
+.bookTiltedRight {
+  transform: rotate(10.5deg);
+}
+
+/* --- 8. Objetos decorativos & espaçador --- */
+.decorSlot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  align-self: flex-end;
+  height: 92px;
+  margin-inline: 2px;
+}
+
+.decorFigure {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.decorSvg {
+  display: block;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 2px 3px rgba(18, 12, 8, 0.22));
+}
+
+.decorShadow {
+  position: absolute;
+  bottom: -1px;
+  left: 12%;
+  right: 12%;
+  height: 4px;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgba(16, 10, 6, 0.42), transparent 72%);
+  pointer-events: none;
+}
+
+.decorSpacerView {
+  height: 24px;
+  pointer-events: none;
+}
+
+.decorSpacerEdit {
+  height: 74px;
+  justify-content: center;
+  border: 1.5px dashed var(--rf-border-accent-soft);
+  border-radius: 6px;
+  background-color: var(--rf-accent-primary-subtle);
+}
+
+.decorSpacerLabel {
+  font-family: var(--rf-font-body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rf-text-secondary);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.decorRemoveBtn {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid var(--rf-border-default);
+  background-color: var(--rf-surface-card);
+  color: var(--rf-status-error);
+  box-shadow: var(--rf-shadow-sm);
+  cursor: pointer;
+  opacity: 0.92;
+  transition: transform 140ms ease, background-color 140ms ease;
+}
+
+.decorRemoveBtn:hover,
+.decorRemoveBtn:focus-visible {
+  transform: scale(1.08);
+  background-color: var(--rf-status-error-bg);
+  outline: 2px solid var(--rf-focus-ring-color);
+  outline-offset: 1px;
+}
