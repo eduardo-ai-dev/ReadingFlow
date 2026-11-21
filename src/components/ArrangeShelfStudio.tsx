@@ -235,18 +235,22 @@ export function ArrangeShelfStudio({
   const [draft, setDraft] = useState<StudioShelf[] | null>(null);
   const [draftThemeConfig, setDraftThemeConfig] =
     useState<ShelfThemeConfig | null>(null);
-  const [draftColorOverrides, setDraftColorOverrides] = useState<
-    Record<string, string> | null
-  >(null);
-  const [draftDisplayModes, setDraftDisplayModes] = useState<
-    Record<string, BookDisplayMode> | null
-  >(null);
-  const [draftTiltDirections, setDraftTiltDirections] = useState<
-    Record<string, "left" | "right"> | null
-  >(null);
-  const [draftDecorByRow, setDraftDecorByRow] = useState<
-    Record<string, ShelfDecorPlacement[]> | null
-  >(null);
+  const [draftColorOverrides, setDraftColorOverrides] = useState<Record<
+    string,
+    string
+  > | null>(null);
+  const [draftDisplayModes, setDraftDisplayModes] = useState<Record<
+    string,
+    BookDisplayMode
+  > | null>(null);
+  const [draftTiltDirections, setDraftTiltDirections] = useState<Record<
+    string,
+    "left" | "right"
+  > | null>(null);
+  const [draftDecorByRow, setDraftDecorByRow] = useState<Record<
+    string,
+    ShelfDecorPlacement[]
+  > | null>(null);
 
   const effectiveThemeConfig: ShelfThemeConfig =
     draftThemeConfig ?? savedLayout.themeConfig ?? DEFAULT_SHELF_THEME_CONFIG;
@@ -552,10 +556,7 @@ export function ArrangeShelfStudio({
   };
 
   /* ---------- Handlers individuais de livro ---------- */
-  const handleSetBookDisplayMode = (
-    bookId: string,
-    mode: BookDisplayMode
-  ) => {
+  const handleSetBookDisplayMode = (bookId: string, mode: BookDisplayMode) => {
     setDraftDisplayModes((prev) => {
       const base = { ...(prev ?? savedLayout.bookDisplayModes ?? {}) };
       if (mode === "lombada") {
@@ -834,18 +835,42 @@ export function ArrangeShelfStudio({
     setDraftDecorByRow(null);
 
     startSave(async () => {
-      if (libraryItemIds.length >= 1) {
-        await reorderShelfBooksAction({ itemIds: libraryItemIds });
-      }
-      for (const [bookId, hex] of Object.entries(colorOverridesToSave)) {
-        const itemId = bookById.get(bookId)?.libraryItemId;
-        if (itemId) {
-          await updateBookSpineColorAction({ itemId, spineColor: hex });
+      let syncWarning: string | null = null;
+      try {
+        if (libraryItemIds.length >= 1) {
+          const reorderRes = await reorderShelfBooksAction({
+            itemIds: libraryItemIds,
+          });
+          if (!reorderRes.ok) {
+            syncWarning = reorderRes.error;
+          }
         }
+        for (const [bookId, hex] of Object.entries(colorOverridesToSave)) {
+          const itemId = bookById.get(bookId)?.libraryItemId;
+          if (itemId) {
+            const colorRes = await updateBookSpineColorAction({
+              itemId,
+              spineColor: hex,
+            });
+            if (!colorRes.ok && !syncWarning) {
+              syncWarning = colorRes.error;
+            }
+          }
+        }
+        router.refresh();
+        if (syncWarning) {
+          showNotice(
+            `Layout salvo neste navegador, mas houve falha na sincronização: ${syncWarning}`
+          );
+          return;
+        }
+        showNotice("Personalização salva e sincronizada com a Estante 3D!");
+        onSaved?.();
+      } catch {
+        showNotice(
+          "Layout salvo neste navegador, mas não foi possível sincronizar ordem/cores com o servidor. Tente novamente."
+        );
       }
-      router.refresh();
-      showNotice("Personalização salva e sincronizada com a Estante 3D!");
-      onSaved?.();
     });
   };
 
@@ -1019,7 +1044,10 @@ export function ArrangeShelfStudio({
               />
               <button
                 type="submit"
-                className={rfButtonClassName({ variant: "primary", size: "sm" })}
+                className={rfButtonClassName({
+                  variant: "primary",
+                  size: "sm",
+                })}
               >
                 Criar
               </button>
@@ -1356,8 +1384,7 @@ export function ArrangeShelfStudio({
                   className="grid grid-cols-3 gap-1.5"
                 >
                   {SHELF_BRACKET_OPTIONS.map((opt) => {
-                    const active =
-                      effectiveThemeConfig.bracketStyle === opt.id;
+                    const active = effectiveThemeConfig.bracketStyle === opt.id;
                     return (
                       <button
                         key={opt.id}
@@ -1725,7 +1752,10 @@ export function ArrangeShelfStudio({
                             aria-label={`Remover ${opt?.label ?? decor.decorType}`}
                             className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-[var(--rf-status-error)] hover:bg-[var(--rf-status-error-bg)]"
                           >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            <Trash2
+                              className="h-3.5 w-3.5"
+                              aria-hidden="true"
+                            />
                             <span>Remover</span>
                           </button>
                         </li>
@@ -1876,7 +1906,9 @@ export function ArrangeShelfStudio({
                         className="h-4 w-4 shrink-0 text-[var(--rf-text-secondary)]"
                         aria-hidden="true"
                       />
-                      <span className="sr-only">Mover para outra prateleira</span>
+                      <span className="sr-only">
+                        Mover para outra prateleira
+                      </span>
                       <select
                         aria-label="Mover para outra prateleira"
                         value={selected.shelfKey}

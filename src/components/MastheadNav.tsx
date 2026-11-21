@@ -26,7 +26,8 @@ export function isNavActive(pathname: string, href: string) {
   if (pathname === href) return true;
   if (
     href === "/estante-3d" &&
-    (pathname === "/estantes" ||
+    (pathname.startsWith("/estante-3d/") ||
+      pathname === "/estantes" ||
       pathname.startsWith("/livros/") ||
       pathname.startsWith("/generos/"))
   ) {
@@ -92,4 +93,3 @@ export function MastheadNav() {
     </nav>
   );
 }
-

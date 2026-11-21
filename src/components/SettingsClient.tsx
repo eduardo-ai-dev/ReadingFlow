@@ -36,21 +36,41 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
   const [isPending, startTransition] = useTransition();
 
   const handleBackupFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
-    const rawJson = await file.text();
     setFeedback(null);
-    startTransition(async () => {
-      const res = await restoreBackupJsonAction({ rawJson });
-      if (!res.ok) {
-        setFeedback({ tone: "error", text: res.error });
-        return;
-      }
+    let rawJson: string;
+    try {
+      rawJson = await file.text();
+    } catch {
       setFeedback({
-        tone: "ok",
-        text: `Backup restaurado com sucesso (${res.restoredWorks} obras recuperadas).`,
+        tone: "error",
+        text: "Não foi possível ler o arquivo de backup selecionado.",
       });
-      router.refresh();
+      input.value = "";
+      return;
+    } finally {
+      input.value = "";
+    }
+    startTransition(async () => {
+      try {
+        const res = await restoreBackupJsonAction({ rawJson });
+        if (!res.ok) {
+          setFeedback({ tone: "error", text: res.error });
+          return;
+        }
+        setFeedback({
+          tone: "ok",
+          text: `Backup restaurado com sucesso (${res.restoredWorks} obras recuperadas).`,
+        });
+        router.refresh();
+      } catch {
+        setFeedback({
+          tone: "error",
+          text: "Erro ao restaurar o backup. Verifique o arquivo JSON e tente novamente.",
+        });
+      }
     });
   };
 
@@ -75,7 +95,8 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
           Conta e Identificação
         </h2>
         <p className="mt-1 text-xs text-[var(--text-muted)]">
-          Privacidade estrita por padrão: nenhum nome completo, telefone ou fuso horário pessoal é compartilhado.
+          Privacidade estrita por padrão: nenhum nome completo, telefone ou fuso
+          horário pessoal é compartilhado.
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -95,28 +116,51 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
 
       {/* Preferências de aparência e leitura */}
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
           setFeedback(null);
-          startTransition(async () => {
-            const res = await updateProfileAction({
-              defaultCurrency,
-              theme: themePreference,
-              threeD,
-              goalsCountRereads,
-              maxSimultaneousReadings:
-                Number.parseInt(maxSimultaneousReadings, 10) || 5,
-              telemetryOptOut,
-            });
-            if (!res.ok) {
-              setFeedback({ tone: "error", text: res.error });
-              return;
-            }
+          const trimmedMax = maxSimultaneousReadings.trim();
+          if (!/^\d+$/.test(trimmedMax)) {
             setFeedback({
-              tone: "ok",
-              text: "Preferências salvas e aplicadas.",
+              tone: "error",
+              text: "O limite de leituras simultâneas deve ser um inteiro entre 1 e 20.",
             });
-            router.refresh();
+            return;
+          }
+          const parsedMax = Number.parseInt(trimmedMax, 10);
+          if (parsedMax < 1 || parsedMax > 20) {
+            setFeedback({
+              tone: "error",
+              text: "O limite de leituras simultâneas deve ficar entre 1 e 20.",
+            });
+            return;
+          }
+          startTransition(async () => {
+            try {
+              const res = await updateProfileAction({
+                defaultCurrency,
+                theme: themePreference,
+                threeD,
+                goalsCountRereads,
+                maxSimultaneousReadings: parsedMax,
+                telemetryOptOut,
+              });
+              if (!res.ok) {
+                setFeedback({ tone: "error", text: res.error });
+                return;
+              }
+              setFeedback({
+                tone: "ok",
+                text: "Preferências salvas e aplicadas.",
+              });
+              router.refresh();
+            } catch {
+              setFeedback({
+                tone: "error",
+                text: "Não foi possível salvar suas preferências agora. Tente novamente.",
+              });
+            }
           });
         }}
         className="space-y-5 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 sm:p-6"
@@ -201,7 +245,8 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
               <strong className="block font-semibold">
                 Contar releituras nas metas de leitura
               </strong>
-              Quando desativado, apenas a primeira leitura da obra entra no cômputo anual.
+              Quando desativado, apenas a primeira leitura da obra entra no
+              cômputo anual.
             </span>
           </label>
 
@@ -216,7 +261,8 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
               <strong className="block font-semibold">
                 Não enviar telemetria anônima agregada
               </strong>
-              O ReadingFlow não usa cookies de rastreio nem envia dados a redes sociais.
+              O ReadingFlow não usa cookies de rastreio nem envia dados a redes
+              sociais.
             </span>
           </label>
         </div>
@@ -244,8 +290,9 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
           Portabilidade e Backup dos Dados
         </h2>
         <p className="text-xs text-[var(--text-muted)]">
-          Seus dados pertencem a você. Exporte seu acervo completo em JSON estruturado
-          (pronto para restaurar a qualquer momento) ou em planilhas CSV.
+          Seus dados pertencem a você. Exporte seu acervo completo em JSON
+          estruturado (pronto para restaurar a qualquer momento) ou em planilhas
+          CSV.
         </p>
 
         <div className="flex flex-wrap gap-3">
@@ -309,7 +356,8 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
         </h2>
         <p className="text-xs text-[var(--text-muted)]">
           Esta ação é irreversível. Todos os seus livros, histórico de leitura,
-          avaliações e metas serão apagados permanentemente dos nossos servidores.
+          avaliações e metas serão apagados permanentemente dos nossos
+          servidores.
         </p>
 
         <form
@@ -318,15 +366,22 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
             if (confirmationPhrase !== "EXCLUIR MINHA CONTA") return;
             setFeedback(null);
             startTransition(async () => {
-              const res = await deleteMyAccountAction({
-                confirmationPhrase: "EXCLUIR MINHA CONTA",
-              });
-              if (!res.ok) {
-                setFeedback({ tone: "error", text: res.error });
-                return;
+              try {
+                const res = await deleteMyAccountAction({
+                  confirmationPhrase: "EXCLUIR MINHA CONTA",
+                });
+                if (!res.ok) {
+                  setFeedback({ tone: "error", text: res.error });
+                  return;
+                }
+                router.push("/");
+                router.refresh();
+              } catch {
+                setFeedback({
+                  tone: "error",
+                  text: "Não foi possível excluir a conta agora. Tente novamente.",
+                });
               }
-              router.push("/");
-              router.refresh();
             });
           }}
           className="space-y-3"
@@ -336,7 +391,11 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
               htmlFor="confirm-delete"
               className="block text-xs font-semibold text-[var(--text-primary)]"
             >
-              Digite exatamente <span className="font-mono text-[var(--rf-status-error)]">EXCLUIR MINHA CONTA</span> para confirmar:
+              Digite exatamente{" "}
+              <span className="font-mono text-[var(--rf-status-error)]">
+                EXCLUIR MINHA CONTA
+              </span>{" "}
+              para confirmar:
             </label>
             <input
               id="confirm-delete"

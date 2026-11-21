@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { BookFormat } from "@/lib/domain";
 import type { EnrichedWishEntry } from "@/features/wishlist/queries";
@@ -23,6 +23,7 @@ export function WishlistClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
   // Add wish form state
   const [showAdd, setShowAdd] = useState(false);
@@ -66,8 +67,10 @@ export function WishlistClient({
 
       {showAdd ? (
         <form
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
+            if (submittingRef.current) return;
             setError(null);
 
             const cleanTitle = title.trim();
@@ -90,37 +93,53 @@ export function WishlistClient({
               return;
             }
 
-            const parsedPrice = targetPrice
-              ? Number.parseFloat(targetPrice.replace(",", "."))
-              : undefined;
-
-            if (
-              parsedPrice !== undefined &&
-              (!Number.isFinite(parsedPrice) || parsedPrice < 0 || parsedPrice > 100000)
-            ) {
-              setError("Informe um preço alvo válido entre R$ 0,00 e R$ 100.000,00.");
-              return;
-            }
-
-            startTransition(async () => {
-              const res = await addWishlistItemAction({
-                title: cleanTitle,
-                primaryAuthor: cleanAuthor,
-                format,
-                priority,
-                targetPrice: parsedPrice,
-                whereToBuy: whereToBuy.trim() || undefined,
-              });
-              if (!res.ok) {
-                setError(res.error);
+            const trimmedPrice = targetPrice.trim();
+            let parsedPrice: number | undefined;
+            if (trimmedPrice) {
+              if (!/^\d+(?:[.,]\d{1,2})?$/.test(trimmedPrice)) {
+                setError(
+                  "Informe um preço-alvo válido (ex.: 39,90) entre R$ 0,00 e R$ 100.000,00."
+                );
                 return;
               }
-              setTitle("");
-              setAuthor("");
-              setTargetPrice("");
-              setWhereToBuy("");
-              setShowAdd(false);
-              router.refresh();
+              const val = Number.parseFloat(trimmedPrice.replace(",", "."));
+              if (!Number.isFinite(val) || val < 0 || val > 100000) {
+                setError(
+                  "Informe um preço alvo válido entre R$ 0,00 e R$ 100.000,00."
+                );
+                return;
+              }
+              parsedPrice = val;
+            }
+
+            submittingRef.current = true;
+            startTransition(async () => {
+              try {
+                const res = await addWishlistItemAction({
+                  title: cleanTitle,
+                  primaryAuthor: cleanAuthor,
+                  format,
+                  priority,
+                  targetPrice: parsedPrice,
+                  whereToBuy: whereToBuy.trim() || undefined,
+                });
+                if (!res.ok) {
+                  setError(res.error);
+                  return;
+                }
+                setTitle("");
+                setAuthor("");
+                setTargetPrice("");
+                setWhereToBuy("");
+                setShowAdd(false);
+                router.refresh();
+              } catch {
+                setError(
+                  "Não foi possível salvar o desejo agora. Tente novamente."
+                );
+              } finally {
+                submittingRef.current = false;
+              }
             });
           }}
           className="space-y-4 rounded-[12px] border border-[var(--border-ui)] bg-[var(--bg-surface)] p-5"
@@ -326,9 +345,22 @@ export function WishlistClient({
                     type="button"
                     disabled={isPending}
                     onClick={() => {
+                      setError(null);
                       startTransition(async () => {
-                        await dropWishlistItemAction({ wishId: entry.wish.id });
-                        router.refresh();
+                        try {
+                          const res = await dropWishlistItemAction({
+                            wishId: entry.wish.id,
+                          });
+                          if (!res.ok) {
+                            setError(res.error);
+                            return;
+                          }
+                          router.refresh();
+                        } catch {
+                          setError(
+                            "Não foi possível arquivar o desejo agora. Tente novamente."
+                          );
+                        }
                       });
                     }}
                     className="min-h-[42px] rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]"
@@ -340,24 +372,58 @@ export function WishlistClient({
 
               {isBuying ? (
                 <form
+                  noValidate
                   onSubmit={(e) => {
                     e.preventDefault();
-                    const parsed = Number.parseFloat(
-                      buyPrice.replace(",", ".")
-                    );
-                    startTransition(async () => {
-                      const res = await purchaseWishlistItemAction({
-                        wishId: entry.wish.id,
-                        format: buyFormat,
-                        pricePaid: Number.isFinite(parsed) ? parsed : undefined,
-                        store: buyStore || undefined,
-                      });
-                      if (!res.ok) {
-                        setError(res.error);
+                    if (submittingRef.current) return;
+                    setError(null);
+                    const trimmedBuyPrice = buyPrice.trim();
+                    let validBuyPrice: number | undefined;
+                    if (trimmedBuyPrice) {
+                      if (!/^\d+(?:[.,]\d{1,2})?$/.test(trimmedBuyPrice)) {
+                        setError(
+                          "Informe um valor pago válido (ex.: 49,90) entre R$ 0,00 e R$ 100.000,00."
+                        );
                         return;
                       }
-                      setPurchasingId(null);
-                      router.refresh();
+                      const parsed = Number.parseFloat(
+                        trimmedBuyPrice.replace(",", ".")
+                      );
+                      if (
+                        !Number.isFinite(parsed) ||
+                        parsed < 0 ||
+                        parsed > 100000
+                      ) {
+                        setError(
+                          "O valor pago deve estar entre R$ 0,00 e R$ 100.000,00."
+                        );
+                        return;
+                      }
+                      validBuyPrice = parsed;
+                    }
+
+                    submittingRef.current = true;
+                    startTransition(async () => {
+                      try {
+                        const res = await purchaseWishlistItemAction({
+                          wishId: entry.wish.id,
+                          format: buyFormat,
+                          pricePaid: validBuyPrice,
+                          store: buyStore.trim() || undefined,
+                        });
+                        if (!res.ok) {
+                          setError(res.error);
+                          return;
+                        }
+                        setPurchasingId(null);
+                        router.refresh();
+                      } catch {
+                        setError(
+                          "Não foi possível confirmar a compra agora. Tente novamente."
+                        );
+                      } finally {
+                        submittingRef.current = false;
+                      }
                     });
                   }}
                   className="mt-4 grid gap-3 border-t border-[var(--border-subtle)] pt-4 sm:grid-cols-4"

@@ -16,6 +16,7 @@ export const metadata: Metadata = {
 export default async function GoalsPage() {
   const data = await getEvaluatedGoals();
   const currentYear = Number(data.todayYmd.slice(0, 4));
+  const currentMonth = Number(data.todayYmd.slice(5, 7));
 
   return (
     <div className="space-y-8">
@@ -52,9 +53,11 @@ export default async function GoalsPage() {
               </div>
 
               <p className="mt-4 font-serif text-2xl font-semibold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--text-heading)]">
-                <CountUp to={evaluation.completedValue} /> de {evaluation.targetValue}{" "}
+                <CountUp to={evaluation.completedValue} /> de{" "}
+                {evaluation.targetValue}{" "}
                 {goal.kind === "books" ? "livros" : "páginas"} (
-                <CountUp to={evaluation.progressPercent} />%)
+                <CountUp to={evaluation.progressPercent} />
+                %)
               </p>
 
               <div className="mt-2.5">
@@ -77,7 +80,10 @@ export default async function GoalsPage() {
         ))}
       </Stagger>
 
-      <CreateGoalFormClient defaultYear={currentYear} />
+      <CreateGoalFormClient
+        defaultYear={currentYear}
+        defaultMonth={currentMonth}
+      />
     </div>
   );
 }

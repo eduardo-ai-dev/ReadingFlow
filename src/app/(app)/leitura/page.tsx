@@ -65,6 +65,9 @@ export default async function ReadingPage() {
                       title={entry.work.title}
                       author={entry.primaryAuthor}
                       coverUrl={entry.edition?.coverUrl}
+                      spineColor={entry.edition?.coverColor}
+                      spineAccent={entry.edition?.coverAccentColor}
+                      seed={entry.edition?.isbn13 ?? entry.work.id}
                       size="md"
                     />
                   </Link>
@@ -135,6 +138,9 @@ export default async function ReadingPage() {
                     title={u.work.title}
                     author={u.primaryAuthor}
                     coverUrl={u.edition.coverUrl}
+                    spineColor={u.edition.coverColor}
+                    spineAccent={u.edition.coverAccentColor}
+                    seed={u.edition.isbn13 ?? u.work.id}
                     size="sm"
                   />
                   <div className="min-w-0">
@@ -186,6 +192,9 @@ export default async function ReadingPage() {
                       title={entry.work.title}
                       author={entry.primaryAuthor}
                       coverUrl={entry.edition?.coverUrl}
+                      spineColor={entry.edition?.coverColor}
+                      spineAccent={entry.edition?.coverAccentColor}
+                      seed={entry.edition?.isbn13 ?? entry.work.id}
                       size="sm"
                     />
                     <div className="min-w-0">

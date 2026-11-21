@@ -40,6 +40,12 @@ export function ShelfItemsClient({
   };
 }) {
   const [activeKind, setActiveKind] = useState<ShelfKind>(initialKind);
+  const [prevInitialKind, setPrevInitialKind] =
+    useState<ShelfKind>(initialKind);
+  if (prevInitialKind !== initialKind) {
+    setPrevInitialKind(initialKind);
+    setActiveKind(initialKind);
+  }
   const [view, setView] = useState<"grid" | "list">(initialView);
   const [visibleLimit, setVisibleLimit] = useState(PAGE_WINDOW_SIZE);
 
@@ -105,6 +111,7 @@ export function ShelfItemsClient({
           {/* Barra de busca tolerante a acentos/erros e filtros */}
           {filterState ? (
             <form
+              key={`${filterState.query}:${filterState.readingStatus}:${filterState.sortMode}`}
               method="get"
               action="/estantes"
               className="grid gap-3 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 sm:grid-cols-12"

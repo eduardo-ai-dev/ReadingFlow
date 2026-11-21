@@ -4,6 +4,7 @@ import { getEvaluatedGoals } from "@/features/goals/queries";
 import { getStatisticsView } from "@/features/stats/queries";
 import { getDashboardEditorialData } from "@/features/dashboard/queries";
 import { getReadingsOverview } from "@/features/reading/queries";
+import { computeReadingForecast } from "@/lib/reading-metrics";
 import { formatDisplayDatePtBr } from "@/lib/dates";
 import { ProgressBar } from "@/components/ProgressBar";
 import { GoalPaceBadge } from "@/components/StatusBadge";
@@ -42,8 +43,10 @@ export default async function EvolucaoPage() {
   ]);
 
   const { stats } = statsView;
-  const dailyPace = editorialData.monthly.dailyAveragePages;
-  const weeklyPagesPace = dailyPace * 7;
+  const dailyPace = editorialData.metrics.dailyPace.value;
+  const weeklyMonthMetric = editorialData.metrics.weeklyMonthAverage;
+  const dailyPaceMetric = editorialData.metrics.dailyPace;
+  const referenceDate = new Date(editorialData.referenceDateIso);
   const activePaginatedReadings = readings.active.filter(
     (entry) =>
       entry.reading.progressUnit === "pages" &&
@@ -56,7 +59,9 @@ export default async function EvolucaoPage() {
       {/* Cabeçalho com marcador de seção e divisória fina */}
       <header className="flex flex-col gap-4 border-b border-[var(--rf-divider)] pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <span className="rf-section-marker">01 · Evolução &amp; Métricas</span>
+          <span className="rf-section-marker">
+            01 · Evolução &amp; Métricas
+          </span>
           <h1 className="rf-title-h1 mt-1.5 text-3xl text-[var(--rf-text-heading)] sm:text-4xl">
             Evolução (Estatísticas &amp; Metas)
           </h1>
@@ -154,7 +159,8 @@ export default async function EvolucaoPage() {
             href="/metas"
             className="inline-flex items-center gap-1 rounded-[var(--rf-radius-xs)] font-sans text-xs font-semibold text-[var(--rf-text-accent-secondary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >
-            Gerenciar metas <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            Gerenciar metas{" "}
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
           </Link>
         </div>
 
@@ -197,7 +203,10 @@ export default async function EvolucaoPage() {
                     {goal.kind === "books" ? "livros" : "páginas"} (
                     {evaluation.progressPercent}%)
                   </p>
-                  <ProgressBar value={evaluation.progressPercent} label={goal.title} />
+                  <ProgressBar
+                    value={evaluation.progressPercent}
+                    label={goal.title}
+                  />
 
                   <p className="mt-3 inline-flex w-full items-start gap-2 rounded-[var(--rf-radius-md)] border border-[var(--rf-border-subtle)] bg-[var(--rf-surface-canvas)] px-3.5 py-2.5 font-sans text-xs font-medium tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)]">
                     <Compass
@@ -217,7 +226,9 @@ export default async function EvolucaoPage() {
       <section aria-labelledby="projecao-titulo" className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-2 border-b border-[var(--rf-divider)] pb-3">
           <div>
-            <span className="rf-section-marker">03 · Ritmo &amp; Projeções</span>
+            <span className="rf-section-marker">
+              03 · Ritmo &amp; Projeções
+            </span>
             <h2
               id="projecao-titulo"
               className="mt-1 font-serif text-2xl font-semibold text-[var(--rf-text-heading)]"
@@ -226,9 +237,14 @@ export default async function EvolucaoPage() {
             </h2>
           </div>
           <p className="font-sans text-xs font-semibold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-accent-secondary)]">
-            Ritmo atual: {weeklyPagesPace} págs/semana ({dailyPace} pág./dia em{" "}
+            Ritmo atual: {weeklyMonthMetric.formatted} (
+            {weeklyMonthMetric.basisLabel}) · {dailyPaceMetric.formatted} (
+            {dailyPaceMetric.basisLabel} em{" "}
             {editorialData.monthly.activeDaysInMonth}{" "}
-            {editorialData.monthly.activeDaysInMonth === 1 ? "dia ativo" : "dias ativos"})
+            {editorialData.monthly.activeDaysInMonth === 1
+              ? "dia ativo"
+              : "dias ativos"}
+            )
           </p>
         </div>
 
@@ -237,8 +253,15 @@ export default async function EvolucaoPage() {
             {activePaginatedReadings.map((entry) => {
               const total =
                 entry.reading.progressTotal ?? entry.edition?.pages ?? 0;
-              const remaining = Math.max(0, total - entry.reading.progressValue);
-              const diasRestantes = Math.max(1, Math.ceil(remaining / dailyPace));
+              const forecast = computeReadingForecast({
+                progressValue: entry.reading.progressValue,
+                progressTotal: total,
+                progressUnit: entry.reading.progressUnit,
+                dailyPacePages: dailyPace,
+                referenceDate,
+                timeZone: editorialData.timezone,
+              });
+              if (!forecast) return null;
               return (
                 <div key={entry.reading.id} className="rf-panel p-5">
                   <div className="flex items-start justify-between gap-3">
@@ -254,8 +277,8 @@ export default async function EvolucaoPage() {
                     <Link
                       href={`/leitura/foco?readingId=${entry.reading.id}`}
                       className={rfButtonClassName({
-                        variant: "subtle",
-                        tone: "dark",
+                        variant: "secondary",
+                        secondaryStyle: "outline",
                         size: "sm",
                         pill: true,
                       })}
@@ -265,9 +288,8 @@ export default async function EvolucaoPage() {
                     </Link>
                   </div>
                   <p className="mt-3 rounded-[var(--rf-radius-md)] border border-[var(--rf-border-subtle)] bg-[var(--rf-surface-canvas)] px-3.5 py-2.5 font-sans text-xs font-medium tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)]">
-                    Projeção de término em ~{diasRestantes}{" "}
-                    {diasRestantes === 1 ? "dia" : "dias"} mantendo o ritmo atual (
-                    {remaining} páginas restantes).
+                    Previsão: {forecast.projectedDatePtBr} ·{" "}
+                    {forecast.remainingText} ({forecast.basisLabel}).
                   </p>
                 </div>
               );
@@ -276,7 +298,8 @@ export default async function EvolucaoPage() {
         ) : (
           <div className="flex flex-col items-start justify-between gap-4 rounded-[var(--rf-card-radius)] border border-[var(--rf-border-subtle)] bg-[var(--rf-surface-subtle)] p-5 sm:flex-row sm:items-center">
             <p className="font-sans text-sm text-[var(--rf-text-primary)]">
-              Inicie uma sessão rápida no Canto de Foco para calcular seu ritmo semanal e a projeção de término dos seus livros atuais.
+              Inicie uma sessão rápida no Canto de Foco para calcular seu ritmo
+              semanal e a projeção de término dos seus livros atuais.
             </p>
             <Link
               href="/leitura/foco"
@@ -333,7 +356,8 @@ export default async function EvolucaoPage() {
                   </span>
                 </div>
                 <p className="font-sans text-xs text-[var(--rf-text-on-contrast)] opacity-85 sm:text-sm">
-                  Sua curadoria mantém alto índice de satisfação entre as obras avaliadas do acervo.
+                  Sua curadoria mantém alto índice de satisfação entre as obras
+                  avaliadas do acervo.
                 </p>
               </div>
 
@@ -420,7 +444,9 @@ export default async function EvolucaoPage() {
                 Nota Média das Obras
               </p>
               <p className="mt-1 font-serif text-2xl font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-on-contrast-muted)]">
-                {stats.averageRating ? `${stats.averageRating.toFixed(1)}★` : "—"}
+                {stats.averageRating
+                  ? `${stats.averageRating.toFixed(1)}★`
+                  : "—"}
               </p>
             </div>
           </div>

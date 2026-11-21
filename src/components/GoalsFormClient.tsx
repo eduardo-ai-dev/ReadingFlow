@@ -1,26 +1,37 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createGoalAction, deleteGoalAction } from "@/features/goals/actions";
 
-export function CreateGoalFormClient({ defaultYear }: { defaultYear: number }) {
+export function CreateGoalFormClient({
+  defaultYear,
+  defaultMonth = 1,
+}: {
+  defaultYear: number;
+  defaultMonth?: number;
+}) {
   const router = useRouter();
   const [title, setTitle] = useState(`Meta de Leitura ${defaultYear}`);
   const [kind, setKind] = useState<"books" | "pages">("books");
   const [period, setPeriod] = useState<"year" | "month">("year");
   const [year, setYear] = useState(String(defaultYear));
-  const [month, setMonth] = useState("11");
+  const [month, setMonth] = useState(String(defaultMonth));
   const [targetValue, setTargetValue] = useState("12");
   const [countRereads, setCountRereads] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const submittingRef = useRef(false);
 
   return (
     <form
+      noValidate
       onSubmit={(e) => {
         e.preventDefault();
+        if (submittingRef.current) return;
         setError(null);
+        setSuccess(null);
 
         const cleanTitle = title.trim();
         if (!cleanTitle) {
@@ -28,8 +39,13 @@ export function CreateGoalFormClient({ defaultYear }: { defaultYear: number }) {
           return;
         }
 
-        const targetVal = Number.parseInt(targetValue, 10);
-        if (!Number.isInteger(targetVal) || targetVal <= 0) {
+        const trimmedTarget = targetValue.trim();
+        if (!/^\d+$/.test(trimmedTarget)) {
+          setError("A meta deve ser um número inteiro maior que zero.");
+          return;
+        }
+        const targetVal = Number.parseInt(trimmedTarget, 10);
+        if (targetVal <= 0) {
           setError("A meta deve ser um número inteiro maior que zero.");
           return;
         }
@@ -38,27 +54,55 @@ export function CreateGoalFormClient({ defaultYear }: { defaultYear: number }) {
           return;
         }
 
-        const parsedYear = Number.parseInt(year, 10);
-        if (!Number.isInteger(parsedYear) || parsedYear < 2000 || parsedYear > 2100) {
+        const trimmedYear = year.trim();
+        if (!/^\d{4}$/.test(trimmedYear)) {
+          setError("Informe um ano válido entre 2000 e 2100.");
+          return;
+        }
+        const parsedYear = Number.parseInt(trimmedYear, 10);
+        if (parsedYear < 2000 || parsedYear > 2100) {
           setError("Informe um ano válido entre 2000 e 2100.");
           return;
         }
 
-        startTransition(async () => {
-          const res = await createGoalAction({
-            title: cleanTitle,
-            kind,
-            period,
-            year: parsedYear,
-            month: period === "month" ? Number.parseInt(month, 10) : undefined,
-            targetValue: targetVal,
-            countRereads,
-          });
-          if (!res.ok) {
-            setError(res.error);
+        let parsedMonth: number | undefined;
+        if (period === "month") {
+          const trimmedMonth = month.trim();
+          if (!/^\d{1,2}$/.test(trimmedMonth)) {
+            setError("Informe um mês válido entre 1 e 12.");
             return;
           }
-          router.refresh();
+          const m = Number.parseInt(trimmedMonth, 10);
+          if (m < 1 || m > 12) {
+            setError("Informe um mês válido entre 1 e 12.");
+            return;
+          }
+          parsedMonth = m;
+        }
+
+        submittingRef.current = true;
+        startTransition(async () => {
+          try {
+            const res = await createGoalAction({
+              title: cleanTitle,
+              kind,
+              period,
+              year: parsedYear,
+              month: parsedMonth,
+              targetValue: targetVal,
+              countRereads,
+            });
+            if (!res.ok) {
+              setError(res.error);
+              return;
+            }
+            setSuccess("Meta criada com sucesso.");
+            router.refresh();
+          } catch {
+            setError("Não foi possível criar a meta agora. Tente novamente.");
+          } finally {
+            submittingRef.current = false;
+          }
         });
       }}
       className="space-y-4 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5"
@@ -73,6 +117,15 @@ export function CreateGoalFormClient({ defaultYear }: { defaultYear: number }) {
           className="rounded-[8px] border border-[var(--status-error)] bg-[var(--status-error-bg)] p-3 text-xs font-medium text-[var(--status-error)]"
         >
           {error}
+        </div>
+      ) : null}
+
+      {success ? (
+        <div
+          role="status"
+          className="rounded-[8px] border border-[var(--status-ok)] bg-[var(--status-ok-bg)] p-3 text-xs font-medium text-[var(--status-ok)]"
+        >
+          {success}
         </div>
       ) : null}
 
@@ -193,20 +246,66 @@ export function CreateGoalFormClient({ defaultYear }: { defaultYear: number }) {
 export function DeleteGoalButtonClient({ goalId }: { goalId: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (confirming) {
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => {
+            setError(null);
+            startTransition(async () => {
+              try {
+                const res = await deleteGoalAction({ goalId });
+                if (!res.ok) {
+                  setError(res.error);
+                  setConfirming(false);
+                  return;
+                }
+                router.refresh();
+              } catch {
+                setError("Não foi possível remover a meta.");
+                setConfirming(false);
+              }
+            });
+          }}
+          className="min-h-[34px] rounded-[6px] bg-[var(--status-error)] px-2.5 text-xs font-semibold text-white disabled:opacity-60"
+        >
+          Confirmar
+        </button>
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => setConfirming(false)}
+          className="min-h-[34px] rounded-[6px] border border-[var(--border-subtle)] px-2.5 text-xs text-[var(--text-primary)]"
+        >
+          Cancelar
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <button
-      type="button"
-      disabled={isPending}
-      onClick={() => {
-        startTransition(async () => {
-          await deleteGoalAction({ goalId });
-          router.refresh();
-        });
-      }}
-      className="min-h-[36px] rounded-[6px] border border-[var(--border-subtle)] px-2.5 text-xs text-[var(--text-muted)] hover:text-[var(--status-error)]"
-    >
-      Remover
-    </button>
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={() => {
+          setError(null);
+          setConfirming(true);
+        }}
+        className="min-h-[36px] rounded-[6px] border border-[var(--border-subtle)] px-2.5 text-xs text-[var(--text-muted)] hover:text-[var(--status-error)]"
+      >
+        Remover
+      </button>
+      {error ? (
+        <span role="alert" className="text-[11px] text-[var(--status-error)]">
+          {error}
+        </span>
+      ) : null}
+    </div>
   );
 }
