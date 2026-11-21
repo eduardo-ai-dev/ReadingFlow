@@ -102,12 +102,29 @@ class AmbientAudioEngine {
   private bufferCache = new Map<AmbientSoundId, AudioBuffer>();
   private loadingPromises = new Map<AmbientSoundId, Promise<AudioBuffer>>();
   private stopTimers = new Map<AmbientSoundId, number>();
+  private visibilityBound = false;
+
+  private ensureVisibilityListener(): void {
+    if (this.visibilityBound || typeof document === "undefined") return;
+    this.visibilityBound = true;
+    document.addEventListener("visibilitychange", () => {
+      if (
+        document.visibilityState === "visible" &&
+        this.activeLayers.size > 0 &&
+        this.ctx &&
+        this.ctx.state === "suspended"
+      ) {
+        void this.ctx.resume().catch(() => {});
+      }
+    });
+  }
 
   /** Cria ou retoma o AudioContext único — chamar apenas dentro de handler de clique/tecla. */
   private async ensureContext(): Promise<AudioContext> {
     if (typeof window === "undefined") {
       throw new Error("AudioContext indisponível fora do navegador.");
     }
+    this.ensureVisibilityListener();
     if (!this.ctx || this.ctx.state === "closed") {
       const AudioCtx =
         window.AudioContext ||

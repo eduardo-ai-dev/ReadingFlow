@@ -491,6 +491,51 @@ export function FocusReadingSessionClient({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [isRunning]);
 
+  // Mantém a tela acesa durante sessão ativa no celular (Screen Wake Lock API com fallback silencioso)
+  useEffect(() => {
+    if (!isRunning || typeof navigator === "undefined") return;
+    const wakeLockApi = (
+      navigator as Navigator & {
+        wakeLock?: {
+          request: (
+            type: "screen"
+          ) => Promise<{ release: () => Promise<void> }>;
+        };
+      }
+    ).wakeLock;
+    if (!wakeLockApi) return;
+
+    let sentinel: { release: () => Promise<void> } | null = null;
+    let cancelled = false;
+
+    const acquire = async () => {
+      if (cancelled || document.visibilityState !== "visible") return;
+      try {
+        sentinel = await wakeLockApi.request("screen");
+      } catch {
+        // Permissão negada, economia de bateria ou navegador sem suporte
+      }
+    };
+
+    void acquire();
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void acquire();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (sentinel) {
+        void sentinel.release().catch(() => {});
+        sentinel = null;
+      }
+    };
+  }, [isRunning]);
+
   // Auto-focus no campo numérico sempre que o card rápido abrir após Pausar/Encerrar Sessão
   useEffect(() => {
     if (showQuickRegister) {
@@ -741,7 +786,7 @@ export function FocusReadingSessionClient({
             <span className="rf-section-marker">04 · Canto de Foco</span>
             <Link
               href="/leitura"
-              className="inline-flex items-center gap-1.5 rounded-sm font-sans text-xs font-semibold text-[#722F3E] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4A77D]"
+              className="inline-flex min-h-[44px] lg:min-h-0 items-center gap-1.5 rounded-sm font-sans text-xs font-semibold text-[#722F3E] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4A77D]"
             >
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
               Voltar para Leitura
@@ -790,7 +835,7 @@ export function FocusReadingSessionClient({
                     type="button"
                     aria-pressed={active}
                     onClick={() => handleSelectMode(item.id)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 font-sans text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4A77D] ${
+                    className={`inline-flex min-h-[44px] lg:min-h-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 font-sans text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4A77D] ${
                       active
                         ? "bg-[#722F3E] text-[#F5F2EB] shadow-xs"
                         : "text-[#2C221E] hover:bg-[#E4DCCD]"
