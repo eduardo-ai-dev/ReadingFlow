@@ -132,6 +132,7 @@ function SignInPageContent() {
               name="email"
               type="email"
               autoComplete="email"
+              enterKeyHint="next"
               required
               disabled={isBusy}
               aria-invalid={Boolean(emailError)}
@@ -178,7 +179,7 @@ function SignInPageContent() {
             </label>
             <Link
               href="/recuperar-senha"
-              className="rounded-sm px-1 font-sans text-xs font-semibold text-[#722F3E] no-underline transition-colors duration-200 hover:text-[#141514] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
+              className="inline-flex min-h-[44px] lg:min-h-0 items-center rounded-sm px-1 font-sans text-xs font-semibold text-[#722F3E] no-underline transition-colors duration-200 hover:text-[#141514] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
             >
               Esqueci a senha
             </Link>
@@ -189,6 +190,7 @@ function SignInPageContent() {
               name="password"
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
+              enterKeyHint="done"
               required
               disabled={isBusy}
               aria-invalid={Boolean(passwordError)}
@@ -218,7 +220,7 @@ function SignInPageContent() {
                   : "Mostrar caracteres digitados"
               }
               aria-pressed={showPassword}
-              className="rf-icon-btn absolute right-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[6px] text-[#4A433C] transition-colors duration-200 group-focus-within:text-[#722F3E] hover:bg-[#2C221E]/8 hover:text-[#141514] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
+              className="rf-icon-btn absolute right-0 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[6px] text-[#4A433C] transition-colors duration-200 group-focus-within:text-[#722F3E] hover:bg-[#2C221E]/8 hover:text-[#141514] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
             >
               {showPassword ? (
                 <EyeOff className="h-4 w-4" aria-hidden="true" />

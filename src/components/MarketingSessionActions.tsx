@@ -80,14 +80,14 @@ export function MarketingSessionActions({
     <nav
       aria-label="Acesso à biblioteca"
       data-session-state={session.authenticated ? "authenticated" : "visitor"}
-      className="flex min-w-[186px] items-center justify-end gap-1.5 sm:min-w-[238px] sm:gap-3"
+      className="flex min-w-[178px] items-center justify-end gap-1 sm:min-w-[238px] sm:gap-3"
     >
       {session.authenticated ? (
         <>
           <Link
             href="/estante-3d"
             aria-label="Abrir Minha Estante"
-            className="inline-flex min-h-[36px] shrink-0 items-center justify-center whitespace-nowrap rounded-[var(--rf-radius-full)] border border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary)] px-3 sm:px-4 font-sans text-xs sm:text-sm font-semibold tracking-[0.01em] text-[var(--rf-accent-on-primary)] shadow-[var(--rf-nav-cta-shadow)] transition-colors hover:border-[var(--rf-accent-primary-hover)] hover:bg-[var(--rf-accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+            className="inline-flex min-h-[44px] lg:min-h-[36px] shrink-0 items-center justify-center whitespace-nowrap rounded-[var(--rf-radius-full)] border border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary)] px-3 sm:px-4 font-sans text-xs sm:text-sm font-semibold tracking-[0.01em] text-[var(--rf-accent-on-primary)] shadow-[var(--rf-nav-cta-shadow)] transition-colors hover:border-[var(--rf-accent-primary-hover)] hover:bg-[var(--rf-accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >
             Minha Estante
           </Link>
@@ -99,7 +99,7 @@ export function MarketingSessionActions({
                 : "Minha conta no ReadingFlow"
             }
             title={session.displayName ?? "Minha conta"}
-            className="inline-flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--rf-radius-full)] border border-[var(--rf-nav-border-accent-strong)] bg-[var(--rf-nav-surface-alt)] font-sans text-xs font-bold tracking-tight text-[var(--rf-nav-text)] transition-colors hover:border-[var(--rf-nav-accent)] hover:text-[var(--rf-nav-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+            className="inline-flex h-11 w-11 lg:h-9 lg:w-9 shrink-0 items-center justify-center rounded-[var(--rf-radius-full)] border border-[var(--rf-nav-border-accent-strong)] bg-[var(--rf-nav-surface-alt)] font-sans text-xs font-bold tracking-tight text-[var(--rf-nav-text)] transition-colors hover:border-[var(--rf-nav-accent)] hover:text-[var(--rf-nav-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >
             {initials}
           </Link>
@@ -109,14 +109,14 @@ export function MarketingSessionActions({
           <Link
             href="/entrar"
             aria-label="Entrar na sua conta"
-            className="inline-flex min-h-[36px] shrink-0 items-center whitespace-nowrap rounded-[var(--rf-radius-full)] px-2 sm:px-3 font-sans text-xs sm:text-sm font-medium text-[var(--rf-nav-text-marketing)] underline-offset-4 transition-colors hover:text-[var(--rf-nav-text)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+            className="inline-flex min-h-[44px] lg:min-h-[36px] shrink-0 items-center whitespace-nowrap rounded-[var(--rf-radius-full)] px-1.5 sm:px-3 font-sans text-xs sm:text-sm font-medium text-[var(--rf-nav-text-marketing)] underline-offset-4 transition-colors hover:text-[var(--rf-nav-text)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >
             Entrar
           </Link>
           <Link
             href="/criar-conta"
             aria-label="Criar minha estante"
-            className="inline-flex min-h-[36px] shrink-0 items-center justify-center whitespace-nowrap rounded-[var(--rf-radius-full)] border border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary)] px-2.5 sm:px-4 font-sans text-xs sm:text-sm font-semibold tracking-[0.01em] text-[var(--rf-accent-on-primary)] shadow-[var(--rf-nav-cta-shadow)] transition-colors hover:border-[var(--rf-accent-primary-hover)] hover:bg-[var(--rf-accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+            className="inline-flex min-h-[44px] lg:min-h-[36px] shrink-0 items-center justify-center whitespace-nowrap rounded-[var(--rf-radius-full)] border border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary)] px-2.5 sm:px-4 font-sans text-xs sm:text-sm font-semibold tracking-[0.01em] text-[var(--rf-accent-on-primary)] shadow-[var(--rf-nav-cta-shadow)] transition-colors hover:border-[var(--rf-accent-primary-hover)] hover:bg-[var(--rf-accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >
             Criar minha estante
           </Link>
@@ -142,7 +142,7 @@ export function MarketingMobileSessionActions({
           href="/estante-3d"
           role="menuitem"
           onClick={onNavigate}
-          className="flex min-h-[38px] w-full items-center justify-center rounded-[var(--rf-radius-full)] bg-[var(--rf-accent-primary)] px-3 font-sans text-xs font-semibold text-[var(--rf-accent-on-primary)] transition-colors hover:bg-[var(--rf-accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+          className="flex min-h-[44px] w-full items-center justify-center rounded-[var(--rf-radius-full)] bg-[var(--rf-accent-primary)] px-3 font-sans text-xs font-semibold text-[var(--rf-accent-on-primary)] transition-colors hover:bg-[var(--rf-accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
         >
           Minha Estante
         </Link>
@@ -150,7 +150,7 @@ export function MarketingMobileSessionActions({
           href="/painel"
           role="menuitem"
           onClick={onNavigate}
-          className="flex items-center gap-2 rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-semibold text-[var(--rf-nav-text)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+          className="flex min-h-[44px] items-center gap-2 rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-semibold text-[var(--rf-nav-text)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
         >
           <span
             aria-hidden="true"
@@ -172,7 +172,7 @@ export function MarketingMobileSessionActions({
         href="/criar-conta"
         role="menuitem"
         onClick={onNavigate}
-        className="flex min-h-[38px] w-full items-center justify-center rounded-[var(--rf-radius-full)] bg-[var(--rf-accent-primary)] px-3 font-sans text-xs font-semibold text-[var(--rf-accent-on-primary)] transition-colors hover:bg-[var(--rf-accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+        className="flex min-h-[44px] w-full items-center justify-center rounded-[var(--rf-radius-full)] bg-[var(--rf-accent-primary)] px-3 font-sans text-xs font-semibold text-[var(--rf-accent-on-primary)] transition-colors hover:bg-[var(--rf-accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
       >
         Criar minha estante
       </Link>
@@ -180,7 +180,7 @@ export function MarketingMobileSessionActions({
         href="/entrar"
         role="menuitem"
         onClick={onNavigate}
-        className="block rounded-[var(--rf-radius-sm)] px-3 py-2 text-center font-sans text-xs font-semibold text-[var(--rf-nav-text-marketing)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+        className="flex min-h-[44px] items-center justify-center rounded-[var(--rf-radius-sm)] px-3 py-2 text-center font-sans text-xs font-semibold text-[var(--rf-nav-text-marketing)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
       >
         Entrar
       </Link>

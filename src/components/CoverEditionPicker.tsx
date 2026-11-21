@@ -13,7 +13,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { BookCover } from "@/components/BookCover";
-import { COVER_UPLOAD_ACCEPTED_TYPES } from "@/features/catalog/cover-rules";
 import { processCoverFile } from "@/features/catalog/cover-upload";
 import {
   isUnambiguousCoverMatch,
@@ -816,7 +815,7 @@ export function CoverEditionPicker({
               ref={fileInputRef}
               id={fileInputId}
               type="file"
-              accept={COVER_UPLOAD_ACCEPTED_TYPES.join(",")}
+              accept="image/*"
               disabled={isBusy}
               onChange={(e) => void handleFileChange(e.target.files?.[0])}
               className="sr-only"

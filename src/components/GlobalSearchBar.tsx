@@ -115,10 +115,11 @@ export function GlobalSearchBar({ className = "" }: { className?: string }) {
         id={inputId}
         data-rf-global-search-input="true"
         type="search"
+        enterKeyHint="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Buscar no acervo..."
-        className="min-h-[40px] w-full rounded-[var(--rf-radius-full)] border border-[var(--rf-nav-border-accent)] bg-[var(--rf-nav-surface)] pl-9 pr-16 text-[13px] text-[var(--rf-nav-text)] placeholder:text-[var(--rf-nav-text-subtle)] transition-colors hover:border-[var(--rf-nav-border-accent-hover)] focus:border-[var(--rf-nav-accent-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--rf-nav-accent-ring)]"
+        className="min-h-[44px] lg:min-h-[40px] w-full rounded-[var(--rf-radius-full)] border border-[var(--rf-nav-border-accent)] bg-[var(--rf-nav-surface)] pl-9 pr-16 text-base lg:text-[13px] text-[var(--rf-nav-text)] placeholder:text-[var(--rf-nav-text-subtle)] transition-colors hover:border-[var(--rf-nav-border-accent-hover)] focus:border-[var(--rf-nav-accent-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--rf-nav-accent-ring)]"
       />
 
       <div

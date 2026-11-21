@@ -4,7 +4,6 @@ import { useId, useState, type DragEvent } from "react";
 import { ImagePlus, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { BookCover } from "@/components/BookCover";
 import { processCoverFile } from "@/features/catalog/cover-upload";
-import { COVER_UPLOAD_ACCEPTED_TYPES } from "@/features/catalog/cover-rules";
 
 export type CoverSource = "auto" | "upload" | "none";
 
@@ -127,8 +126,8 @@ export function CoverUploader({
         <input
           id={inputId}
           type="file"
-          accept={COVER_UPLOAD_ACCEPTED_TYPES.join(",")}
-          aria-label="Enviar capa do livro (JPEG, PNG ou WebP)"
+          accept="image/*"
+          aria-label="Enviar capa do livro (galeria ou câmera)"
           aria-describedby={feedback ? messageId : undefined}
           disabled={processing}
           onChange={(event) => {

@@ -90,7 +90,7 @@ export function Modal({
           onClick={(event) => {
             if (event.target === event.currentTarget) handleClose();
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--rf-surface-overlay)] p-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--rf-surface-overlay)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
         >
           <motion.div
             ref={dialogRef}
@@ -108,14 +108,14 @@ export function Modal({
                 ? { opacity: 0 }
                 : { opacity: 0, y: 8, scale: 0.97 }
             }
-            className={`relative w-full ${sizeClass} rounded-[var(--rf-radius-lg)] border p-6 ${surfaceClass} ${className}`.trim()}
+            className={`relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto overscroll-contain ${sizeClass} rounded-[var(--rf-radius-lg)] border p-6 ${surfaceClass} ${className}`.trim()}
           >
             <button
               ref={closeButtonRef}
               type="button"
               aria-label={closeLabel}
               onClick={handleClose}
-              className={`absolute top-3.5 right-3.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-[var(--rf-radius-full)] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${closeBtnClass}`}
+              className={`absolute top-2.5 right-2.5 flex h-11 w-11 sm:h-9 sm:w-9 cursor-pointer items-center justify-center rounded-[var(--rf-radius-full)] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${closeBtnClass}`}
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </button>

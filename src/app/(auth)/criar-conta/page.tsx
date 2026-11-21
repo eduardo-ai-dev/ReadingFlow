@@ -32,7 +32,8 @@ export default function SignUpPage() {
           Criar minha biblioteca
         </h1>
         <p className="mt-1 font-sans text-sm text-[#2C221E]">
-          Sua conta nasce 100% privada, solicitando exclusivamente e-mail e senha.
+          Sua conta nasce 100% privada, solicitando exclusivamente e-mail e
+          senha.
         </p>
       </header>
 
@@ -51,7 +52,11 @@ export default function SignUpPage() {
           const passwordStrength = evaluatePasswordStrength(password);
           let hasFieldError = false;
 
-          if (!cleanEmail || !cleanEmail.includes("@") || !cleanEmail.includes(".")) {
+          if (
+            !cleanEmail ||
+            !cleanEmail.includes("@") ||
+            !cleanEmail.includes(".")
+          ) {
             setEmailError("Informe um endereço de e-mail válido.");
             hasFieldError = true;
           }
@@ -114,6 +119,7 @@ export default function SignUpPage() {
               name="email"
               type="email"
               autoComplete="email"
+              enterKeyHint="next"
               required
               disabled={isBusy}
               aria-invalid={Boolean(emailError)}
@@ -140,7 +146,10 @@ export default function SignUpPage() {
                 role="alert"
                 className="flex items-center gap-1 font-sans text-xs font-medium text-[#9E2A2B]"
               >
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <AlertCircle
+                  className="h-3.5 w-3.5 shrink-0"
+                  aria-hidden="true"
+                />
                 <span>{emailError}</span>
               </p>
             ) : null}
@@ -160,11 +169,14 @@ export default function SignUpPage() {
               name="password"
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
+              enterKeyHint="done"
               required
               minLength={8}
               disabled={isBusy}
               aria-invalid={Boolean(passwordError)}
-              aria-describedby={passwordError ? "signup-password-error" : undefined}
+              aria-describedby={
+                passwordError ? "signup-password-error" : undefined
+              }
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
@@ -188,7 +200,7 @@ export default function SignUpPage() {
                   : "Mostrar caracteres digitados"
               }
               aria-pressed={showPassword}
-              className="rf-icon-btn absolute right-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[6px] text-[#4A433C] transition-colors duration-200 group-focus-within:text-[#722F3E] hover:bg-[#2C221E]/8 hover:text-[#141514] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
+              className="rf-icon-btn absolute right-0 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[6px] text-[#4A433C] transition-colors duration-200 group-focus-within:text-[#722F3E] hover:bg-[#2C221E]/8 hover:text-[#141514] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
             >
               {showPassword ? (
                 <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -208,7 +220,10 @@ export default function SignUpPage() {
                 role="alert"
                 className="flex items-center gap-1 font-sans text-xs font-medium text-[#9E2A2B]"
               >
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <AlertCircle
+                  className="h-3.5 w-3.5 shrink-0"
+                  aria-hidden="true"
+                />
                 <span>{passwordError}</span>
               </p>
             ) : null}
@@ -279,7 +294,10 @@ export default function SignUpPage() {
               role="alert"
               className="flex items-center gap-1.5 font-sans text-xs font-medium text-[#9E2A2B]"
             >
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <AlertCircle
+                className="h-3.5 w-3.5 shrink-0"
+                aria-hidden="true"
+              />
               <span>{formError}</span>
             </p>
           ) : null}

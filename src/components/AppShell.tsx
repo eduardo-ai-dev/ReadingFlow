@@ -138,7 +138,7 @@ export function AppShell({
               variant="primary"
               size="sm"
               pill
-              className="min-h-[38px] shrink-0 px-3 sm:px-4 text-xs font-bold shadow-[var(--rf-nav-cta-shadow)]"
+              className="min-h-[44px] lg:min-h-[38px] shrink-0 px-3 sm:px-4 text-xs font-bold shadow-[var(--rf-nav-cta-shadow)]"
             >
               <Plus size={15} strokeWidth={2.2} aria-hidden="true" />
               <span className="hidden sm:inline">Novo livro</span>
@@ -154,7 +154,7 @@ export function AppShell({
                 aria-haspopup="menu"
                 aria-label="Menu da conta"
                 onClick={() => setAccountMenuOpen((v) => !v)}
-                className="flex h-9 w-9 items-center justify-center rounded-[var(--rf-radius-full)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface)] text-[var(--rf-nav-accent)] transition-colors hover:border-[var(--rf-nav-accent)] hover:text-[var(--rf-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                className="flex h-11 w-11 lg:h-9 lg:w-9 items-center justify-center rounded-[var(--rf-radius-full)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface)] text-[var(--rf-nav-accent)] transition-colors hover:border-[var(--rf-nav-accent)] hover:text-[var(--rf-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
               >
                 <User size={16} strokeWidth={1.8} aria-hidden="true" />
               </button>
@@ -178,7 +178,7 @@ export function AppShell({
                       href="/configuracoes"
                       role="menuitem"
                       onClick={() => setAccountMenuOpen(false)}
-                      className="flex items-center gap-2.5 rounded-[var(--rf-radius-md)] px-3 py-2 font-sans text-xs font-medium text-[var(--rf-nav-text)] transition-colors hover:bg-[var(--rf-nav-surface-hover)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                      className="flex min-h-[44px] items-center gap-2.5 rounded-[var(--rf-radius-md)] px-3 py-2 font-sans text-xs font-medium text-[var(--rf-nav-text)] transition-colors hover:bg-[var(--rf-nav-surface-hover)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
                     >
                       <Settings
                         size={14}
@@ -195,7 +195,7 @@ export function AppShell({
                       role="menuitem"
                       disabled={isSigningOut}
                       onClick={handleSignOut}
-                      className="flex w-full items-center gap-2.5 rounded-[var(--rf-radius-md)] px-3 py-2 font-sans text-xs font-semibold text-[var(--rf-nav-danger)] transition-colors hover:bg-[var(--rf-nav-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] disabled:opacity-50"
+                      className="flex min-h-[44px] w-full items-center gap-2.5 rounded-[var(--rf-radius-md)] px-3 py-2 font-sans text-xs font-semibold text-[var(--rf-nav-danger)] transition-colors hover:bg-[var(--rf-nav-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] disabled:opacity-50"
                     >
                       <LogOut size={14} strokeWidth={1.8} aria-hidden="true" />
                       {isSigningOut ? "Encerrando..." : "Encerrar sessão"}
@@ -217,7 +217,7 @@ export function AppShell({
                   : "Abrir menu de navegação"
               }
               onClick={() => setMobileMenuOpen((v) => !v)}
-              className="flex h-9 w-9 items-center justify-center rounded-[var(--rf-radius-md)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface)] text-[var(--rf-nav-accent)] transition-colors hover:border-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-[var(--rf-radius-md)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface)] text-[var(--rf-nav-accent)] transition-colors hover:border-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:hidden"
             >
               {mobileMenuOpen ? (
                 <X size={18} strokeWidth={1.8} aria-hidden="true" />
@@ -287,7 +287,7 @@ export function AppShell({
                         href={item.href}
                         aria-current={active ? "page" : undefined}
                         onClick={() => setMobileMenuOpen(false)}
-                        className={`flex min-h-[38px] items-center rounded-[var(--rf-radius-sm)] border px-3 font-sans text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                        className={`flex min-h-[44px] items-center rounded-[var(--rf-radius-sm)] border px-3 font-sans text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                           active
                             ? "border-[var(--rf-accent-secondary)] bg-[var(--rf-accent-secondary)] text-[var(--rf-accent-on-secondary)]"
                             : "border-[var(--rf-border-subtle)] bg-[var(--rf-surface-elevated)] text-[var(--rf-text-heading)] hover:border-[var(--rf-border-accent)]"
@@ -301,7 +301,7 @@ export function AppShell({
               </ul>
             </div>
 
-            <div className="mt-4 flex items-center justify-between border-t border-[var(--rf-border-subtle)] pt-3 font-sans text-xs">
+            <div className="mt-4 flex items-center justify-between gap-2 border-t border-[var(--rf-border-subtle)] pt-3 font-sans text-xs">
               <span className="truncate font-mono text-[11px] text-[var(--rf-text-secondary)]">
                 {profile.email}
               </span>
@@ -309,7 +309,7 @@ export function AppShell({
                 type="button"
                 disabled={isSigningOut}
                 onClick={handleSignOut}
-                className="rounded-[var(--rf-radius-sm)] border border-[var(--rf-status-error)] bg-[var(--rf-surface-elevated)] px-3 py-1.5 font-sans text-xs font-semibold text-[var(--rf-status-error)] transition-colors hover:bg-[var(--rf-status-error-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                className="inline-flex min-h-[44px] shrink-0 items-center rounded-[var(--rf-radius-sm)] border border-[var(--rf-status-error)] bg-[var(--rf-surface-elevated)] px-3 py-1.5 font-sans text-xs font-semibold text-[var(--rf-status-error)] transition-colors hover:bg-[var(--rf-status-error-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
               >
                 {isSigningOut ? "Saindo..." : "Encerrar sessão"}
               </button>

@@ -16,11 +16,11 @@ export default function AuthLayout({
       <LibraryBackdrop variant="auth" />
 
       {/* 1. Cabeçalho Compacto Unificado (/entrar e /criar-conta) */}
-      <header className="relative z-10 h-16 border-b border-[var(--rf-border-subtle)] bg-[var(--rf-surface-header-translucent)] backdrop-blur-sm">
-        <div className="mx-auto flex h-full max-w-5xl items-center justify-between px-6">
+      <header className="relative z-10 min-h-16 border-b border-[var(--rf-border-subtle)] bg-[var(--rf-surface-canvas)] pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
           <Link
             href="/"
-            className="group inline-flex items-baseline gap-2.5 rounded-[var(--rf-radius-xs)] px-1 no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+            className="group inline-flex min-h-[44px] items-center gap-2.5 rounded-[var(--rf-radius-xs)] px-1 no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >
             <span className="font-serif text-xl font-semibold tracking-tight text-[var(--rf-text-primary)] transition-colors group-hover:text-[var(--rf-text-accent-secondary)]">
               ReadingFlow
@@ -32,7 +32,7 @@ export default function AuthLayout({
 
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 rounded-[var(--rf-radius-md)] px-3 py-1.5 font-sans text-xs font-semibold tracking-[0.01em] text-[var(--rf-text-heading)] no-underline transition-all duration-200 ease-[var(--ease-editorial)] hover:-translate-y-[1px] hover:bg-[var(--rf-surface-subtle)] hover:text-[var(--rf-text-accent-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--rf-radius-md)] px-3 py-1.5 font-sans text-xs font-semibold tracking-[0.01em] text-[var(--rf-text-heading)] no-underline transition-all duration-200 ease-[var(--ease-editorial)] hover:-translate-y-[1px] hover:bg-[var(--rf-surface-subtle)] hover:text-[var(--rf-text-accent-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >
             <span>← Voltar ao início</span>
           </Link>
@@ -49,7 +49,7 @@ export default function AuthLayout({
       </main>
 
       {/* 6. Rodapé Discreto */}
-      <footer className="relative z-10 border-t border-[var(--rf-border-subtle)] py-4 text-center font-sans text-xs text-[var(--rf-text-heading)]">
+      <footer className="relative z-10 border-t border-[var(--rf-border-subtle)] py-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-center font-sans text-xs text-[var(--rf-text-heading)]">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-4 px-6">
           <Link
             href="/privacidade"

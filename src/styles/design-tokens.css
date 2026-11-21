@@ -113,6 +113,18 @@
   --rf-panel-section-gap: 56px;
 }
 
+/* Alvos de toque mínimos (>= 44px) em dispositivos touch (WCAG 2.2 / HIG) sem alterar desktop */
+@media (pointer: coarse) {
+  :root,
+  [data-density="compact"],
+  [data-density="comfortable"],
+  [data-density="spacious"] {
+    --rf-control-h-sm: 44px;
+    --rf-control-h-md: 44px;
+    --rf-control-h-lg: 48px;
+  }
+}
+
 /* ==========================================================================
    MOVIMENTO (`data-motion="reduced"`)
    ========================================================================== */

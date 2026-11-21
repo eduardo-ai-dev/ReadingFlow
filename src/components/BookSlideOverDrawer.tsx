@@ -632,11 +632,11 @@ function DrawerBody({
 
       {/* Rodapé com link para ficha completa */}
       {book.href || book.workId ? (
-        <div className="border-t border-[#C8A46E]/20 px-5 py-4 sm:px-6">
+        <div className="border-t border-[#C8A46E]/20 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
           <Link
             href={book.href ?? `/livros/${book.workId}`}
             onClick={onClose}
-            className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-md border border-[#C8A46E]/25 px-3 font-sans text-xs font-semibold text-[#DFBE88] transition-colors hover:border-[#C8A46E]/60 hover:bg-[#222422] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
+            className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-[#C8A46E]/25 px-3 font-sans text-xs font-semibold text-[#DFBE88] transition-colors hover:border-[#C8A46E]/60 hover:bg-[#222422] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
           >
             Abrir ficha completa da obra
             <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
@@ -671,7 +671,7 @@ export function BookSlideOverDrawer({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-[#141514]/75 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex justify-end bg-[#141514]/75"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -683,7 +683,7 @@ export function BookSlideOverDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative h-full w-full max-w-md border-l border-[#C8A46E]/30 bg-[#1B1D1B] text-[#F4EFE6] shadow-[-20px_0_48px_rgba(14,12,10,0.75)]"
+        className="relative h-dvh w-full max-w-md overflow-y-auto overscroll-contain border-l border-[#C8A46E]/30 bg-[#1B1D1B] pt-[env(safe-area-inset-top)] text-[#F4EFE6] shadow-[-20px_0_48px_rgba(14,12,10,0.75)]"
       >
         <DrawerBody
           key={book.id}

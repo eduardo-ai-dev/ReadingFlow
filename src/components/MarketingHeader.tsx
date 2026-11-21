@@ -61,13 +61,13 @@ export function MarketingHeader() {
         isScrolled ? "shadow-[var(--rf-nav-shadow-scrolled)]" : ""
       }`}
     >
-      <div className="mx-auto flex h-14 sm:h-16 max-w-[1520px] items-center justify-between gap-2 px-3 sm:px-8">
+      <div className="mx-auto flex h-14 sm:h-16 max-w-[1520px] items-center justify-between gap-1.5 px-2.5 sm:gap-2 sm:px-8">
         {/* Esquerda: Marca + Âncoras da landing */}
         <div className="flex min-w-0 items-center gap-4 sm:gap-8">
           <Link
             href="/"
             aria-label="ReadingFlow"
-            className="shrink-0 rounded-[var(--rf-radius-xs)] px-0.5 font-sans text-base sm:text-xl font-semibold tracking-tight text-[var(--rf-nav-text)] hover:text-[var(--rf-nav-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+            className="inline-flex min-h-[44px] shrink-0 items-center rounded-[var(--rf-radius-xs)] px-0.5 font-sans text-base sm:text-xl font-semibold tracking-tight text-[var(--rf-nav-text)] hover:text-[var(--rf-nav-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >
             ReadingFlow
           </Link>
@@ -123,7 +123,7 @@ export function MarketingHeader() {
             aria-label={
               menuOpen ? ptBR.landingRoom.closeMenu : ptBR.landingRoom.openMenu
             }
-            className="flex lg:hidden h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[var(--rf-radius-full)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface-alt)] text-[var(--rf-nav-text)] hover:border-[var(--rf-nav-accent)] hover:text-[var(--rf-nav-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+            className="flex lg:hidden h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-[var(--rf-radius-full)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface-alt)] text-[var(--rf-nav-text)] hover:border-[var(--rf-nav-accent)] hover:text-[var(--rf-nav-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >
             {menuOpen ? (
               <X className="h-4 w-4" aria-hidden="true" />
@@ -150,7 +150,7 @@ export function MarketingHeader() {
                     : { opacity: 0, y: -4, scale: 0.98 }
                 }
                 transition={{ duration: 0.16 }}
-                className="lg:hidden absolute top-11 right-0 z-50 w-60 rounded-[var(--rf-radius-lg)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-bg-marketing)] p-2.5 font-sans text-sm text-[var(--rf-nav-text)] shadow-[var(--rf-nav-modal-shadow)]"
+                className="lg:hidden absolute top-12 right-0 z-50 max-h-[calc(100dvh-5rem)] w-60 overflow-y-auto overscroll-contain rounded-[var(--rf-radius-lg)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-bg-marketing)] p-2.5 font-sans text-sm text-[var(--rf-nav-text)] shadow-[var(--rf-nav-modal-shadow)]"
               >
                 <MarketingMobileSessionActions
                   session={session}
@@ -163,7 +163,7 @@ export function MarketingHeader() {
                   href="/#sobre"
                   role="menuitem"
                   onClick={() => setMenuOpen(false)}
-                  className="block rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-semibold text-[var(--rf-nav-text)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                  className="flex min-h-[44px] items-center rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-semibold text-[var(--rf-nav-text)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
                 >
                   {ptBR.landingRoom.aboutLink}
                 </Link>
@@ -171,7 +171,7 @@ export function MarketingHeader() {
                   href="/#funcionalidades"
                   role="menuitem"
                   onClick={() => setMenuOpen(false)}
-                  className="block rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-semibold text-[var(--rf-nav-text)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                  className="flex min-h-[44px] items-center rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-semibold text-[var(--rf-nav-text)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
                 >
                   Funcionalidades
                 </Link>
@@ -179,7 +179,7 @@ export function MarketingHeader() {
                   href="/#faq"
                   role="menuitem"
                   onClick={() => setMenuOpen(false)}
-                  className="block rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-semibold text-[var(--rf-nav-text)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                  className="flex min-h-[44px] items-center rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-semibold text-[var(--rf-nav-text)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
                 >
                   FAQ
                 </Link>
@@ -187,7 +187,7 @@ export function MarketingHeader() {
                   href="/#contato"
                   role="menuitem"
                   onClick={() => setMenuOpen(false)}
-                  className="block rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-semibold text-[var(--rf-nav-text)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                  className="flex min-h-[44px] items-center rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-semibold text-[var(--rf-nav-text)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
                 >
                   {ptBR.landingRoom.contactLink}
                 </Link>
@@ -198,7 +198,7 @@ export function MarketingHeader() {
                   href="/ajuda"
                   role="menuitem"
                   onClick={() => setMenuOpen(false)}
-                  className="block rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-medium text-[var(--rf-nav-text-muted)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                  className="flex min-h-[44px] items-center rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-medium text-[var(--rf-nav-text-muted)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
                 >
                   {ptBR.landingRoom.helpLink}
                 </Link>
@@ -206,7 +206,7 @@ export function MarketingHeader() {
                   href="/termos"
                   role="menuitem"
                   onClick={() => setMenuOpen(false)}
-                  className="block rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-medium text-[var(--rf-nav-text-muted)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                  className="flex min-h-[44px] items-center rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-medium text-[var(--rf-nav-text-muted)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
                 >
                   {ptBR.landingRoom.termsLink}
                 </Link>
@@ -214,7 +214,7 @@ export function MarketingHeader() {
                   href="/privacidade"
                   role="menuitem"
                   onClick={() => setMenuOpen(false)}
-                  className="block rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-medium text-[var(--rf-nav-text-muted)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                  className="flex min-h-[44px] items-center rounded-[var(--rf-radius-sm)] px-3 py-2 font-sans text-xs font-medium text-[var(--rf-nav-text-muted)] hover:bg-[var(--rf-nav-surface-alt)] hover:text-[var(--rf-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
                 >
                   {ptBR.landingRoom.privacyLink}
                 </Link>

@@ -115,6 +115,7 @@ export default function RecoverPasswordPage() {
                 id="recover-email"
                 type="email"
                 autoComplete="email"
+                enterKeyHint="send"
                 required
                 disabled={isPending}
                 aria-invalid={Boolean(emailError)}

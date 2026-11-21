@@ -41,7 +41,7 @@ export function MetricFormulaHint({
         aria-expanded={open}
         aria-controls={open ? noteId : undefined}
         aria-label={`${basisLabel}. ${formula}`}
-        className={`rf-icon-btn inline-flex cursor-pointer items-center gap-1 rounded-[var(--rf-radius-xs)] text-left font-sans text-[13px] font-medium leading-snug underline decoration-dotted underline-offset-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${triggerColor}`}
+        className={`rf-icon-btn inline-flex min-h-[44px] py-2 lg:min-h-0 lg:py-0 cursor-pointer items-center gap-1 rounded-[var(--rf-radius-xs)] text-left font-sans text-[13px] font-medium leading-snug underline decoration-dotted underline-offset-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${triggerColor}`}
       >
         <span>{basisLabel}</span>
         <Info className="h-3.5 w-3.5 shrink-0 opacity-85" aria-hidden="true" />
