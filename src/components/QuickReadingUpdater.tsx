@@ -39,6 +39,7 @@ export function QuickReadingUpdater({
 }) {
   const router = useRouter();
   const [unit, setUnit] = useState<ProgressUnit>(initialUnit);
+  const [currentTotal, setCurrentTotal] = useState<number | undefined>(total);
   const [val, setVal] = useState(
     initialUnit === "seconds"
       ? String(Math.round(initialValue / 60))
@@ -56,31 +57,62 @@ export function QuickReadingUpdater({
    */
   const submitProgress = (
     targetUnit: ProgressUnit,
-    numeric: number,
+    rawInput: string | number,
     successMessage = "Progresso salvo."
   ) => {
     if (isBusy) return;
     setErrorMessage(null);
     setStatusMessage(null);
 
-    if (!Number.isFinite(numeric) || numeric < 0) {
-      setErrorMessage("Informe um valor numérico positivo.");
+    let numeric: number;
+    if (typeof rawInput === "string") {
+      const trimmed = rawInput.trim();
+      if (!trimmed) {
+        setErrorMessage(
+          "Informe um valor numérico para atualizar o progresso."
+        );
+        return;
+      }
+      if (!/^-?\d+$/.test(trimmed)) {
+        setErrorMessage("Informe um número inteiro sem casas decimais.");
+        return;
+      }
+      numeric = Number.parseInt(trimmed, 10);
+    } else {
+      numeric = rawInput;
+    }
+
+    if (!Number.isFinite(numeric) || !Number.isInteger(numeric)) {
+      setErrorMessage("Informe um número inteiro sem casas decimais.");
+      return;
+    }
+    if (numeric < 0) {
+      setErrorMessage("Informe um valor numérico positivo (zero ou maior).");
       return;
     }
     if (targetUnit === "percent" && numeric > 100) {
       setErrorMessage("A porcentagem não pode exceder 100%.");
       return;
     }
-    if (targetUnit === "pages" && total && numeric > total) {
+    if (targetUnit === "pages" && currentTotal && numeric > currentTotal) {
       setErrorMessage(
-        `O número de páginas não pode exceder o total do livro (${total} pág.).`
+        `O número de páginas não pode exceder o total do livro (${currentTotal} pág.).`
+      );
+      return;
+    }
+    if (
+      targetUnit === "seconds" &&
+      currentTotal &&
+      numeric * 60 > currentTotal
+    ) {
+      setErrorMessage(
+        `O tempo informado não pode exceder a duração total (${Math.round(currentTotal / 60)} min).`
       );
       return;
     }
 
-    const rawVal =
-      targetUnit === "seconds" ? Math.round(numeric * 60) : Math.round(numeric);
-    setVal(String(Math.round(numeric)));
+    const rawVal = targetUnit === "seconds" ? numeric * 60 : numeric;
+    setVal(String(numeric));
 
     setIsSubmitting(true);
     startTransition(async () => {
@@ -96,6 +128,10 @@ export function QuickReadingUpdater({
         }
         setStatusMessage(successMessage);
         router.refresh();
+      } catch {
+        setErrorMessage(
+          "Não foi possível salvar o progresso agora. Tente novamente."
+        );
       } finally {
         setIsSubmitting(false);
       }
@@ -103,16 +139,20 @@ export function QuickReadingUpdater({
   };
 
   const handleQuickPageDelta = (delta: number, label: string) => {
-    const parsed = Number.parseFloat(val);
-    const currentPages = Number.isFinite(parsed) && parsed >= 0 ? parsed : initialValue;
+    const parsed = Number.parseInt(val, 10);
+    const currentPages =
+      Number.isInteger(parsed) && parsed >= 0 ? parsed : initialValue;
     const rawNext = currentPages + delta;
     const nextPages =
-      typeof total === "number" && total > 0 ? Math.min(total, rawNext) : rawNext;
+      typeof currentTotal === "number" && currentTotal > 0
+        ? Math.min(currentTotal, rawNext)
+        : rawNext;
     submitProgress("pages", nextPages, label);
   };
 
   const handleUnitSwitch = (nextUnit: ProgressUnit) => {
-    if (isBusy) return;
+    if (isBusy || nextUnit === unit) return;
+    const prevUnit = unit;
     setUnit(nextUnit);
     setErrorMessage(null);
     setStatusMessage(null);
@@ -126,22 +166,39 @@ export function QuickReadingUpdater({
           convertFromPreviousUnit: true,
         });
         if (!res.ok) {
+          setUnit(prevUnit);
           setErrorMessage(res.error);
           return;
         }
+        setUnit(res.progressUnit);
+        setCurrentTotal(res.progressTotal);
+        setVal(
+          res.progressUnit === "seconds"
+            ? String(Math.round(res.progressValue / 60))
+            : String(res.progressValue)
+        );
+        setStatusMessage("Unidade convertida.");
         router.refresh();
+      } catch {
+        setUnit(prevUnit);
+        setErrorMessage(
+          "Não foi possível converter a unidade agora. Tente novamente."
+        );
       } finally {
         setIsSubmitting(false);
       }
     });
   };
 
-  const parsedCurrent = Number.parseFloat(val);
-  const currentNumeric = Number.isFinite(parsedCurrent)
+  const parsedCurrent = Number.parseInt(val, 10);
+  const currentNumeric = Number.isInteger(parsedCurrent)
     ? parsedCurrent
     : initialValue;
   const reachedPageTotal =
-    unit === "pages" && typeof total === "number" && total > 0 && currentNumeric >= total;
+    unit === "pages" &&
+    typeof currentTotal === "number" &&
+    currentTotal > 0 &&
+    currentNumeric >= currentTotal;
 
   return (
     <div
@@ -164,9 +221,7 @@ export function QuickReadingUpdater({
           <button
             type="button"
             disabled={isBusy || reachedPageTotal}
-            onClick={() =>
-              handleQuickPageDelta(10, "+10 páginas registradas.")
-            }
+            onClick={() => handleQuickPageDelta(10, "+10 páginas registradas.")}
             aria-label="Avançar 10 páginas"
             className={rfButtonClassName({
               variant: "subtle",
@@ -175,16 +230,17 @@ export function QuickReadingUpdater({
               pill: true,
             })}
           >
-            <Plus className="h-3.5 w-3.5 text-[var(--rf-text-on-contrast-muted)]" aria-hidden="true" />
+            <Plus
+              className="h-3.5 w-3.5 text-[var(--rf-text-on-contrast-muted)]"
+              aria-hidden="true"
+            />
             <span>10 pág.</span>
           </button>
 
           <button
             type="button"
             disabled={isBusy || reachedPageTotal}
-            onClick={() =>
-              handleQuickPageDelta(25, "+25 páginas registradas.")
-            }
+            onClick={() => handleQuickPageDelta(25, "+25 páginas registradas.")}
             aria-label="Avançar 25 páginas"
             className={rfButtonClassName({
               variant: "subtle",
@@ -193,7 +249,10 @@ export function QuickReadingUpdater({
               pill: true,
             })}
           >
-            <Plus className="h-3.5 w-3.5 text-[var(--rf-text-on-contrast-muted)]" aria-hidden="true" />
+            <Plus
+              className="h-3.5 w-3.5 text-[var(--rf-text-on-contrast-muted)]"
+              aria-hidden="true"
+            />
             <span>25 pág.</span>
           </button>
 
@@ -225,10 +284,11 @@ export function QuickReadingUpdater({
       ) : null}
 
       <form
+        noValidate
         aria-busy={isBusy}
         onSubmit={(e) => {
           e.preventDefault();
-          submitProgress(unit, Number.parseFloat(val));
+          submitProgress(unit, val);
         }}
         className="flex flex-wrap items-end justify-between gap-3"
       >
@@ -272,7 +332,10 @@ export function QuickReadingUpdater({
               className="min-h-[40px] rounded-[var(--rf-radius-md)] border border-[var(--rf-border-strong)] bg-[var(--rf-surface-card-solid)] px-3 font-sans text-[13px] font-semibold text-[var(--rf-text-primary)] shadow-[var(--rf-shadow-xs)] transition-colors focus:border-[var(--rf-focus-ring-color)] focus:outline-none focus:ring-2 focus:ring-[var(--rf-focus-ring-color)] disabled:opacity-60"
             >
               <option value="pages">
-                páginas{total && unit === "pages" ? ` (de ${total})` : ""}
+                páginas
+                {currentTotal && unit === "pages"
+                  ? ` (de ${currentTotal})`
+                  : ""}
               </option>
               <option value="percent">% concluído</option>
               <option value="seconds">minutos ouvidos</option>
@@ -314,7 +377,10 @@ export function QuickReadingUpdater({
               })}
               title="Abrir sessão cronometrada no Canto de Foco para este livro"
             >
-              <Timer className="h-3.5 w-3.5 text-[var(--rf-text-on-contrast-muted)]" aria-hidden="true" />
+              <Timer
+                className="h-3.5 w-3.5 text-[var(--rf-text-on-contrast-muted)]"
+                aria-hidden="true"
+              />
               <span>Iniciar Foco</span>
             </Link>
           ) : null}
@@ -345,6 +411,10 @@ export function QuickReadingUpdater({
                   );
                 }
                 router.refresh();
+              } catch {
+                setErrorMessage(
+                  "Não foi possível concluir o livro agora. Tente novamente."
+                );
               } finally {
                 setIsSubmitting(false);
               }

@@ -25,6 +25,7 @@ import {
   resolveReadingPagesContribution,
 } from "@/features/goals/rules";
 import { formatDateInTimezone } from "@/lib/dates";
+import type { ProgressUnit } from "@/lib/domain";
 import { sanitizePlainText } from "@/server/security/sanitize";
 
 export async function startReadingAction(
@@ -96,9 +97,15 @@ export async function startReadingAction(
   return { ok: true, readingId: created.id };
 }
 
-export async function updateReadingProgressAction(
-  rawInput: unknown
-): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function updateReadingProgressAction(rawInput: unknown): Promise<
+  | {
+      ok: true;
+      progressUnit: ProgressUnit;
+      progressValue: number;
+      progressTotal?: number;
+    }
+  | { ok: false; error: string }
+> {
   const ws = await requireAuthenticatedWorkspace();
   const parsed = updateReadingProgressSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -148,6 +155,13 @@ export async function updateReadingProgressAction(
     reading.progressValue = converted.progressValue;
     reading.progressTotal = converted.progressTotal;
   } else {
+    if (!Number.isInteger(data.progressValue)) {
+      return {
+        ok: false,
+        error: "Informe um número inteiro sem casas decimais.",
+      };
+    }
+
     const resolvedTotal =
       data.progressTotal ??
       (data.progressUnit === "percent"
@@ -156,13 +170,25 @@ export async function updateReadingProgressAction(
           ? (edition?.pages ?? reading.progressTotal)
           : (edition?.durationSeconds ?? reading.progressTotal));
 
-    const clampedValue =
-      resolvedTotal && data.progressValue > resolvedTotal
-        ? resolvedTotal
-        : data.progressValue;
+    if (data.progressUnit === "percent" && data.progressValue > 100) {
+      return {
+        ok: false,
+        error: "A porcentagem não pode exceder 100%.",
+      };
+    }
+
+    if (resolvedTotal && data.progressValue > resolvedTotal) {
+      return {
+        ok: false,
+        error:
+          data.progressUnit === "pages"
+            ? `O número de páginas não pode exceder o total do livro (${resolvedTotal} pág.).`
+            : `O tempo informado excede a duração total da obra (${Math.round(resolvedTotal / 60)} min).`,
+      };
+    }
 
     reading.progressUnit = data.progressUnit;
-    reading.progressValue = clampedValue;
+    reading.progressValue = data.progressValue;
     reading.progressTotal = resolvedTotal;
   }
 
@@ -185,7 +211,12 @@ export async function updateReadingProgressAction(
 
   reading.updatedAt = nowIso;
   revalidatePath("/", "layout");
-  return { ok: true };
+  return {
+    ok: true,
+    progressUnit: reading.progressUnit,
+    progressValue: reading.progressValue,
+    progressTotal: reading.progressTotal,
+  };
 }
 
 export async function togglePauseReadingAction(

@@ -4,14 +4,7 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  BookOpen,
-  Check,
-  ExternalLink,
-  Flame,
-  Star,
-  X,
-} from "lucide-react";
+import { BookOpen, Check, ExternalLink, Flame, Star, X } from "lucide-react";
 import type { BookFormat, ProgressUnit, ReadingStatus } from "@/lib/domain";
 import type { RealisticBookFormat } from "@/features/shelves/virtual-bookshelf";
 import {
@@ -114,8 +107,7 @@ function DrawerBody({
     book.progressUnit === "pages"
       ? (book.progressTotal ?? book.pages ?? null)
       : (book.pages ?? null);
-  const usePercentMode =
-    book.progressUnit === "percent" && !book.pages;
+  const usePercentMode = book.progressUnit === "percent" && !book.pages;
 
   const initialValue =
     book.readingStatus === "finished" && totalPages && !usePercentMode
@@ -149,17 +141,22 @@ function DrawerBody({
   const isBusy = isPending || busyAction !== null;
   const hasActiveReading = Boolean(
     currentReadingId &&
-      (currentStatus === "reading" || currentStatus === "paused")
+    (currentStatus === "reading" || currentStatus === "paused")
   );
   const numericRating =
     typeof book.rating === "number" && book.rating > 0 ? book.rating : null;
 
   async function ensureReadingId(): Promise<string | null> {
-    if (currentReadingId && (currentStatus === "reading" || currentStatus === "paused")) {
+    if (
+      currentReadingId &&
+      (currentStatus === "reading" || currentStatus === "paused")
+    ) {
       return currentReadingId;
     }
     if (!book.workId) {
-      setErrorMsg("Esta obra não possui identificador para registro de leitura.");
+      setErrorMsg(
+        "Esta obra não possui identificador para registro de leitura."
+      );
       return null;
     }
     const res = await startReadingAction({
@@ -183,31 +180,48 @@ function DrawerBody({
     setErrorMsg(null);
     setFeedbackMsg(null);
 
-    const parsed = Number(inputValue);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      setErrorMsg("Informe um número válido maior ou igual a zero.");
+    const trimmed = inputValue.trim();
+    if (!trimmed) {
+      setErrorMsg("Informe um valor numérico para atualizar o progresso.");
+      return;
+    }
+    if (!/^-?\d+$/.test(trimmed)) {
+      setErrorMsg("Informe um número inteiro sem casas decimais.");
+      return;
+    }
+
+    const parsed = Number.parseInt(trimmed, 10);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      setErrorMsg("Informe um número inteiro maior ou igual a zero.");
+      return;
+    }
+
+    const unit: ProgressUnit = usePercentMode ? "percent" : "pages";
+    const maxVal = usePercentMode ? 100 : (totalPages ?? undefined);
+    if (usePercentMode && parsed > 100) {
+      setErrorMsg("A porcentagem não pode exceder 100%.");
+      return;
+    }
+    if (!usePercentMode && maxVal !== undefined && parsed > maxVal) {
+      setErrorMsg(
+        `O número de páginas não pode exceder o total do livro (${maxVal} pág.).`
+      );
       return;
     }
 
     setBusyAction("update");
     startTransition(async () => {
       try {
-        const targetId =
-          currentReadingId ?? (await ensureReadingId());
+        const targetId = currentReadingId ?? (await ensureReadingId());
         if (!targetId) {
           setBusyAction(null);
           return;
         }
 
-        const unit: ProgressUnit = usePercentMode ? "percent" : "pages";
-        const maxVal = usePercentMode ? 100 : (totalPages ?? undefined);
-        const clamped =
-          maxVal !== undefined ? Math.min(parsed, maxVal) : parsed;
-
         const res = await updateReadingProgressAction({
           readingId: targetId,
           progressUnit: unit,
-          progressValue: clamped,
+          progressValue: parsed,
           progressTotal: maxVal,
         });
 
@@ -217,18 +231,22 @@ function DrawerBody({
         }
 
         const nextPercent = usePercentMode
-          ? Math.round(clamped)
+          ? Math.round(parsed)
           : maxVal && maxVal > 0
-            ? Math.max(0, Math.min(100, Math.round((clamped / maxVal) * 100)))
+            ? Math.max(0, Math.min(100, Math.round((parsed / maxVal) * 100)))
             : currentPercent;
 
-        setInputValue(String(clamped));
+        setInputValue(String(parsed));
         setCurrentPercent(nextPercent);
         if (currentStatus === "not_started") {
           setCurrentStatus("reading");
         }
         setFeedbackMsg("Progresso atualizado.");
         router.refresh();
+      } catch {
+        setErrorMsg(
+          "Não foi possível salvar o progresso agora. Tente novamente."
+        );
       } finally {
         setBusyAction(null);
       }
@@ -409,7 +427,8 @@ function DrawerBody({
               </p>
             ) : null}
             <p className="font-sans text-xs text-[#D4CBC0]">
-              Acompanhe prioridade, loja sugerida ou registre a compra atômica diretamente na Lista de Desejos.
+              Acompanhe prioridade, loja sugerida ou registre a compra atômica
+              diretamente na Lista de Desejos.
             </p>
             <Link
               href="/desejos"
@@ -503,7 +522,11 @@ function DrawerBody({
               </p>
 
               {/* Formulário rápido: Atualizar Páginas */}
-              <form onSubmit={handleUpdatePages} className="space-y-2.5 pt-2">
+              <form
+                noValidate
+                onSubmit={handleUpdatePages}
+                className="space-y-2.5 pt-2"
+              >
                 <label
                   htmlFor={pagesInputId}
                   className="block font-sans text-xs font-medium text-[#DFBE88]"
@@ -528,7 +551,9 @@ function DrawerBody({
                     className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-1.5 rounded-md border border-[#C8A46E]/55 bg-[#2C221E] px-3.5 font-sans text-xs font-semibold text-[#F4EFE6] transition-colors hover:border-[#C8A46E] hover:bg-[#3A2D27] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
                   >
                     <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
-                    {busyAction === "update" ? "Salvando..." : "Atualizar Páginas"}
+                    {busyAction === "update"
+                      ? "Salvando..."
+                      : "Atualizar Páginas"}
                   </button>
                 </div>
               </form>
@@ -597,7 +622,7 @@ function DrawerBody({
       </div>
 
       {/* Rodapé com link para ficha completa */}
-      {(book.href || book.workId) ? (
+      {book.href || book.workId ? (
         <div className="border-t border-[#C8A46E]/20 px-5 py-4 sm:px-6">
           <Link
             href={book.href ?? `/livros/${book.workId}`}
