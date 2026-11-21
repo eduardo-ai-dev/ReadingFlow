@@ -635,6 +635,39 @@ export interface GroupBooksOptions {
  * (cor persistida da capa ou, na falta, derivada de forma determinística do seed),
  * formato realista e metadados de exibição.
  */
+const bookInvariantCache = new WeakMap<
+  VirtualBookItem,
+  {
+    resolvedSeed: string;
+    geom: ReturnType<typeof computeShelfBookGeometry>;
+    publisherMark: ReturnType<typeof pickPublisherMark>;
+    authorSurname: string;
+    unifiedGenre: { key: string; label: string };
+  }
+>();
+
+function getBookInvariants(book: VirtualBookItem) {
+  let cached = bookInvariantCache.get(book);
+  if (!cached) {
+    const resolvedSeed = String(
+      book.seed ?? book.isbn ?? book.id ?? book.title
+    );
+    cached = {
+      resolvedSeed,
+      geom: computeShelfBookGeometry({
+        pages: book.pages,
+        format: book.format,
+        seed: resolvedSeed,
+      }),
+      publisherMark: pickPublisherMark(resolvedSeed),
+      authorSurname: extractAuthorSurname(book.author),
+      unifiedGenre: resolveCanonicalGenre(book.genre?.trim() ?? ""),
+    };
+    bookInvariantCache.set(book, cached);
+  }
+  return cached;
+}
+
 export function normalizeVirtualBook(
   book: VirtualBookItem,
   genreKey: string,
@@ -642,7 +675,8 @@ export function normalizeVirtualBook(
   avoidNeighborHex?: string | null,
   avoidNeighborTemplate?: SpineTemplateId | null
 ): NormalizedVirtualBook {
-  const resolvedSeed = String(book.seed ?? book.isbn ?? book.id ?? book.title);
+  const { resolvedSeed, geom, publisherMark, authorSurname } =
+    getBookInvariants(book);
   const { spineBg, spineInk, spineAccentHex, spineAccentInk } =
     resolveSpinePalette(
       book.spineColor,
@@ -650,13 +684,7 @@ export function normalizeVirtualBook(
       avoidNeighborHex,
       book.spineAccent
     );
-  const geom = computeShelfBookGeometry({
-    pages: book.pages,
-    format: book.format,
-    seed: resolvedSeed,
-  });
   const spineTemplate = pickSpineTemplate(resolvedSeed, avoidNeighborTemplate);
-  const publisherMark = pickPublisherMark(resolvedSeed);
 
   return {
     ...book,
@@ -674,7 +702,7 @@ export function normalizeVirtualBook(
     spineWidthPx: geom.spineWidthPx,
     bookHeightPx: geom.heightPx,
     realisticFormat: geom.format,
-    authorSurname: extractAuthorSurname(book.author),
+    authorSurname,
     resolvedSeed,
     statusLabel: book.status ?? "Na estante",
   };
@@ -704,7 +732,7 @@ export function groupBooksByGenre(
     let rawLabel: string;
 
     if (unifyTaxonomy) {
-      const unified = resolveCanonicalGenre(trimmedGenre);
+      const unified = getBookInvariants(book).unifiedGenre;
       canonicalKey = unified.key;
       rawLabel = unified.label;
     } else {
@@ -819,6 +847,8 @@ export function measureBookRenderLayout(
     realisticFormat?: string | null;
     seed?: string | null;
     resolvedSeed?: string | null;
+    spineWidthPx?: number | null;
+    bookHeightPx?: number | null;
   },
   options: {
     displayMode?: ShelfBookLayoutDisplayMode;
@@ -830,11 +860,15 @@ export function measureBookRenderLayout(
   const view3dMode = options.view3dMode ?? "spines";
   const shelfScale = options.shelfScale ?? 1;
 
-  const geom = computeShelfBookGeometry({
-    pages: book.pages,
-    format: book.realisticFormat ?? book.format,
-    seed: book.resolvedSeed ?? book.seed ?? String(book.id),
-  });
+  const geom =
+    typeof book.spineWidthPx === "number" &&
+    typeof book.bookHeightPx === "number"
+      ? { spineWidthPx: book.spineWidthPx, heightPx: book.bookHeightPx }
+      : computeShelfBookGeometry({
+          pages: book.pages,
+          format: book.realisticFormat ?? book.format,
+          seed: book.resolvedSeed ?? book.seed ?? String(book.id),
+        });
 
   const coverShowcaseHeightPx = Math.max(
     132,

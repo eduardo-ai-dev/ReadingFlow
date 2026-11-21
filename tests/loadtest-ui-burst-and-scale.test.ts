@@ -174,6 +174,7 @@ describe("Regressão de UI e Escala #4 — Vazamento Web Audio em Rajadas 50x no
       });
 
       const t0 = performance.now();
+      let neighborCollisions = 0;
       const groups = groupBooksByGenre(virtualInputs);
       for (const group of groups) {
         const chunks = packShelfBooksByWidth(group.books, {
@@ -186,14 +187,17 @@ describe("Regressão de UI e Escala #4 — Vazamento Web Audio em Rajadas 50x no
           for (let i = 1; i < visuals.length; i++) {
             const prev = visuals[i - 1]!;
             const curr = visuals[i]!;
-            const sameTemplateAndColor =
+            if (
               prev.template === curr.template &&
-              prev.spineBg.toLowerCase() === curr.spineBg.toLowerCase();
-            expect(sameTemplateAndColor).toBe(false);
+              prev.spineBg.toLowerCase() === curr.spineBg.toLowerCase()
+            ) {
+              neighborCollisions += 1;
+            }
           }
         }
       }
       const elapsedMs = performance.now() - t0;
+      expect(neighborCollisions).toBe(0);
       expect(elapsedMs).toBeLessThan(200);
     }
   });

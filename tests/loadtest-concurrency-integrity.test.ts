@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  DEMO_USER_ID,
   getMemoryStore,
   SESSION_COOKIE_NAME,
 } from "@/server/store/memory-repository";
@@ -12,10 +11,7 @@ import {
   addBookToLibraryAction,
   updateEditionCoverAction,
 } from "@/features/catalog/actions";
-import {
-  finishReadingAction,
-  startReadingAction,
-} from "@/features/reading/actions";
+import { finishReadingAction } from "@/features/reading/actions";
 import { reorderShelfBooksAction } from "@/features/shelves/actions";
 import { saveShelfCustomizationAction } from "@/features/settings/actions";
 import {

@@ -75,18 +75,38 @@ export default async function ShelvesPage({
   );
 
   const effectiveSort = sortMode ?? overview.activeShelf.sortMode;
+  // Remove o array histórico dailyLogs do payload serializado para o cliente (ShelfItemsClient usa apenas progressValue/progressTotal/finishedOn)
+  const slimForClient = (entries: EnrichedShelfItem[]): EnrichedShelfItem[] =>
+    entries.map((entry) =>
+      entry.latestReading?.dailyLogs
+        ? {
+            ...entry,
+            latestReading: {
+              ...entry.latestReading,
+              dailyLogs: undefined,
+            },
+          }
+        : entry
+    );
+
   const itemsByKind: Record<ShelfKind, EnrichedShelfItem[]> = {
-    physical: filterAndSortShelfItems(
-      allItems.filter((e) => e.shelf.kind === "physical"),
-      { query, readingStatus, genre, sortMode: effectiveSort }
+    physical: slimForClient(
+      filterAndSortShelfItems(
+        allItems.filter((e) => e.shelf.kind === "physical"),
+        { query, readingStatus, genre, sortMode: effectiveSort }
+      )
     ),
-    digital: filterAndSortShelfItems(
-      allItems.filter((e) => e.shelf.kind === "digital"),
-      { query, readingStatus, genre, sortMode: effectiveSort }
+    digital: slimForClient(
+      filterAndSortShelfItems(
+        allItems.filter((e) => e.shelf.kind === "digital"),
+        { query, readingStatus, genre, sortMode: effectiveSort }
+      )
     ),
-    audio: filterAndSortShelfItems(
-      allItems.filter((e) => e.shelf.kind === "audio"),
-      { query, readingStatus, genre, sortMode: effectiveSort }
+    audio: slimForClient(
+      filterAndSortShelfItems(
+        allItems.filter((e) => e.shelf.kind === "audio"),
+        { query, readingStatus, genre, sortMode: effectiveSort }
+      )
     ),
   };
 
@@ -164,7 +184,7 @@ export default async function ShelvesPage({
 
       {/* Abas sem reset de scroll, busca/filtros e contêiner com min-height */}
       <ShelfItemsClient
-        items={overview.items}
+        items={itemsByKind[activeKind]}
         shelfTabs={tabs}
         initialKind={activeKind}
         itemsByKind={itemsByKind}

@@ -575,7 +575,12 @@ function parseHexRgb(hex: string): [number, number, number] | null {
   return null;
 }
 
+const hexToHslCache = new Map<string, { h: number; s: number; l: number }>();
+
 export function hexToHsl(hex: string): { h: number; s: number; l: number } {
+  const cached = hexToHslCache.get(hex);
+  if (cached) return cached;
+
   const rgb = parseHexRgb(hex) ?? [81, 38, 47];
   const r = rgb[0] / 255;
   const g = rgb[1] / 255;
@@ -587,7 +592,9 @@ export function hexToHsl(hex: string): { h: number; s: number; l: number } {
   const delta = max - min;
 
   if (delta === 0) {
-    return { h: 0, s: 0, l: Math.round(l * 100) };
+    const res = { h: 0, s: 0, l: Math.round(l * 100) };
+    hexToHslCache.set(hex, res);
+    return res;
   }
 
   const s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
@@ -601,11 +608,13 @@ export function hexToHsl(hex: string): { h: number; s: number; l: number } {
   }
   h /= 6;
 
-  return {
+  const result = {
     h: Math.round(h * 360),
     s: Math.round(s * 100),
     l: Math.round(l * 100),
   };
+  hexToHslCache.set(hex, result);
+  return result;
 }
 
 /** Garante contraste AA (>= 4,5:1) escolhendo marfim (#F5F2EB) ou grafite (#1F1B18) conforme luminância. */

@@ -4,6 +4,10 @@ import {
   buildAutomaticRanking,
   type RankedWorkEntry,
 } from "@/features/ratings/rules";
+import {
+  indexEditionsByWorkId,
+  resolveWorkCoverEdition,
+} from "@/features/catalog/cover-url";
 
 export async function getAutomaticRankingView(): Promise<
   Array<
@@ -18,10 +22,15 @@ export async function getAutomaticRankingView(): Promise<
 > {
   const ws = await requireAuthenticatedWorkspace();
   const worksById = new Map(ws.works.map((w) => [w.id, w]));
+  const editionsByWorkId = indexEditionsByWorkId(ws.editions);
   const ranked = buildAutomaticRanking(ws.reviews, worksById);
 
   return ranked.map((entry) => {
-    const ed = ws.editions.find((e) => e.workId === entry.work.id);
+    const ed = resolveWorkCoverEdition({
+      workId: entry.work.id,
+      editions: ws.editions,
+      editionsByWorkId,
+    });
     return {
       ...entry,
       primaryAuthor:

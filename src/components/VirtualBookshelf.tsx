@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import {
   filterVirtualBooksByQuickFilter,
   groupBooksByGenre,
@@ -66,10 +73,42 @@ export function VirtualBookshelf({
   const [view3dMode, setView3dMode] = useState<"spines" | "covers">("spines");
   const [activeFilter, setActiveFilter] =
     useState<ShelfQuickFilter>(initialQuickFilter);
+  const [appliedFilter, setAppliedFilter] =
+    useState<ShelfQuickFilter>(initialQuickFilter);
+  const filterRafRef = useRef<number | null>(null);
+
+  const handleSelectQuickFilter = useCallback(
+    (nextFilter: ShelfQuickFilter) => {
+      setActiveId(null);
+      setActiveFilter(nextFilter);
+      if (filterRafRef.current !== null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(filterRafRef.current);
+        filterRafRef.current = null;
+      }
+      if (books.length > 60 && typeof window !== "undefined") {
+        filterRafRef.current = window.requestAnimationFrame(() => {
+          filterRafRef.current = null;
+          window.setTimeout(() => {
+            startTransition(() => {
+              setAppliedFilter(nextFilter);
+            });
+          }, 0);
+        });
+      } else {
+        setAppliedFilter(nextFilter);
+      }
+    },
+    [books.length, startTransition]
+  );
   const [layout, setLayout] = useState<PersistedShelfLayout>(
     () => initialShelfLayout ?? EMPTY_PERSISTED_SHELF_LAYOUT
   );
   const [reorderAnnouncement, setReorderAnnouncement] = useState("");
+  const isHydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   // Metadados (coverUrl, spineColor, spineAccent) vêm persistidos do cadastro; nada é buscado a cada render.
   // Aplica apenas overrides manuais de cor salvos no modo "Arrumar estante".
@@ -130,9 +169,9 @@ export function VirtualBookshelf({
       filterVirtualBooksByQuickFilter(
         hydratedLibraryBooks,
         hydratedWishlistBooks,
-        activeFilter
+        appliedFilter
       ),
-    [hydratedLibraryBooks, hydratedWishlistBooks, activeFilter]
+    [hydratedLibraryBooks, hydratedWishlistBooks, appliedFilter]
   );
 
   const shelves = useMemo<ShelfRenderGroup[]>(() => {
@@ -242,7 +281,9 @@ export function VirtualBookshelf({
       const colors =
         meta?.customDots && meta.customDots.length > 0
           ? meta.customDots
-          : extractPredominantDotColors(orderedBooks, (b) => b.spineBg, 4);
+          : kind === "color"
+            ? extractPredominantDotColors(orderedBooks, (b) => b.spineBg, 4)
+            : [];
 
       return {
         genreKey: group.genreKey,
@@ -312,135 +353,141 @@ export function VirtualBookshelf({
     setActiveId(null);
   }, []);
 
-  const handleReorderWithinShelf = (
-    shelf: ShelfRenderGroup,
-    nextBooks: NormalizedVirtualBook[],
-    movedTitle: string,
-    newIndex: number
-  ) => {
-    const nextIds = nextBooks.map((b) => String(b.id));
-    const prevLayout = layout;
-    const nextLayout: PersistedShelfLayout = {
-      ...layout,
-      customOrderByShelf: {
-        ...layout.customOrderByShelf,
-        [shelf.genreKey]: nextIds,
-      },
-    };
-    setLayout(nextLayout);
-    setReorderAnnouncement(
-      `${movedTitle} movido para a posição ${newIndex + 1} de ${nextBooks.length} na prateleira ${shelf.genre}.`
-    );
+  const handleReorderWithinShelf = useCallback(
+    (
+      shelf: ShelfRenderGroup,
+      nextBooks: NormalizedVirtualBook[],
+      movedTitle: string,
+      newIndex: number
+    ) => {
+      const nextIds = nextBooks.map((b) => String(b.id));
+      const prevLayout = layout;
+      const nextLayout: PersistedShelfLayout = {
+        ...layout,
+        customOrderByShelf: {
+          ...layout.customOrderByShelf,
+          [shelf.genreKey]: nextIds,
+        },
+      };
+      setLayout(nextLayout);
+      setReorderAnnouncement(
+        `${movedTitle} movido para a posição ${newIndex + 1} de ${nextBooks.length} na prateleira ${shelf.genre}.`
+      );
 
-    const libraryItemIds = nextBooks
-      .map((b) => b.libraryItemId)
-      .filter((id): id is string => Boolean(id));
+      const libraryItemIds = nextBooks
+        .map((b) => b.libraryItemId)
+        .filter((id): id is string => Boolean(id));
 
-    startTransition(async () => {
-      try {
-        const res = await saveShelfCustomizationAction({
-          layout: nextLayout,
-          orderedItemIds:
-            libraryItemIds.length >= 2 ? libraryItemIds : undefined,
-        });
-        if (!res.ok) {
+      startTransition(async () => {
+        try {
+          const res = await saveShelfCustomizationAction({
+            layout: nextLayout,
+            orderedItemIds:
+              libraryItemIds.length >= 2 ? libraryItemIds : undefined,
+          });
+          if (!res.ok) {
+            setLayout(prevLayout);
+            setReorderAnnouncement(
+              `Não foi possível salvar a nova ordem de ${movedTitle}: ${res.error}`
+            );
+            return;
+          }
+          setLayout(res.layout);
+        } catch {
           setLayout(prevLayout);
           setReorderAnnouncement(
-            `Não foi possível salvar a nova ordem de ${movedTitle}: ${res.error}`
+            `Falha ao salvar a nova ordem de ${movedTitle}. Ordem restaurada.`
           );
-          return;
         }
-        setLayout(res.layout);
-      } catch {
-        setLayout(prevLayout);
-        setReorderAnnouncement(
-          `Falha ao salvar a nova ordem de ${movedTitle}. Ordem restaurada.`
-        );
-      }
-    });
-  };
+      });
+    },
+    [layout, startTransition]
+  );
 
-  const handleMoveBookAcrossShelves = ({
-    bookId,
-    fromShelfKey,
-    toShelfKey,
-    targetBookId,
-    position,
-  }: {
-    bookId: string;
-    fromShelfKey: string;
-    toShelfKey: string;
-    targetBookId?: string;
-    position?: "before" | "after";
-  }) => {
-    if (fromShelfKey === toShelfKey) return;
+  const handleMoveBookAcrossShelves = useCallback(
+    ({
+      bookId,
+      fromShelfKey,
+      toShelfKey,
+      targetBookId,
+      position,
+    }: {
+      bookId: string;
+      fromShelfKey: string;
+      toShelfKey: string;
+      targetBookId?: string;
+      position?: "before" | "after";
+    }) => {
+      if (fromShelfKey === toShelfKey) return;
 
-    const sourceShelf = shelves.find((s) => s.genreKey === fromShelfKey);
-    const destShelf = shelves.find((s) => s.genreKey === toShelfKey);
-    const movedBook = sourceShelf?.books.find(
-      (b) => String(b.id) === String(bookId)
-    );
-    if (!destShelf || !movedBook) return;
+      const sourceShelf = shelves.find((s) => s.genreKey === fromShelfKey);
+      const destShelf = shelves.find((s) => s.genreKey === toShelfKey);
+      const movedBook = sourceShelf?.books.find(
+        (b) => String(b.id) === String(bookId)
+      );
+      if (!destShelf || !movedBook) return;
 
-    const nextFromOrder = (sourceShelf?.books ?? [])
-      .filter((b) => String(b.id) !== bookId)
-      .map((b) => String(b.id));
+      const nextFromOrder = (sourceShelf?.books ?? [])
+        .filter((b) => String(b.id) !== bookId)
+        .map((b) => String(b.id));
 
-    const baseDestIds = destShelf.books
-      .filter((b) => String(b.id) !== bookId)
-      .map((b) => String(b.id));
+      const baseDestIds = destShelf.books
+        .filter((b) => String(b.id) !== bookId)
+        .map((b) => String(b.id));
 
-    if (targetBookId) {
-      const targetIdx = baseDestIds.indexOf(targetBookId);
-      if (targetIdx >= 0) {
-        const insertIdx = position === "after" ? targetIdx + 1 : targetIdx;
-        baseDestIds.splice(insertIdx, 0, bookId);
+      if (targetBookId) {
+        const targetIdx = baseDestIds.indexOf(targetBookId);
+        if (targetIdx >= 0) {
+          const insertIdx = position === "after" ? targetIdx + 1 : targetIdx;
+          baseDestIds.splice(insertIdx, 0, bookId);
+        } else {
+          baseDestIds.push(bookId);
+        }
       } else {
         baseDestIds.push(bookId);
       }
-    } else {
-      baseDestIds.push(bookId);
-    }
 
-    const prevLayout = layout;
-    const nextLayout: PersistedShelfLayout = {
-      ...layout,
-      bookShelfMap: {
-        ...layout.bookShelfMap,
-        [bookId]: toShelfKey,
-      },
-      customOrderByShelf: {
-        ...layout.customOrderByShelf,
-        [fromShelfKey]: nextFromOrder,
-        [toShelfKey]: baseDestIds,
-      },
-    };
-    setLayout(nextLayout);
-    setReorderAnnouncement(
-      `${movedBook.title} movido para a prateleira ${destShelf.genre}.`
-    );
+      const prevLayout = layout;
+      const nextLayout: PersistedShelfLayout = {
+        ...layout,
+        bookShelfMap: {
+          ...layout.bookShelfMap,
+          [bookId]: toShelfKey,
+        },
+        customOrderByShelf: {
+          ...layout.customOrderByShelf,
+          [fromShelfKey]: nextFromOrder,
+          [toShelfKey]: baseDestIds,
+        },
+      };
+      setLayout(nextLayout);
+      setReorderAnnouncement(
+        `${movedBook.title} movido para a prateleira ${destShelf.genre}.`
+      );
 
-    startTransition(async () => {
-      try {
-        const res = await saveShelfCustomizationAction({
-          layout: nextLayout,
-        });
-        if (!res.ok) {
+      startTransition(async () => {
+        try {
+          const res = await saveShelfCustomizationAction({
+            layout: nextLayout,
+          });
+          if (!res.ok) {
+            setLayout(prevLayout);
+            setReorderAnnouncement(
+              `Não foi possível salvar a mudança de prateleira: ${res.error}`
+            );
+            return;
+          }
+          setLayout(res.layout);
+        } catch {
           setLayout(prevLayout);
           setReorderAnnouncement(
-            `Não foi possível salvar a mudança de prateleira: ${res.error}`
+            `Falha ao salvar a mudança de prateleira para ${movedBook.title}. Posição restaurada.`
           );
-          return;
         }
-        setLayout(res.layout);
-      } catch {
-        setLayout(prevLayout);
-        setReorderAnnouncement(
-          `Falha ao salvar a mudança de prateleira para ${movedBook.title}. Posição restaurada.`
-        );
-      }
-    });
-  };
+      });
+    },
+    [layout, shelves, startTransition]
+  );
 
   const handleSelectBook = useCallback(
     (book: NormalizedVirtualBook) => {
@@ -457,6 +504,7 @@ export function VirtualBookshelf({
   return (
     <section
       aria-labelledby="minha-estante-3d-heading"
+      data-shelf-hydrated={isHydrated ? "true" : undefined}
       className={styles.wrapper}
     >
       <div className={styles.toolbar}>
@@ -518,10 +566,7 @@ export function VirtualBookshelf({
               active={activeFilter === opt.key}
               label={opt.label}
               count={filterCounts[opt.key]}
-              onClick={() => {
-                setActiveId(null);
-                setActiveFilter(opt.key);
-              }}
+              onClick={() => handleSelectQuickFilter(opt.key)}
             />
           ))}
         </div>
@@ -534,7 +579,7 @@ export function VirtualBookshelf({
           </p>
           <button
             type="button"
-            onClick={() => setActiveFilter("all")}
+            onClick={() => handleSelectQuickFilter("all")}
             className={rfButtonClassName({ variant: "secondary", size: "sm" })}
           >
             Mostrar todos os volumes
