@@ -109,7 +109,9 @@ async function main() {
         '[role="progressbar"][aria-label*="Dom Casmurro"]'
       );
       const bookFill = bookTrack?.firstElementChild;
-      const titleEl = prev?.querySelector("p.font-serif");
+      const titleEl = prev?.querySelector(
+        "p.font-serif:not(.rf-book-cover-title)"
+      );
 
       const cs = (el) => (el ? getComputedStyle(el) : null);
       return [
