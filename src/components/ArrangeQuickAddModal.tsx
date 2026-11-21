@@ -46,6 +46,7 @@ export function ArrangeQuickAddModal({
   const [spineColor, setSpineColor] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const submittingRef = useRef(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -80,6 +81,7 @@ export function ArrangeQuickAddModal({
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     setErrorMsg(null);
 
     const cleanTitle = title.trim();
@@ -89,60 +91,80 @@ export function ArrangeQuickAddModal({
       return;
     }
 
-    const parsedPages = Number.parseInt(pages, 10);
-    const validPages =
-      Number.isFinite(parsedPages) && parsedPages > 0 ? parsedPages : undefined;
-
-    startTransition(async () => {
-      const res = await addBookToLibraryAction({
-        title: cleanTitle,
-        primaryAuthor: cleanAuthor,
-        isbn: isbn.trim() || undefined,
-        primaryGenre: targetShelfTitle,
-        format,
-        pages: validPages,
-        coverUrl: coverUrl.trim() || undefined,
-        ownershipStatus: "owned",
-      });
-
-      if (!res.ok) {
-        setErrorMsg(res.error);
+    const trimmedPages = pages.trim();
+    let validPages: number | undefined;
+    if (trimmedPages) {
+      if (!/^\d+$/.test(trimmedPages)) {
+        setErrorMsg("O número de páginas deve ser um inteiro positivo.");
         return;
       }
+      const parsedPages = Number.parseInt(trimmedPages, 10);
+      if (parsedPages < 1 || parsedPages > 20000) {
+        setErrorMsg("O número de páginas deve estar entre 1 e 20.000.");
+        return;
+      }
+      validPages = parsedPages;
+    }
 
-      const createdBook: VirtualBookItem = {
-        id: res.itemId ?? res.editionId,
-        workId: res.workId,
-        editionId: res.editionId,
-        libraryItemId: res.itemId,
-        title: cleanTitle,
-        author: cleanAuthor,
-        genre: targetShelfTitle,
-        pages: res.pages ?? validPages ?? 240,
-        format,
-        coverUrl: res.coverUrl ?? (coverUrl.trim() || null),
-        spineColor: spineColor || res.coverColor || undefined,
-        spineAccent: res.coverAccentColor || undefined,
-        status: "Não iniciado",
-        readingStatus: "not_started",
-        progressPercent: 0,
-        href: `/livros/${res.workId}`,
-        shelfKind:
-          format === "ebook"
-            ? "digital"
-            : format === "audiobook"
-              ? "audio"
-              : "physical",
-      };
+    submittingRef.current = true;
+    startTransition(async () => {
+      try {
+        const res = await addBookToLibraryAction({
+          title: cleanTitle,
+          primaryAuthor: cleanAuthor,
+          isbn: isbn.trim() || undefined,
+          primaryGenre: targetShelfTitle,
+          format,
+          pages: validPages,
+          coverUrl: coverUrl.trim() || undefined,
+          ownershipStatus: "owned",
+        });
 
-      onBookAdded(createdBook, targetShelfKey);
-      setTitle("");
-      setAuthor("");
-      setPages("240");
-      setIsbn("");
-      setCoverUrl("");
-      setSpineColor("");
-      onClose();
+        if (!res.ok) {
+          setErrorMsg(res.error);
+          return;
+        }
+
+        const createdBook: VirtualBookItem = {
+          id: res.itemId ?? res.editionId,
+          workId: res.workId,
+          editionId: res.editionId,
+          libraryItemId: res.itemId,
+          title: cleanTitle,
+          author: cleanAuthor,
+          genre: targetShelfTitle,
+          pages: res.pages ?? validPages ?? 240,
+          format,
+          coverUrl: res.coverUrl ?? (coverUrl.trim() || null),
+          spineColor: spineColor || res.coverColor || undefined,
+          spineAccent: res.coverAccentColor || undefined,
+          status: "Não iniciado",
+          readingStatus: "not_started",
+          progressPercent: 0,
+          href: `/livros/${res.workId}`,
+          shelfKind:
+            format === "ebook"
+              ? "digital"
+              : format === "audiobook"
+                ? "audio"
+                : "physical",
+        };
+
+        onBookAdded(createdBook, targetShelfKey);
+        setTitle("");
+        setAuthor("");
+        setPages("240");
+        setIsbn("");
+        setCoverUrl("");
+        setSpineColor("");
+        onClose();
+      } catch {
+        setErrorMsg(
+          "Não foi possível adicionar o livro agora. Tente novamente."
+        );
+      } finally {
+        submittingRef.current = false;
+      }
     });
   };
 
@@ -197,7 +219,7 @@ export function ArrangeQuickAddModal({
           />
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
+        <form noValidate onSubmit={handleSubmit} className="mt-4 space-y-3.5">
           <div>
             <label
               htmlFor="quick-add-title"

@@ -20,8 +20,10 @@ type AutofillField = "title" | "author" | "pages" | "isbn" | "genre";
 
 export function AddBookFormClient({
   initialGenre = "",
+  initialTitle = "",
 }: {
   initialGenre?: string;
+  initialTitle?: string;
 }) {
   const router = useRouter();
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -33,7 +35,7 @@ export function AddBookFormClient({
   } | null>(null);
 
   const [isbn, setIsbn] = useState("");
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(initialTitle);
   const [primaryAuthor, setPrimaryAuthor] = useState("");
   const [translator, setTranslator] = useState("");
   const [narrator, setNarrator] = useState("");
@@ -81,6 +83,7 @@ export function AddBookFormClient({
 
   const [isLookingUp, startLookup] = useTransition();
   const [isSaving, startSave] = useTransition();
+  const submittingRef = useRef(false);
 
   const cancelCoverResolution = () => {
     coverAbortRef.current?.abort();
@@ -95,8 +98,8 @@ export function AddBookFormClient({
     setCoverSource(url ? "auto" : "none");
     setChosenBookCoverSource(
       url
-        ? providerSource ??
-            (url.includes("openlibrary.org") ? "openlibrary" : "google")
+        ? (providerSource ??
+            (url.includes("openlibrary.org") ? "openlibrary" : "google"))
         : null
     );
     setUserSkippedCover(false);
@@ -124,7 +127,13 @@ export function AddBookFormClient({
     setIsbn(result.isbn);
     setPrimaryGenre(result.genero);
     setAutofill((prev) => ({
-      fields: new Set<AutofillField>(["title", "author", "pages", "isbn", "genre"]),
+      fields: new Set<AutofillField>([
+        "title",
+        "author",
+        "pages",
+        "isbn",
+        "genre",
+      ]),
       phase: prev.phase === 0 ? 1 : 0,
     }));
     setAutofillNotice(
@@ -152,37 +161,47 @@ export function AddBookFormClient({
     setLookupMessage(null);
     setFormError(null);
     startLookup(async () => {
-      const res = await lookupBookByIsbnAction({ isbn: rawIsbn });
-      if (!res.ok) {
-        setLookupMessage({ tone: "error", text: res.error });
-        return;
-      }
+      try {
+        const res = await lookupBookByIsbnAction({ isbn: rawIsbn });
+        if (!res.ok) {
+          setLookupMessage({ tone: "error", text: res.error });
+          return;
+        }
 
-      if (res.result.status === "found") {
-        const meta = res.result.metadata;
-        setIsbn(meta.isbn13);
-        setTitle(meta.title);
-        setPrimaryAuthor(meta.authors[0] ?? "");
-        setPublisher(meta.publisher ?? "");
-        setPages(meta.pages ? String(meta.pages) : "");
-        setPublishedYear(meta.publishedYear ? String(meta.publishedYear) : "");
-        setDescription(meta.description ?? "");
-        applyAutoCover(meta.coverUrl ?? "");
+        if (res.result.status === "found") {
+          const meta = res.result.metadata;
+          setIsbn(meta.isbn13);
+          setTitle(meta.title);
+          setPrimaryAuthor(meta.authors[0] ?? "");
+          setPublisher(meta.publisher ?? "");
+          setPages(meta.pages ? String(meta.pages) : "");
+          setPublishedYear(
+            meta.publishedYear ? String(meta.publishedYear) : ""
+          );
+          setDescription(meta.description ?? "");
+          applyAutoCover(meta.coverUrl ?? "");
+          setLookupMessage({
+            tone: "ok",
+            text: `Dados preenchidos automaticamente via ${meta.source.toUpperCase()} (ISBN ${meta.isbn13}). Confira e salve.`,
+          });
+        } else if (res.result.status === "manual_fallback") {
+          setIsbn(res.result.isbn13);
+          setLookupMessage({
+            tone: "warn",
+            text: `ISBN ${res.result.isbn13} válido, mas sem registro nas bases externas. Preencha título e autor manualmente abaixo.`,
+          });
+        }
+      } catch {
         setLookupMessage({
-          tone: "ok",
-          text: `Dados preenchidos automaticamente via ${meta.source.toUpperCase()} (ISBN ${meta.isbn13}). Confira e salve.`,
-        });
-      } else if (res.result.status === "manual_fallback") {
-        setIsbn(res.result.isbn13);
-        setLookupMessage({
-          tone: "warn",
-          text: `ISBN ${res.result.isbn13} válido, mas sem registro nas bases externas. Preencha título e autor manualmente abaixo.`,
+          tone: "error",
+          text: "Não foi possível consultar o ISBN agora. Tente novamente ou preencha os campos manualmente.",
         });
       }
     });
   };
 
   const submitBook = (forceDuplicateCopy = false) => {
+    if (submittingRef.current) return;
     setFormError(null);
     setDuplicateInfo(null);
 
@@ -206,83 +225,149 @@ export function AddBookFormClient({
       return;
     }
 
-    const parsedPages = Number.parseInt(pages, 10);
-    if (pages && (!Number.isInteger(parsedPages) || parsedPages <= 0 || parsedPages > 20000)) {
-      setFormError("O número de páginas deve ser um número inteiro entre 1 e 20.000.");
-      return;
-    }
-
-    const parsedDuration = Number.parseInt(durationMinutes, 10);
-    if (durationMinutes && (!Number.isInteger(parsedDuration) || parsedDuration <= 0 || parsedDuration > 60000)) {
-      setFormError("A duração em minutos deve ser um número inteiro positivo (máximo 60.000 min).");
-      return;
-    }
-
-    const parsedYear = Number.parseInt(publishedYear, 10);
-    if (publishedYear && (!Number.isInteger(parsedYear) || parsedYear < 1000 || parsedYear > 2100)) {
-      setFormError("O ano de publicação deve ser um ano válido entre 1000 e 2100.");
-      return;
-    }
-
-    const parsedPrice = Number.parseFloat(pricePaid.replace(",", "."));
-    if (pricePaid && (!Number.isFinite(parsedPrice) || parsedPrice < 0 || parsedPrice > 100000)) {
-      setFormError("O preço pago deve ser um valor monetário válido entre R$ 0,00 e R$ 100.000,00.");
-      return;
-    }
-
-    startSave(async () => {
-      const res = await addBookToLibraryAction({
-        isbn: isbn || undefined,
-        title: cleanTitle,
-        primaryAuthor: cleanAuthor,
-        translator: translator || undefined,
-        narrator: narrator || undefined,
-        publisher: publisher || undefined,
-        publishedYear: Number.isFinite(parsedYear) ? parsedYear : undefined,
-        primaryGenre: primaryGenre || undefined,
-        description: description || undefined,
-        language: "pt-BR",
-        format,
-        pages: Number.isFinite(parsedPages) ? parsedPages : undefined,
-        durationMinutes: Number.isFinite(parsedDuration)
-          ? parsedDuration
-          : undefined,
-        coverUrl: coverUrl || undefined,
-        coverSource: coverUrl
-          ? coverSource === "upload"
-            ? "upload"
-            : chosenBookCoverSource ??
-              (coverUrl.includes("openlibrary.org") ? "openlibrary" : "google")
-          : userSkippedCover
-            ? null
-            : undefined,
-        skipAutoCover: userSkippedCover,
-        pricePaid: Number.isFinite(parsedPrice) ? parsedPrice : undefined,
-        store: store || undefined,
-        notes: notes || undefined,
-        addToWishlistOnly,
-        startReadingImmediately,
-        forceDuplicateCopy,
-      });
-
-      if (!res.ok) {
-        if (res.duplicateWarning) {
-          setDuplicateInfo({
-            existingWorkId: res.duplicateWarning.existingWorkId,
-            message: res.error,
-          });
-        } else {
-          setFormError(res.error);
-        }
+    const trimmedPages = pages.trim();
+    let validPages: number | undefined;
+    if (trimmedPages) {
+      if (!/^\d+$/.test(trimmedPages)) {
+        setFormError(
+          "O número de páginas deve ser um número inteiro positivo (sem casas decimais)."
+        );
         return;
       }
-
-      if (addToWishlistOnly) {
-        router.push("/desejos");
-      } else {
-        router.push(`/livros/${res.workId}`);
+      const parsedPages = Number.parseInt(trimmedPages, 10);
+      if (parsedPages <= 0 || parsedPages > 20000) {
+        setFormError(
+          "O número de páginas deve ser um número inteiro entre 1 e 20.000."
+        );
+        return;
       }
-      router.refresh();
+      validPages = parsedPages;
+    }
+
+    const trimmedDuration = durationMinutes.trim();
+    let validDuration: number | undefined;
+    if (trimmedDuration) {
+      if (!/^\d+$/.test(trimmedDuration)) {
+        setFormError(
+          "A duração em minutos deve ser um número inteiro positivo (sem casas decimais)."
+        );
+        return;
+      }
+      const parsedDuration = Number.parseInt(trimmedDuration, 10);
+      if (parsedDuration <= 0 || parsedDuration > 60000) {
+        setFormError(
+          "A duração em minutos deve ser um número inteiro positivo (máximo 60.000 min)."
+        );
+        return;
+      }
+      validDuration = parsedDuration;
+    }
+
+    const trimmedYear = publishedYear.trim();
+    let validYear: number | undefined;
+    if (trimmedYear) {
+      if (!/^\d{4}$/.test(trimmedYear)) {
+        setFormError(
+          "O ano de publicação deve ser um ano válido com 4 dígitos entre 1000 e 2100."
+        );
+        return;
+      }
+      const parsedYear = Number.parseInt(trimmedYear, 10);
+      if (parsedYear < 1000 || parsedYear > 2100) {
+        setFormError(
+          "O ano de publicação deve ser um ano válido entre 1000 e 2100."
+        );
+        return;
+      }
+      validYear = parsedYear;
+    }
+
+    const trimmedPrice = pricePaid.trim();
+    let validPrice: number | undefined;
+    if (trimmedPrice) {
+      if (!/^\d+(?:[.,]\d{1,2})?$/.test(trimmedPrice)) {
+        setFormError(
+          "Informe um valor monetário válido (ex.: 49,90), entre R$ 0,00 e R$ 100.000,00."
+        );
+        return;
+      }
+      const parsedPrice = Number.parseFloat(trimmedPrice.replace(",", "."));
+      if (
+        !Number.isFinite(parsedPrice) ||
+        parsedPrice < 0 ||
+        parsedPrice > 100000
+      ) {
+        setFormError(
+          "O valor monetário deve estar entre R$ 0,00 e R$ 100.000,00."
+        );
+        return;
+      }
+      validPrice = parsedPrice;
+    }
+
+    submittingRef.current = true;
+    startSave(async () => {
+      try {
+        const res = await addBookToLibraryAction({
+          isbn: isbn || undefined,
+          title: cleanTitle,
+          primaryAuthor: cleanAuthor,
+          translator: translator || undefined,
+          narrator: narrator || undefined,
+          publisher: publisher || undefined,
+          publishedYear: validYear,
+          primaryGenre: primaryGenre || undefined,
+          description: description || undefined,
+          language: "pt-BR",
+          format,
+          pages: validPages,
+          durationMinutes: validDuration,
+          coverUrl: coverUrl || undefined,
+          coverSource: coverUrl
+            ? coverSource === "upload"
+              ? "upload"
+              : (chosenBookCoverSource ??
+                (coverUrl.includes("openlibrary.org")
+                  ? "openlibrary"
+                  : "google"))
+            : userSkippedCover
+              ? null
+              : undefined,
+          skipAutoCover: userSkippedCover,
+          pricePaid: addToWishlistOnly ? undefined : validPrice,
+          targetPrice: addToWishlistOnly ? validPrice : undefined,
+          store: store || undefined,
+          notes: notes || undefined,
+          addToWishlistOnly,
+          startReadingImmediately,
+          forceDuplicateCopy,
+        });
+
+        if (!res.ok) {
+          if (res.duplicateWarning) {
+            setDuplicateInfo({
+              existingWorkId: res.duplicateWarning.existingWorkId,
+              message: res.error,
+            });
+          } else {
+            setFormError(res.error);
+          }
+          return;
+        }
+
+        if (addToWishlistOnly) {
+          router.push("/desejos");
+        } else {
+          router.push(`/livros/${res.workId}`);
+        }
+        router.refresh();
+      } catch {
+        setFormError(
+          "Não foi possível salvar o livro agora. Seus dados foram preservados; tente novamente."
+        );
+      } finally {
+        submittingRef.current = false;
+      }
     });
   };
 
@@ -427,6 +512,7 @@ export function AddBookFormClient({
 
       {/* Bloco 3: Dados da Obra, Edição e Exemplar */}
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
           submitBook(false);

@@ -57,6 +57,11 @@ export async function removeLibraryItemAction(
   );
 
   ws.items = ws.items.filter((it) => it.id !== item.id);
+  for (const reading of ws.readings) {
+    if (reading.libraryItemId === item.id) {
+      reading.libraryItemId = undefined;
+    }
+  }
   revalidatePath("/", "layout");
   return { ok: true };
 }

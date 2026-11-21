@@ -109,8 +109,8 @@ export function CoverEditionPicker({
       : { baseKey: currentBaseKey };
 
   const searchTitle = activeEdits.title ?? title;
-  const searchAuthor = activeEdits.author ?? (author ?? "");
-  const searchIsbn = activeEdits.isbn ?? (isbn ?? "");
+  const searchAuthor = activeEdits.author ?? author ?? "";
+  const searchIsbn = activeEdits.isbn ?? isbn ?? "";
 
   const setSearchTitle = (next: string) =>
     setEditedFields((prev) => ({
@@ -201,32 +201,53 @@ export function CoverEditionPicker({
           signal: opts?.signal,
         });
 
-        const payload = (await res.json()) as CoverSearchResponse;
+        let payload: CoverSearchResponse | null = null;
+        try {
+          payload = (await res.json()) as CoverSearchResponse;
+        } catch {
+          payload = null;
+        }
         if (opts?.signal?.aborted) return;
 
-        const nextCandidates = (payload.candidates ?? []).slice(0, 8);
+        if (!res.ok && !payload) {
+          setCandidates([]);
+          setApiUnavailable(true);
+          setNotice(
+            res.status === 401
+              ? "Sessão expirada. Entre novamente para buscar capas."
+              : "Serviço indisponível, tentar de novo."
+          );
+          setHasSearchedOnce(true);
+          return;
+        }
+
+        const safePayload =
+          payload ?? ({ candidates: [] } as unknown as CoverSearchResponse);
+        const nextCandidates = (safePayload.candidates ?? []).slice(0, 8);
         setCandidates(nextCandidates);
-        setResolvedPageCount(payload.pageCount);
-        setNotice(payload.notice ?? null);
+        setResolvedPageCount(safePayload.pageCount);
+        setNotice(
+          safePayload.notice ??
+            (!res.ok ? "Serviço indisponível, tentar de novo." : null)
+        );
         setApiUnavailable(
           Boolean(
-            payload.apiUnavailable ||
-              res.status === 429 ||
-              res.status === 403 ||
-              (payload.degraded && nextCandidates.length === 0)
+            safePayload.apiUnavailable ||
+            !res.ok ||
+            (safePayload.degraded && nextCandidates.length === 0)
           )
         );
-        setDiagnostic(payload.diagnostic ?? null);
+        setDiagnostic(safePayload.diagnostic ?? null);
         setHasSearchedOnce(true);
 
-        if (payload.diagnostic?.badgePtBr) {
+        if (safePayload.diagnostic?.badgePtBr) {
           recordDevCoverDiagnostic(
             {
               editionId: effectiveSeed,
               title: cleanTitle || title,
               isbn: cleanIsbn || isbn,
             },
-            payload.diagnostic.badgePtBr
+            safePayload.diagnostic.badgePtBr
           );
         }
 
@@ -275,8 +296,7 @@ export function CoverEditionPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, author, isbn, autoSearch]);
 
-  const selectedCandidate =
-    candidates.find((c) => c.id === selectedId) ?? null;
+  const selectedCandidate = candidates.find((c) => c.id === selectedId) ?? null;
 
   const handleFileChange = async (file: File | undefined) => {
     if (!file) return;
@@ -292,6 +312,10 @@ export function CoverEditionPicker({
         coverUrl: result.dataUrl,
         coverSource: "upload",
       });
+    } catch {
+      setUploadError(
+        "Não foi possível processar esta imagem. Verifique se o arquivo é um JPEG, PNG ou WebP válido."
+      );
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -349,8 +373,7 @@ export function CoverEditionPicker({
     }
   };
 
-  const devBadgeText =
-    diagnostic?.badgePtBr || diagnostic?.reasonPtBr || null;
+  const devBadgeText = diagnostic?.badgePtBr || diagnostic?.reasonPtBr || null;
   const isBusy = isLoading || isUploading || isImportingUrl || isSaving;
 
   return (
@@ -513,9 +536,7 @@ export function CoverEditionPicker({
                   className="h-4 w-4 shrink-0 text-[#B45309]"
                   aria-hidden="true"
                 />
-                <span>
-                  {notice || "Serviço indisponível, tentar de novo."}
-                </span>
+                <span>{notice || "Serviço indisponível, tentar de novo."}</span>
               </div>
               <button
                 type="button"
@@ -713,8 +734,7 @@ export function CoverEditionPicker({
                   coverUrl: selectedCandidate.coverUrl,
                   coverSource: selectedCandidate.source,
                   candidate: selectedCandidate,
-                  pageCount:
-                    selectedCandidate.pageCount ?? resolvedPageCount,
+                  pageCount: selectedCandidate.pageCount ?? resolvedPageCount,
                 });
               }}
               className="inline-flex min-h-[38px] items-center gap-1.5 rounded-[8px] bg-[#722F3E] px-3.5 text-xs font-semibold text-[#FAF7F1] shadow-xs transition-colors hover:bg-[#5B2330] disabled:cursor-not-allowed disabled:opacity-45"

@@ -401,7 +401,7 @@ export async function updateBookMetadataAction(
   const data = parsed.data;
   const work = ws.works.find((w) => w.id === data.workId);
   const edition = ws.editions.find((e) => e.id === data.editionId);
-  if (!work || !edition) {
+  if (!work || !edition || edition.workId !== work.id) {
     return { ok: false, error: "Livro não encontrado no seu acervo." };
   }
 
@@ -495,8 +495,25 @@ export async function updateBookMetadataAction(
   }
   edition.contributors = work.contributors;
 
+  if (typeof data.pages === "number" && data.pages > 0) {
+    for (const reading of ws.readings) {
+      if (
+        reading.editionId === edition.id &&
+        reading.progressUnit === "pages" &&
+        (reading.status === "reading" || reading.status === "paused")
+      ) {
+        reading.progressTotal = data.pages;
+        if (reading.progressValue > data.pages) {
+          reading.progressValue = data.pages;
+        }
+      }
+    }
+  }
+
   if (data.itemId) {
-    const item = ws.items.find((it) => it.id === data.itemId);
+    const item = ws.items.find(
+      (it) => it.id === data.itemId && it.editionId === edition.id
+    );
     if (item) {
       const targetKind = inferShelfKindFromFormat(data.format);
       const targetShelf = ws.shelves.find((s) => s.kind === targetKind);
@@ -533,8 +550,7 @@ export async function updateEditionCoverAction(rawInput: unknown): Promise<
   if (!parsed.success) {
     return {
       ok: false,
-      error:
-        parsed.error.issues[0]?.message ?? "Dados da capa inválidos.",
+      error: parsed.error.issues[0]?.message ?? "Dados da capa inválidos.",
     };
   }
 
@@ -576,7 +592,11 @@ export async function updateEditionCoverAction(rawInput: unknown): Promise<
 
   edition.coverUrl = safeCoverUrl;
   edition.coverSource = resolvedSource;
-  if (data.pageCount && data.pageCount > 0 && (!edition.pages || edition.pages <= 0)) {
+  if (
+    data.pageCount &&
+    data.pageCount > 0 &&
+    (!edition.pages || edition.pages <= 0)
+  ) {
     edition.pages = data.pageCount;
   }
 

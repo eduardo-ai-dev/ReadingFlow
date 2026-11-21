@@ -56,7 +56,15 @@ export function CoverUploader({
         return;
       }
       onUpload(result.dataUrl);
-      setFeedback({ tone: "ok", text: "Capa enviada. A prévia foi atualizada." });
+      setFeedback({
+        tone: "ok",
+        text: "Capa enviada. A prévia foi atualizada.",
+      });
+    } catch {
+      setFeedback({
+        tone: "error",
+        text: "Não foi possível ler ou converter esta imagem. Tente outro arquivo JPEG, PNG ou WebP.",
+      });
     } finally {
       setProcessing(false);
     }
@@ -103,7 +111,9 @@ export function CoverUploader({
           event.dataTransfer.dropEffect = "copy";
         }}
         onDragLeave={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          if (
+            !event.currentTarget.contains(event.relatedTarget as Node | null)
+          ) {
             setDragging(false);
           }
         }}

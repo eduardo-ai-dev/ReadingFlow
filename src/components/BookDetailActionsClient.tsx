@@ -60,6 +60,7 @@ export function BookDetailActionsClient({
   // Abandon modal state
   const [showAbandon, setShowAbandon] = useState(false);
   const [abandonReason, setAbandonReason] = useState("");
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   // Edit metadata state
   const [editing, setEditing] = useState(false);
@@ -143,23 +144,30 @@ export function BookDetailActionsClient({
             type="button"
             disabled={isPending}
             onClick={() => {
+              setFeedback(null);
               startTransition(async () => {
-                const res = await startReadingAction({
-                  workId: work.id,
-                  editionId: edition.id,
-                  libraryItemId: firstItem?.id,
-                  format: edition.format,
-                });
-                if (!res.ok) {
-                  setFeedback(res.error);
-                  return;
+                try {
+                  const res = await startReadingAction({
+                    workId: work.id,
+                    editionId: edition.id,
+                    libraryItemId: firstItem?.id,
+                    format: edition.format,
+                  });
+                  if (!res.ok) {
+                    setFeedback(res.error);
+                    return;
+                  }
+                  setFeedback(
+                    hasFinishedBefore
+                      ? "Nova releitura iniciada (histórico anterior preservado)."
+                      : "Leitura iniciada."
+                  );
+                  router.refresh();
+                } catch {
+                  setFeedback(
+                    "Não foi possível iniciar a leitura agora. Tente novamente."
+                  );
                 }
-                setFeedback(
-                  hasFinishedBefore
-                    ? "Nova releitura iniciada (histórico anterior preservado)."
-                    : "Leitura iniciada."
-                );
-                router.refresh();
               });
             }}
             className="min-h-[44px] rounded-[8px] bg-[var(--accent-primary)] px-4 text-sm font-semibold text-[var(--on-primary)] hover:bg-[var(--accent-primary-hover)] disabled:opacity-60"
@@ -172,11 +180,22 @@ export function BookDetailActionsClient({
               type="button"
               disabled={isPending}
               onClick={() => {
+                setFeedback(null);
                 startTransition(async () => {
-                  await togglePauseReadingAction({
-                    readingId: activeReadingId,
-                  });
-                  router.refresh();
+                  try {
+                    const res = await togglePauseReadingAction({
+                      readingId: activeReadingId,
+                    });
+                    if (!res.ok) {
+                      setFeedback(res.error);
+                      return;
+                    }
+                    router.refresh();
+                  } catch {
+                    setFeedback(
+                      "Não foi possível atualizar o estado da leitura agora. Tente novamente."
+                    );
+                  }
                 });
               }}
               className="min-h-[44px] rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-4 text-sm font-semibold text-[var(--text-primary)]"
@@ -219,20 +238,59 @@ export function BookDetailActionsClient({
         </button>
 
         {firstItem ? (
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => {
-              startTransition(async () => {
-                await removeLibraryItemAction({ itemId: firstItem.id });
-                router.push("/estantes");
-                router.refresh();
-              });
-            }}
-            className="min-h-[44px] rounded-[8px] border border-[var(--status-error)] px-4 text-xs font-semibold text-[var(--status-error)] hover:bg-[var(--status-error-bg)]"
-          >
-            Remover exemplar
-          </button>
+          confirmingRemove ? (
+            <div className="inline-flex flex-wrap items-center gap-2 rounded-[8px] border border-[var(--status-error)] bg-[var(--status-error-bg)] px-3 py-1.5">
+              <span className="text-xs font-semibold text-[var(--status-error)]">
+                Remover da estante? (histórico de leitura preservado)
+              </span>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => {
+                  setFeedback(null);
+                  startTransition(async () => {
+                    try {
+                      const res = await removeLibraryItemAction({
+                        itemId: firstItem.id,
+                      });
+                      if (!res.ok) {
+                        setFeedback(res.error);
+                        setConfirmingRemove(false);
+                        return;
+                      }
+                      router.push("/estantes");
+                      router.refresh();
+                    } catch {
+                      setFeedback(
+                        "Não foi possível remover o exemplar agora. Tente novamente."
+                      );
+                      setConfirmingRemove(false);
+                    }
+                  });
+                }}
+                className="min-h-[34px] rounded-[6px] bg-[var(--status-error)] px-3 text-xs font-semibold text-white disabled:opacity-60"
+              >
+                Confirmar remoção
+              </button>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => setConfirmingRemove(false)}
+                className="min-h-[34px] rounded-[6px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-xs font-semibold text-[var(--text-primary)]"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => setConfirmingRemove(true)}
+              className="min-h-[44px] rounded-[8px] border border-[var(--status-error)] px-4 text-xs font-semibold text-[var(--status-error)] hover:bg-[var(--status-error-bg)]"
+            >
+              Remover exemplar
+            </button>
+          )
         ) : null}
       </div>
 
@@ -242,20 +300,28 @@ export function BookDetailActionsClient({
             e.preventDefault();
             const cleanReason = abandonReason.trim();
             if (cleanReason.length > 300) {
-              setFeedback("O motivo do abandono não pode ter mais de 300 caracteres.");
+              setFeedback(
+                "O motivo do abandono não pode ter mais de 300 caracteres."
+              );
               return;
             }
             startTransition(async () => {
-              const res = await abandonReadingAction({
-                readingId: activeReadingId,
-                abandonReason: cleanReason || undefined,
-              });
-              if (res.ok) {
-                setShowAbandon(false);
-                setFeedback("Abandono registrado.");
-                router.refresh();
-              } else {
-                setFeedback(res.error);
+              try {
+                const res = await abandonReadingAction({
+                  readingId: activeReadingId,
+                  abandonReason: cleanReason || undefined,
+                });
+                if (res.ok) {
+                  setShowAbandon(false);
+                  setFeedback("Abandono registrado.");
+                  router.refresh();
+                } else {
+                  setFeedback(res.error);
+                }
+              } catch {
+                setFeedback(
+                  "Não foi possível registrar o abandono agora. Tente novamente."
+                );
               }
             });
           }}
@@ -306,35 +372,43 @@ export function BookDetailActionsClient({
           }) => {
             setFeedback(null);
             startTransition(async () => {
-              const res = await updateEditionCoverAction({
-                editionId: edition.id,
-                coverUrl: nextUrl,
-                coverSource: nextSource,
-                pageCount,
-              });
-              if (!res.ok) {
-                setFeedback(res.error);
-                return;
+              try {
+                const res = await updateEditionCoverAction({
+                  editionId: edition.id,
+                  coverUrl: nextUrl,
+                  coverSource: nextSource,
+                  pageCount,
+                });
+                if (!res.ok) {
+                  setFeedback(res.error);
+                  return;
+                }
+                if (pageCount && pageCount > 0 && !pages.trim()) {
+                  setPages(String(pageCount));
+                }
+                setAutoCoverUrl(res.coverUrl ?? "");
+                setUploadedCover(
+                  res.coverSource === "upload" ? (res.coverUrl ?? "") : ""
+                );
+                setCoverSource(
+                  !res.coverUrl
+                    ? "none"
+                    : res.coverSource === "upload"
+                      ? "upload"
+                      : "auto"
+                );
+                setChangingCover(false);
+                setFeedback(
+                  res.coverUrl
+                    ? "Capa e cores da lombada atualizadas com sucesso em todo o ReadingFlow."
+                    : "Capa removida. O fallback editorial foi aplicado."
+                );
+                router.refresh();
+              } catch {
+                setFeedback(
+                  "Não foi possível salvar a capa agora. Tente novamente."
+                );
               }
-              if (pageCount && pageCount > 0 && !pages.trim()) {
-                setPages(String(pageCount));
-              }
-              setAutoCoverUrl(res.coverUrl ?? "");
-              setUploadedCover(res.coverSource === "upload" ? (res.coverUrl ?? "") : "");
-              setCoverSource(
-                !res.coverUrl
-                  ? "none"
-                  : res.coverSource === "upload"
-                    ? "upload"
-                    : "auto"
-              );
-              setChangingCover(false);
-              setFeedback(
-                res.coverUrl
-                  ? "Capa e cores da lombada atualizadas com sucesso em todo o ReadingFlow."
-                  : "Capa removida. O fallback editorial foi aplicado."
-              );
-              router.refresh();
             });
           }}
         />
@@ -342,6 +416,7 @@ export function BookDetailActionsClient({
 
       {editing ? (
         <form
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
             setFeedback(null);
@@ -362,22 +437,35 @@ export function BookDetailActionsClient({
               return;
             }
             if (cleanAuthor.length > 200) {
-              setFeedback("O nome do autor(a) não pode ter mais de 200 caracteres.");
+              setFeedback(
+                "O nome do autor(a) não pode ter mais de 200 caracteres."
+              );
               return;
             }
 
             let parsedPages: number | undefined;
-            if (pages.trim() !== "") {
-              const numPages = Number.parseInt(pages, 10);
-              if (!Number.isInteger(numPages) || numPages < 1 || numPages > 20000) {
-                setFeedback("O número de páginas deve ser um inteiro entre 1 e 20.000.");
+            const trimmedPages = pages.trim();
+            if (trimmedPages !== "") {
+              if (!/^\d+$/.test(trimmedPages)) {
+                setFeedback(
+                  "O número de páginas deve ser um inteiro positivo (sem casas decimais)."
+                );
+                return;
+              }
+              const numPages = Number.parseInt(trimmedPages, 10);
+              if (numPages < 1 || numPages > 20000) {
+                setFeedback(
+                  "O número de páginas deve ser um inteiro entre 1 e 20.000."
+                );
                 return;
               }
               parsedPages = numPages;
             }
 
             if (publisher.trim().length > 150) {
-              setFeedback("O nome da editora não pode ter mais de 150 caracteres.");
+              setFeedback(
+                "O nome da editora não pode ter mais de 150 caracteres."
+              );
               return;
             }
             if (genre.trim().length > 80) {
@@ -390,27 +478,33 @@ export function BookDetailActionsClient({
             }
 
             startTransition(async () => {
-              const res = await updateBookMetadataAction({
-                workId: work.id,
-                editionId: edition.id,
-                itemId: firstItem?.id,
-                isbn: isbn.trim(),
-                title: cleanTitle,
-                primaryAuthor: cleanAuthor,
-                publisher: publisher.trim() || undefined,
-                primaryGenre: genre.trim() || undefined,
-                format,
-                pages: parsedPages,
-                coverUrl: effectiveCoverUrl,
-                notes: notes.trim() || undefined,
-              });
-              if (!res.ok) {
-                setFeedback(res.error);
-                return;
+              try {
+                const res = await updateBookMetadataAction({
+                  workId: work.id,
+                  editionId: edition.id,
+                  itemId: firstItem?.id,
+                  isbn: isbn.trim(),
+                  title: cleanTitle,
+                  primaryAuthor: cleanAuthor,
+                  publisher: publisher.trim() || undefined,
+                  primaryGenre: genre.trim() || undefined,
+                  format,
+                  pages: parsedPages,
+                  coverUrl: effectiveCoverUrl,
+                  notes: notes.trim() || undefined,
+                });
+                if (!res.ok) {
+                  setFeedback(res.error);
+                  return;
+                }
+                setEditing(false);
+                setFeedback("Metadados atualizados no seu acervo privado.");
+                router.refresh();
+              } catch {
+                setFeedback(
+                  "Não foi possível salvar os metadados agora. Tente novamente."
+                );
               }
-              setEditing(false);
-              setFeedback("Metadados atualizados no seu acervo privado.");
-              router.refresh();
             });
           }}
           className="space-y-5 rounded-[12px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] p-5"
@@ -447,128 +541,128 @@ export function BookDetailActionsClient({
             />
 
             <div className="grid flex-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="edit-title"
-                className="block text-xs font-semibold"
-              >
-                Título
-              </label>
-              <input
-                id="edit-title"
-                type="text"
-                required
-                maxLength={300}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="edit-author"
-                className="block text-xs font-semibold"
-              >
-                Autor(a)
-              </label>
-              <input
-                id="edit-author"
-                type="text"
-                required
-                maxLength={200}
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="edit-publisher"
-                className="block text-xs font-semibold"
-              >
-                Editora
-              </label>
-              <input
-                id="edit-publisher"
-                type="text"
-                maxLength={150}
-                value={publisher}
-                onChange={(e) => setPublisher(e.target.value)}
-                className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="edit-pages"
-                className="block text-xs font-semibold"
-              >
-                Páginas
-              </label>
-              <input
-                id="edit-pages"
-                type="number"
-                min={1}
-                max={20000}
-                value={pages}
-                onChange={(e) => setPages(e.target.value)}
-                className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="edit-format"
-                className="block text-xs font-semibold"
-              >
-                Formato
-              </label>
-              <select
-                id="edit-format"
-                value={format}
-                onChange={(e) => setFormat(e.target.value as BookFormat)}
-                className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
-              >
-                <option value="paperback">Brochura</option>
-                <option value="hardcover">Capa dura</option>
-                <option value="pocket">Bolso</option>
-                <option value="ebook">E-book</option>
-                <option value="audiobook">Audiobook</option>
-                <option value="box">Box</option>
-              </select>
-            </div>
-            <div>
-              <label
-                htmlFor="edit-genre"
-                className="block text-xs font-semibold"
-              >
-                Gênero
-              </label>
-              <input
-                id="edit-genre"
-                type="text"
-                maxLength={80}
-                value={genre}
-                onChange={(e) => setGenre(e.target.value)}
-                className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label
-                htmlFor="edit-isbn"
-                className="block text-xs font-semibold"
-              >
-                ISBN (opcional)
-              </label>
-              <input
-                id="edit-isbn"
-                type="text"
-                inputMode="numeric"
-                maxLength={24}
-                value={isbn}
-                onChange={(e) => setIsbn(e.target.value)}
-                placeholder="Ex.: 9788535931983 (ou deixe vazio se sem ISBN)"
-                className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
-              />
-            </div>
+              <div>
+                <label
+                  htmlFor="edit-title"
+                  className="block text-xs font-semibold"
+                >
+                  Título
+                </label>
+                <input
+                  id="edit-title"
+                  type="text"
+                  required
+                  maxLength={300}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="edit-author"
+                  className="block text-xs font-semibold"
+                >
+                  Autor(a)
+                </label>
+                <input
+                  id="edit-author"
+                  type="text"
+                  required
+                  maxLength={200}
+                  value={author}
+                  onChange={(e) => setAuthor(e.target.value)}
+                  className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="edit-publisher"
+                  className="block text-xs font-semibold"
+                >
+                  Editora
+                </label>
+                <input
+                  id="edit-publisher"
+                  type="text"
+                  maxLength={150}
+                  value={publisher}
+                  onChange={(e) => setPublisher(e.target.value)}
+                  className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="edit-pages"
+                  className="block text-xs font-semibold"
+                >
+                  Páginas
+                </label>
+                <input
+                  id="edit-pages"
+                  type="number"
+                  min={1}
+                  max={20000}
+                  value={pages}
+                  onChange={(e) => setPages(e.target.value)}
+                  className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="edit-format"
+                  className="block text-xs font-semibold"
+                >
+                  Formato
+                </label>
+                <select
+                  id="edit-format"
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value as BookFormat)}
+                  className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
+                >
+                  <option value="paperback">Brochura</option>
+                  <option value="hardcover">Capa dura</option>
+                  <option value="pocket">Bolso</option>
+                  <option value="ebook">E-book</option>
+                  <option value="audiobook">Audiobook</option>
+                  <option value="box">Box</option>
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="edit-genre"
+                  className="block text-xs font-semibold"
+                >
+                  Gênero
+                </label>
+                <input
+                  id="edit-genre"
+                  type="text"
+                  maxLength={80}
+                  value={genre}
+                  onChange={(e) => setGenre(e.target.value)}
+                  className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label
+                  htmlFor="edit-isbn"
+                  className="block text-xs font-semibold"
+                >
+                  ISBN (opcional)
+                </label>
+                <input
+                  id="edit-isbn"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={24}
+                  value={isbn}
+                  onChange={(e) => setIsbn(e.target.value)}
+                  placeholder="Ex.: 9788535931983 (ou deixe vazio se sem ISBN)"
+                  className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-canvas)] px-3 text-sm"
+                />
+              </div>
             </div>
           </div>
           <div>
@@ -603,8 +697,13 @@ export function BookDetailActionsClient({
             setFeedback("Selecione uma nota de 0,5 a 5,0 estrelas.");
             return;
           }
-          if (narrationRating !== undefined && (narrationRating < 0.5 || narrationRating > 5.0)) {
-            setFeedback("A nota da narração deve ser entre 0,5 e 5,0 estrelas.");
+          if (
+            narrationRating !== undefined &&
+            (narrationRating < 0.5 || narrationRating > 5.0)
+          ) {
+            setFeedback(
+              "A nota da narração deve ser entre 0,5 e 5,0 estrelas."
+            );
             return;
           }
           if (reviewBody.length > 10000) {
@@ -612,18 +711,24 @@ export function BookDetailActionsClient({
             return;
           }
           startTransition(async () => {
-            const res = await upsertReviewAction({
-              workId: work.id,
-              rating,
-              narrationRating,
-              body: reviewBody.trim() || undefined,
-            });
-            if (!res.ok) {
-              setFeedback(res.error);
-              return;
+            try {
+              const res = await upsertReviewAction({
+                workId: work.id,
+                rating,
+                narrationRating,
+                body: reviewBody.trim() || undefined,
+              });
+              if (!res.ok) {
+                setFeedback(res.error);
+                return;
+              }
+              setFeedback("Avaliação salva no ranking pessoal.");
+              router.refresh();
+            } catch {
+              setFeedback(
+                "Não foi possível salvar a avaliação agora. Tente novamente."
+              );
             }
-            setFeedback("Avaliação salva no ranking pessoal.");
-            router.refresh();
           });
         }}
         className="space-y-4 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5"
