@@ -77,11 +77,13 @@ export function AmbientSoundMixer({
   userId,
   initialPreferences,
   stopSignal = 0,
+  onActiveCountChange,
 }: {
   userId?: string;
   initialPreferences?: AmbientPreferences | null;
   /** Incrementado quando a sessão de leitura é encerrada para silenciar o áudio (salvo continueAcrossPages). */
   stopSignal?: number;
+  onActiveCountChange?: (count: number) => void;
 }) {
   const [prefs, setPrefs] = useState<AmbientPreferences>(() => {
     const initial = normalizeAmbientPreferences(initialPreferences);
@@ -106,6 +108,10 @@ export function AmbientSoundMixer({
   useEffect(() => {
     continueAcrossRef.current = prefs.continueAcrossPages;
   }, [prefs.continueAcrossPages]);
+
+  useEffect(() => {
+    onActiveCountChange?.(playingIds.length);
+  }, [playingIds.length, onActiveCountChange]);
 
   const persistPreferences = useCallback(
     (next: AmbientPreferences) => {
@@ -356,7 +362,7 @@ export function AmbientSoundMixer({
           <button
             type="button"
             onClick={handleMuteAll}
-            className="inline-flex min-h-[28px] items-center gap-1 rounded-full border border-[var(--rf-border-strong)] bg-[var(--rf-surface-canvas)] px-2.5 font-sans text-[11px] font-semibold text-[var(--rf-text-primary)] hover:border-[var(--rf-border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+            className="inline-flex min-h-[44px] lg:min-h-[28px] items-center gap-1 rounded-full border border-[var(--rf-border-strong)] bg-[var(--rf-surface-canvas)] px-3 lg:px-2.5 font-sans text-xs lg:text-[11px] font-semibold text-[var(--rf-text-primary)] hover:border-[var(--rf-border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >
             <VolumeX className="h-3 w-3" aria-hidden="true" />
             Silenciar tudo
@@ -380,7 +386,7 @@ export function AmbientSoundMixer({
           <button
             type="button"
             onClick={() => void handlePlaySavedSelection()}
-            className="inline-flex min-h-[30px] shrink-0 items-center gap-1 rounded-full bg-[var(--rf-accent-primary)] px-3 font-sans text-[11px] font-bold text-[var(--rf-accent-on-primary)] hover:bg-[var(--rf-accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+            className="inline-flex min-h-[44px] lg:min-h-[30px] shrink-0 items-center gap-1 rounded-full bg-[var(--rf-accent-primary)] px-3.5 lg:px-3 font-sans text-xs lg:text-[11px] font-bold text-[var(--rf-accent-on-primary)] hover:bg-[var(--rf-accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >
             <Play className="h-3 w-3 fill-current" aria-hidden="true" />
             Iniciar
@@ -409,7 +415,7 @@ export function AmbientSoundMixer({
                 aria-pressed={matches}
                 title={preset.description}
                 onClick={() => void handleApplyPreset(preset.id)}
-                className={`rounded-full border px-2.5 py-1 font-sans text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                className={`min-h-[44px] lg:min-h-0 rounded-full border px-3 lg:px-2.5 py-1.5 lg:py-1 font-sans text-xs lg:text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                   matches
                     ? "border-[var(--rf-accent-secondary)] bg-[var(--rf-accent-secondary)] text-[var(--rf-accent-on-secondary)]"
                     : "border-[var(--rf-border-default)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-primary)] hover:border-[var(--rf-border-accent)]"
@@ -439,7 +445,7 @@ export function AmbientSoundMixer({
               aria-pressed={isPlaying}
               title={sound.description}
               onClick={() => void handleToggleChip(sound.id)}
-              className={`flex min-h-[34px] items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left font-sans text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+              className={`flex min-h-[44px] lg:min-h-[34px] items-center gap-1.5 rounded-lg border px-2.5 lg:px-2 py-2 lg:py-1.5 text-left font-sans text-xs lg:text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                 isPlaying
                   ? "border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary-subtle)] font-semibold text-[var(--rf-text-heading)]"
                   : isReady
@@ -508,7 +514,7 @@ export function AmbientSoundMixer({
                   onChange={(e) =>
                     handleLayerVolumeChange(id, Number(e.target.value) / 100)
                   }
-                  className="h-1.5 w-full cursor-pointer accent-[var(--rf-accent-secondary)]"
+                  className="h-8 lg:h-1.5 w-full cursor-pointer accent-[var(--rf-accent-secondary)]"
                 />
               </div>
             );
@@ -535,7 +541,7 @@ export function AmbientSoundMixer({
               onChange={(e) =>
                 handleMasterVolumeChange(Number(e.target.value) / 100)
               }
-              className="mt-1 h-1.5 w-full cursor-pointer accent-[var(--rf-accent-primary)]"
+              className="mt-1 h-8 lg:h-1.5 w-full cursor-pointer accent-[var(--rf-accent-primary)]"
             />
           </div>
 
@@ -568,7 +574,7 @@ export function AmbientSoundMixer({
                       setSleepMinutes(mins);
                       setSleepRemainingSec(mins * 60);
                     }}
-                    className={`rounded-md border px-1.5 py-1 font-sans text-[10.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                    className={`min-h-[44px] lg:min-h-0 rounded-md border px-1.5 py-1 font-sans text-xs lg:text-[10.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                       active
                         ? "border-[var(--rf-accent-secondary)] bg-[var(--rf-accent-secondary)] text-[var(--rf-accent-on-secondary)]"
                         : "border-[var(--rf-border-default)] bg-[var(--rf-surface-elevated)] text-[var(--rf-text-secondary)] hover:border-[var(--rf-border-accent)]"
@@ -584,12 +590,12 @@ export function AmbientSoundMixer({
       ) : null}
 
       {/* Opção desligada por padrão: continuar em outras telas */}
-      <label className="flex cursor-pointer items-center gap-2 font-sans text-[11px] text-[var(--rf-text-secondary)]">
+      <label className="flex min-h-[44px] lg:min-h-0 cursor-pointer items-center gap-2 font-sans text-xs lg:text-[11px] text-[var(--rf-text-secondary)]">
         <input
           type="checkbox"
           checked={prefs.continueAcrossPages}
           onChange={(e) => handleToggleContinueAcross(e.target.checked)}
-          className="h-3.5 w-3.5 shrink-0 accent-[var(--rf-accent-secondary)]"
+          className="h-4 w-4 lg:h-3.5 lg:w-3.5 shrink-0 accent-[var(--rf-accent-secondary)]"
         />
         <span>Continuar som em outras telas</span>
       </label>

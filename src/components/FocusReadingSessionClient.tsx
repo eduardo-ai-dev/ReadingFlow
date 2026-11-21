@@ -16,6 +16,8 @@ import {
   Target,
   Clock,
   AlertCircle,
+  Volume2,
+  X,
 } from "lucide-react";
 import { updateReadingProgressAction } from "@/features/reading/actions";
 import { formatFocusSessionSummaryPtBr } from "@/features/reading/rules";
@@ -348,6 +350,8 @@ export function FocusReadingSessionClient({
   const [quickRegisterMode, setQuickRegisterMode] =
     useState<QuickRegisterMode>("delta");
   const [stopAudioSignal, setStopAudioSignal] = useState(0);
+  const [ambientSheetOpen, setAmbientSheetOpen] = useState(false);
+  const [activeAmbientCount, setActiveAmbientCount] = useState(0);
   const [sessionNotes, setSessionNotes] = useState("");
   const [rawSessionInput, setRawSessionInput] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
@@ -370,6 +374,17 @@ export function FocusReadingSessionClient({
   });
 
   const selectedBook = booksState.find((b) => b.readingId === selectedBookId);
+
+  useEffect(() => {
+    if (!ambientSheetOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setAmbientSheetOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [ambientSheetOpen]);
 
   // Restaura sessão em andamento após recarregamento sem erro de hidratação SSR (isolado por userId)
   useEffect(() => {
@@ -934,7 +949,7 @@ export function FocusReadingSessionClient({
                     setQuickRegisterMode("delta");
                     setRawSessionInput("");
                   }}
-                  className={`rounded-full px-3 py-1 font-sans text-[11px] font-semibold transition-colors ${
+                  className={`min-h-[44px] lg:min-h-0 rounded-full px-3 py-1 font-sans text-[11px] font-semibold transition-colors ${
                     quickRegisterMode === "delta"
                       ? "bg-[#C8A46E] text-[#141514]"
                       : "text-[#DFBE88] hover:text-[#F4EFE6]"
@@ -949,7 +964,7 @@ export function FocusReadingSessionClient({
                     setQuickRegisterMode("current_page");
                     setRawSessionInput(String(previousBookValue));
                   }}
-                  className={`rounded-full px-3 py-1 font-sans text-[11px] font-semibold transition-colors ${
+                  className={`min-h-[44px] lg:min-h-0 rounded-full px-3 py-1 font-sans text-[11px] font-semibold transition-colors ${
                     quickRegisterMode === "current_page"
                       ? "bg-[#C8A46E] text-[#141514]"
                       : "text-[#DFBE88] hover:text-[#F4EFE6]"
@@ -1103,7 +1118,7 @@ export function FocusReadingSessionClient({
                     setRawSessionInput("");
                     setSaveSuccess(false);
                   }}
-                  className="w-full rounded-lg border border-[#8C7A63]/28 bg-[#F4EFE6] px-3 py-2 font-sans text-xs font-medium text-[#1C1815] focus:border-[#C4A77D] focus:outline-none focus:ring-2 focus:ring-[#C4A77D]"
+                  className="min-h-[44px] w-full rounded-lg border border-[#8C7A63]/28 bg-[#F4EFE6] px-3 py-2 font-sans text-xs font-medium text-[#1C1815] focus:border-[#C4A77D] focus:outline-none focus:ring-2 focus:ring-[#C4A77D]"
                 >
                   {booksState.map((b) => (
                     <option key={b.readingId} value={b.readingId}>
@@ -1193,11 +1208,81 @@ export function FocusReadingSessionClient({
             </h2>
           </div>
 
-          <AmbientSoundMixer
-            userId={userId}
-            initialPreferences={initialAmbientPreferences}
-            stopSignal={stopAudioSignal}
-          />
+          {/* No mobile/tablet (< 1024px), botão compacto abre Bottom Sheet do mixer sem desmontar o áudio */}
+          <button
+            type="button"
+            aria-expanded={ambientSheetOpen}
+            aria-controls="foco-mixer-sheet"
+            onClick={() => setAmbientSheetOpen(true)}
+            className="flex min-h-[48px] w-full items-center justify-between gap-3 rounded-xl border border-[#C4A77D]/45 bg-[#F4EFE6] px-3.5 py-2.5 text-left transition-colors hover:border-[#C4A77D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4A77D] lg:hidden"
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <Volume2
+                className="h-4 w-4 shrink-0 text-[#722F3E]"
+                aria-hidden="true"
+              />
+              <span className="min-w-0">
+                <span className="block font-sans text-xs font-semibold text-[#1C1815]">
+                  Sons ambiente
+                </span>
+                <span className="block truncate font-sans text-[11px] text-[#5B4D44]">
+                  {activeAmbientCount > 0
+                    ? `${activeAmbientCount} camada(s) em reprodução · Abrir mixer`
+                    : "Presets, chuva, lareira e timer · Abrir mixer"}
+                </span>
+              </span>
+            </span>
+            <span className="shrink-0 rounded-full border border-[#8C7A63]/30 bg-[#FAF7F1] px-2.5 py-1 font-mono text-[11px] font-semibold tabular-nums text-[#722F3E]">
+              {activeAmbientCount}/3
+            </span>
+          </button>
+
+          {ambientSheetOpen ? (
+            <div
+              aria-hidden="true"
+              onClick={() => setAmbientSheetOpen(false)}
+              className="fixed inset-0 z-40 bg-black/45 lg:hidden"
+            />
+          ) : null}
+
+          <div
+            id="foco-mixer-sheet"
+            role={ambientSheetOpen ? "dialog" : undefined}
+            aria-modal={ambientSheetOpen ? true : undefined}
+            aria-label={ambientSheetOpen ? "Mixer de sons ambiente" : undefined}
+            className={
+              ambientSheetOpen
+                ? "fixed inset-x-0 bottom-0 z-50 max-h-[82dvh] overflow-y-auto overscroll-contain rounded-t-2xl border-t border-[var(--rf-border-default)] bg-[#FAF7F1] p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl lg:static lg:z-auto lg:block lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none"
+                : "hidden lg:block"
+            }
+          >
+            <div className="mb-3 flex flex-col gap-2 border-b border-[#8C7A63]/22 pb-2.5 lg:hidden">
+              <div
+                className="mx-auto h-1.5 w-10 rounded-full bg-[#8C7A63]/35"
+                aria-hidden="true"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-serif text-base font-semibold text-[#2C221E]">
+                  Mixer de sons ambiente
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAmbientSheetOpen(false)}
+                  aria-label="Fechar mixer de sons ambiente"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#8C7A63]/30 bg-[#F4EFE6] text-[#1C1815] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4A77D]"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+
+            <AmbientSoundMixer
+              userId={userId}
+              initialPreferences={initialAmbientPreferences}
+              stopSignal={stopAudioSignal}
+              onActiveCountChange={setActiveAmbientCount}
+            />
+          </div>
 
           <div className="border-t border-[#8C7A63]/22 pt-3.5">
             <p className="font-sans text-[11px] font-semibold uppercase tracking-wider text-[#5B4D44]">
