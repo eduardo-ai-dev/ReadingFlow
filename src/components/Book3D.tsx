@@ -98,6 +98,8 @@ export interface Book3DProps {
   draggable?: boolean;
   isDragging?: boolean;
   dropPosition?: "before" | "after" | null;
+  bookDropId?: string;
+  bookDropShelf?: string;
   onDragStart?: DragEventHandler<HTMLElement>;
   onDragOver?: DragEventHandler<HTMLElement>;
   onDrop?: DragEventHandler<HTMLElement>;
@@ -594,6 +596,8 @@ function Book3DBase({
   draggable = false,
   isDragging = false,
   dropPosition = null,
+  bookDropId,
+  bookDropShelf,
   onDragStart,
   onDragOver,
   onDrop,
@@ -1011,6 +1015,8 @@ function Book3DBase({
       onDragOver={stableDragOver}
       onDrop={stableDrop}
       onDragEnd={stableDragEnd}
+      data-book-drop-id={bookDropId}
+      data-book-drop-shelf={bookDropShelf}
       onPointerEnter={(e: ReactPointerEvent<HTMLElement>) => {
         if (e.pointerType !== "mouse") return;
         measureTip();

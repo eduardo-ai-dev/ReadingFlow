@@ -13,8 +13,10 @@ import {
   Palette,
   Plus,
   RotateCcw,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   groupBooksByGenre,
@@ -343,6 +345,7 @@ export function ArrangeShelfStudio({
   };
 
   const [activeTab, setActiveTab] = useState<StudioTabId>("estilo");
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [selected, setSelected] = useState<{
     shelfKey: string;
     bookId: string;
@@ -393,6 +396,17 @@ export function ArrangeShelfStudio({
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
+
+  useEffect(() => {
+    if (!mobileSheetOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMobileSheetOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileSheetOpen]);
 
   const renderShelves = useMemo<ShelfRenderGroup[]>(
     () =>
@@ -1057,7 +1071,7 @@ export function ArrangeShelfStudio({
           ?.label ?? "Clássica");
 
   return (
-    <div className="w-full py-2 text-[var(--rf-text-primary)] sm:py-3">
+    <div className="w-full py-2 pb-20 text-[var(--rf-text-primary)] sm:py-3 sm:pb-20 xl:pb-3">
       {/* Cabeçalho do Estúdio */}
       <header className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--rf-border-default)] pb-4">
         <div className="flex items-center gap-3">
@@ -1201,8 +1215,14 @@ export function ArrangeShelfStudio({
         >
           <div className="flex w-full max-w-[640px] flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--rf-border-subtle)] bg-[var(--rf-surface-card)] px-3.5 py-2.5">
             <p className="font-sans text-xs text-[var(--rf-text-secondary)]">
-              Clique em um livro para personalizar capa, inclinação ou cor ·
-              Arraste para reorganizar
+              <span className="hidden sm:inline">
+                Clique em um livro para personalizar capa, inclinação ou cor ·
+                Arraste para reorganizar
+              </span>
+              <span className="sm:hidden">
+                Toque em um livro para editar ou segure para arrastar entre
+                prateleiras
+              </span>
             </p>
             <button
               type="button"
@@ -1218,6 +1238,108 @@ export function ArrangeShelfStudio({
               <span>Nova prateleira</span>
             </button>
           </div>
+
+          {selected && selectedBook ? (
+            <div
+              role="region"
+              aria-label={`Ações rápidas para ${selectedBook.title}`}
+              data-touch-move-bar="true"
+              className="flex w-full max-w-[640px] flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--rf-border-accent-soft)] bg-[var(--rf-surface-card)] px-3.5 py-2.5 shadow-xs"
+            >
+              <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+                <p className="truncate font-serif text-sm font-semibold text-[var(--rf-text-heading)]">
+                  {selectedBook.title}
+                </p>
+                <p className="font-sans text-[11px] text-[var(--rf-text-secondary)]">
+                  Mover posição ou enviar para outra prateleira
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleNudgeSelected(-1)}
+                  aria-label={`Mover ${selectedBook.title} para a esquerda`}
+                  className={rfButtonClassName({
+                    variant: "secondary",
+                    secondaryStyle: "outline",
+                    size: "sm",
+                    className: "min-h-[44px]",
+                  })}
+                >
+                  ← Esquerda
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleNudgeSelected(1)}
+                  aria-label={`Mover ${selectedBook.title} para a direita`}
+                  className={rfButtonClassName({
+                    variant: "secondary",
+                    secondaryStyle: "outline",
+                    size: "sm",
+                    className: "min-h-[44px]",
+                  })}
+                >
+                  Direita →
+                </button>
+                {shelves.length >= 2 ? (
+                  <label className="inline-flex min-h-[44px] items-center gap-1.5">
+                    <span className="sr-only">Mover para prateleira</span>
+                    <select
+                      aria-label="Mover para prateleira…"
+                      value={selected.shelfKey}
+                      onChange={(e) => {
+                        const dest = e.target.value;
+                        if (dest && dest !== selected.shelfKey) {
+                          const destShelf = shelves.find((s) => s.key === dest);
+                          moveBook({
+                            bookId: selected.bookId,
+                            fromShelfKey: selected.shelfKey,
+                            toShelfKey: dest,
+                          });
+                          setSelected({
+                            shelfKey: dest,
+                            bookId: selected.bookId,
+                          });
+                          setTargetDecorShelfKey(dest);
+                          if (destShelf) {
+                            showNotice(
+                              `“${selectedBook.title}” movido para “${destShelf.title}”.`
+                            );
+                          }
+                        }
+                      }}
+                      className="min-h-[44px] rounded-xl border border-[var(--rf-border-default)] bg-[var(--rf-surface-canvas)] px-3 py-2 font-sans text-xs font-medium text-[var(--rf-text-primary)]"
+                    >
+                      {shelves.map((s) => (
+                        <option key={s.key} value={s.key}>
+                          Mover para: {s.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("livro");
+                    setMobileSheetOpen(true);
+                  }}
+                  className={rfButtonClassName({
+                    variant: "primary",
+                    size: "sm",
+                    pill: true,
+                    className: "min-h-[44px] xl:hidden",
+                  })}
+                >
+                  <SlidersHorizontal
+                    className="h-3.5 w-3.5"
+                    aria-hidden="true"
+                  />
+                  <span>Personalizar</span>
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {creating ? (
             <form
@@ -1414,11 +1536,45 @@ export function ArrangeShelfStudio({
           />
         </section>
 
-        {/* COLUNA DIREITA: Painel Sticky do Estúdio */}
+        {/* COLUNA DIREITA (Desktop xl:) / BOTTOM SHEET (< 1280px) */}
+        {mobileSheetOpen ? (
+          <div
+            aria-hidden="true"
+            onClick={() => setMobileSheetOpen(false)}
+            className="fixed inset-0 z-40 bg-black/45 xl:hidden"
+          />
+        ) : null}
         <aside
+          role={mobileSheetOpen ? "dialog" : undefined}
+          aria-modal={mobileSheetOpen ? true : undefined}
           aria-label="Controles de personalização da estante"
-          className="rounded-2xl border border-[var(--rf-border-default)] bg-[var(--rf-surface-card)] p-4 shadow-sm xl:sticky xl:top-6"
+          className={
+            mobileSheetOpen
+              ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[82dvh] flex-col overflow-y-auto overscroll-contain rounded-t-2xl border-t border-[var(--rf-border-default)] bg-[var(--rf-surface-card)] p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl xl:static xl:z-auto xl:block xl:max-h-none xl:overflow-visible xl:rounded-2xl xl:border xl:p-4 xl:shadow-sm xl:sticky xl:top-6"
+              : "hidden rounded-2xl border border-[var(--rf-border-default)] bg-[var(--rf-surface-card)] p-4 shadow-sm xl:sticky xl:top-6 xl:block"
+          }
         >
+          {/* Cabeçalho do Bottom Sheet no mobile/tablet (< 1280px) */}
+          <div className="mb-3 flex flex-col gap-2 border-b border-[var(--rf-border-subtle)] pb-2.5 xl:hidden">
+            <div
+              className="mx-auto h-1.5 w-10 rounded-full bg-[var(--rf-border-default)]"
+              aria-hidden="true"
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-serif text-base font-semibold text-[var(--rf-text-heading)]">
+                Estúdio da estante
+              </span>
+              <button
+                type="button"
+                onClick={() => setMobileSheetOpen(false)}
+                aria-label="Fechar controles do estúdio"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--rf-border-default)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
           {/* Navegação por abas do Estúdio */}
           <div
             role="tablist"
@@ -1443,7 +1599,7 @@ export function ArrangeShelfStudio({
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 font-sans text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                  className={`relative flex min-h-[44px] xl:min-h-0 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 font-sans text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                     isActive
                       ? "bg-[var(--rf-surface-card)] text-[var(--rf-text-heading)] shadow-xs ring-1 ring-[var(--rf-border-default)]"
                       : "text-[var(--rf-text-secondary)] hover:text-[var(--rf-text-primary)]"
@@ -1543,7 +1699,7 @@ export function ArrangeShelfStudio({
                             `Material alterado para ${opt.label}.`
                           )
                         }
-                        className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 font-sans text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                        className={`flex min-h-[44px] xl:min-h-0 items-center gap-2 rounded-xl border px-2.5 py-2 font-sans text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                           active
                             ? "border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary-subtle)] text-[var(--rf-text-heading)] font-semibold"
                             : "border-[var(--rf-border-subtle)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-primary)] hover:border-[var(--rf-border-default)]"
@@ -1594,7 +1750,7 @@ export function ArrangeShelfStudio({
                             `Suporte: ${opt.label}.`
                           )
                         }
-                        className={`rounded-xl border px-2.5 py-2 text-center font-sans text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                        className={`min-h-[44px] xl:min-h-0 rounded-xl border px-2.5 py-2 text-center font-sans text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                           active
                             ? "border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary-subtle)] text-[var(--rf-text-heading)] font-semibold"
                             : "border-[var(--rf-border-subtle)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-primary)] hover:border-[var(--rf-border-default)]"
@@ -1632,7 +1788,7 @@ export function ArrangeShelfStudio({
                             `Fundo do nicho: ${opt.label}.`
                           )
                         }
-                        className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 font-sans text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                        className={`flex min-h-[44px] xl:min-h-0 items-center gap-2 rounded-xl border px-2.5 py-2 font-sans text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                           active
                             ? "border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary-subtle)] text-[var(--rf-text-heading)] font-semibold"
                             : "border-[var(--rf-border-subtle)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-primary)] hover:border-[var(--rf-border-default)]"
@@ -1759,7 +1915,7 @@ export function ArrangeShelfStudio({
                             `Densidade: ${opt.label}.`
                           )
                         }
-                        className={`rounded-xl border px-2.5 py-2 text-center font-sans text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                        className={`min-h-[44px] xl:min-h-0 rounded-xl border px-2.5 py-2 text-center font-sans text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                           active
                             ? "border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary-subtle)] text-[var(--rf-text-heading)] font-semibold"
                             : "border-[var(--rf-border-subtle)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-primary)] hover:border-[var(--rf-border-default)]"
@@ -1793,7 +1949,7 @@ export function ArrangeShelfStudio({
                         aria-checked={active}
                         title={opt.description}
                         onClick={() => handleSelectOrganizationMode(opt.id)}
-                        className={`rounded-xl border px-2.5 py-2 text-center font-sans text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                        className={`min-h-[44px] xl:min-h-0 rounded-xl border px-2.5 py-2 text-center font-sans text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                           active
                             ? "border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary-subtle)] text-[var(--rf-text-heading)] font-semibold"
                             : "border-[var(--rf-border-subtle)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-primary)] hover:border-[var(--rf-border-default)]"
@@ -1849,7 +2005,7 @@ export function ArrangeShelfStudio({
                       type="button"
                       aria-pressed={decorInsertSpot === spot.id}
                       onClick={() => setDecorInsertSpot(spot.id)}
-                      className={`rounded-lg border px-2 py-1.5 font-sans text-xs font-medium transition ${
+                      className={`min-h-[44px] xl:min-h-0 rounded-lg border px-2 py-1.5 font-sans text-xs font-medium transition ${
                         decorInsertSpot === spot.id
                           ? "border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary-subtle)] text-[var(--rf-text-heading)] font-semibold"
                           : "border-[var(--rf-border-subtle)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-secondary)]"
@@ -1864,7 +2020,7 @@ export function ArrangeShelfStudio({
                     type="button"
                     aria-pressed={decorInsertSpot === "after-selected"}
                     onClick={() => setDecorInsertSpot("after-selected")}
-                    className={`mt-1.5 w-full rounded-lg border px-2.5 py-1.5 font-sans text-xs font-medium transition ${
+                    className={`mt-1.5 min-h-[44px] xl:min-h-0 w-full rounded-lg border px-2.5 py-1.5 font-sans text-xs font-medium transition ${
                       decorInsertSpot === "after-selected"
                         ? "border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary-subtle)] text-[var(--rf-text-heading)] font-semibold"
                         : "border-[var(--rf-border-subtle)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-secondary)]"
@@ -2018,7 +2174,7 @@ export function ArrangeShelfStudio({
                           onClick={() =>
                             handleSetBookDisplayMode(selected.bookId, opt.id)
                           }
-                          className={`rounded-xl border px-2 py-2 text-center font-sans text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                          className={`min-h-[44px] xl:min-h-0 rounded-xl border px-2 py-2 text-center font-sans text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                             active
                               ? "border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary-subtle)] text-[var(--rf-text-heading)] font-semibold"
                               : "border-[var(--rf-border-subtle)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-primary)]"
@@ -2172,7 +2328,7 @@ export function ArrangeShelfStudio({
                           onClick={() =>
                             handleChangeSelectedColor(selected.bookId, sw.hex)
                           }
-                          className={`h-6 w-6 rounded-full border transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                          className={`h-11 w-11 xl:h-6 xl:w-6 rounded-full border transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                             isCurrent
                               ? "scale-110 border-[var(--rf-text-heading)] ring-2 ring-[var(--rf-accent-primary)]"
                               : "border-black/25"
@@ -2181,7 +2337,7 @@ export function ArrangeShelfStudio({
                         />
                       );
                     })}
-                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--rf-border-default)] bg-[var(--rf-surface-canvas)] px-2.5 py-1 font-sans text-xs font-medium text-[var(--rf-text-primary)]">
+                    <label className="inline-flex min-h-[44px] xl:min-h-0 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--rf-border-default)] bg-[var(--rf-surface-canvas)] px-3 py-1 font-sans text-xs font-medium text-[var(--rf-text-primary)]">
                       <input
                         type="color"
                         aria-label={`Cor personalizada da lombada de ${selectedBook.title}`}
@@ -2254,13 +2410,13 @@ export function ArrangeShelfStudio({
                             : ""}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           title="Ordenar esta prateleira por cor"
                           aria-label={`Ordenar ${shelf.title} por cor`}
                           onClick={() => handleSortByColor(shelf.key)}
-                          className="rounded-lg border border-[var(--rf-border-subtle)] p-1.5 text-[var(--rf-text-secondary)] hover:border-[var(--rf-border-default)] hover:text-[var(--rf-text-heading)]"
+                          className="inline-flex h-11 w-11 xl:h-auto xl:w-auto items-center justify-center rounded-lg border border-[var(--rf-border-subtle)] p-1.5 text-[var(--rf-text-secondary)] hover:border-[var(--rf-border-default)] hover:text-[var(--rf-text-heading)]"
                         >
                           <Palette className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
@@ -2269,7 +2425,7 @@ export function ArrangeShelfStudio({
                           disabled={idx === 0}
                           onClick={() => handleMoveShelf(shelf.key, -1)}
                           aria-label={`Subir prateleira ${shelf.title}`}
-                          className="rounded-lg border border-[var(--rf-border-subtle)] px-2 py-1 font-sans text-xs font-semibold text-[var(--rf-text-secondary)] disabled:opacity-35"
+                          className="inline-flex h-11 w-11 xl:h-auto xl:w-auto items-center justify-center rounded-lg border border-[var(--rf-border-subtle)] px-2 py-1 font-sans text-xs font-semibold text-[var(--rf-text-secondary)] disabled:opacity-35"
                         >
                           ↑
                         </button>
@@ -2278,7 +2434,7 @@ export function ArrangeShelfStudio({
                           disabled={idx === shelves.length - 1}
                           onClick={() => handleMoveShelf(shelf.key, 1)}
                           aria-label={`Descer prateleira ${shelf.title}`}
-                          className="rounded-lg border border-[var(--rf-border-subtle)] px-2 py-1 font-sans text-xs font-semibold text-[var(--rf-text-secondary)] disabled:opacity-35"
+                          className="inline-flex h-11 w-11 xl:h-auto xl:w-auto items-center justify-center rounded-lg border border-[var(--rf-border-subtle)] px-2 py-1 font-sans text-xs font-semibold text-[var(--rf-text-secondary)] disabled:opacity-35"
                         >
                           ↓
                         </button>
@@ -2291,6 +2447,48 @@ export function ArrangeShelfStudio({
           ) : null}
         </aside>
       </div>
+
+      {/* Barra fixa inferior do Estúdio em mobile/tablet (< 1280px) para abrir o Bottom Sheet */}
+      {!mobileSheetOpen ? (
+        <div
+          role="region"
+          aria-label="Abrir estúdio de personalização"
+          className="fixed inset-x-3 bottom-[calc(4.1rem+env(safe-area-inset-bottom))] z-30 rounded-2xl border border-[var(--rf-border-default)] bg-[var(--rf-surface-card)]/95 p-1.5 shadow-lg xl:hidden"
+        >
+          <div className="grid grid-cols-4 gap-1">
+            {(
+              [
+                { id: "estilo", label: "Estilo", icon: Palette },
+                { id: "objetos", label: "Objetos", icon: Lamp },
+                { id: "livro", label: "Livro", icon: BookOpen },
+                { id: "prateleiras", label: "Ordem", icon: Layers },
+              ] as const
+            ).map((tab) => {
+              const Icon = tab.icon;
+              const isSelectedBookTab =
+                tab.id === "livro" && Boolean(selectedBook);
+              return (
+                <button
+                  key={`dock-${tab.id}`}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setMobileSheetOpen(true);
+                  }}
+                  className={`relative flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-2 font-sans text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                    isSelectedBookTab
+                      ? "bg-[var(--rf-accent-primary)] text-[var(--rf-accent-on-primary)]"
+                      : "bg-[var(--rf-surface-canvas)] text-[var(--rf-text-heading)] hover:bg-[var(--rf-surface-subtle)]"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <ArrangeQuickAddModal
         open={Boolean(quickAddTarget)}

@@ -1073,6 +1073,8 @@ const PackedShelfRow = memo(function PackedShelfRow({
                         {displayMode === "capa_frente" ? (
                           <li
                             data-book-display="capa_frente"
+                            data-book-drop-id={bookIdStr}
+                            data-book-drop-shelf={shelf.genreKey}
                             data-group-start={
                               bookGroupGapPx > 0 ? "true" : undefined
                             }
@@ -1175,6 +1177,8 @@ const PackedShelfRow = memo(function PackedShelfRow({
                             draggable={canDrag}
                             isDragging={isBookDragging}
                             dropPosition={dropPos}
+                            bookDropId={bookIdStr}
+                            bookDropShelf={shelf.genreKey}
                             onDragStart={(e) =>
                               onBookDragStart(e, shelf.genreKey, book.id)
                             }
@@ -1622,12 +1626,252 @@ export function ShelfView({
     [clearDrag, onMoveBookAcrossShelves]
   );
 
+  // Suporte nativo a toque em /estante-3d/arrumar: long-press (300 ms) inicia arraste por Pointer Events sem bloquear rolagem normal
+  const suppressTouchClickUntilRef = useRef(0);
+  const touchCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      touchCleanupRef.current?.();
+    };
+  }, []);
+
+  const handleBookcasePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isEdit || e.pointerType === "mouse") return;
+      const targetEl = e.target as Element | null;
+      const slotEl = targetEl?.closest<HTMLElement>("[data-book-drop-id]");
+      if (!slotEl) return;
+      const bookId = slotEl.dataset.bookDropId;
+      const shelfKey = slotEl.dataset.bookDropShelf;
+      if (!bookId || !shelfKey) return;
+
+      touchCleanupRef.current?.();
+
+      const pointerId = e.pointerId;
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let dragActivated = false;
+
+      const blockTouchMoveScroll = (ev: TouchEvent) => {
+        if (dragActivated) {
+          ev.preventDefault();
+        }
+      };
+
+      const finish = (ev?: PointerEvent) => {
+        window.clearTimeout(holdTimer);
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerup", onPointerUp);
+        window.removeEventListener("pointercancel", onPointerCancel);
+        window.removeEventListener("touchmove", blockTouchMoveScroll);
+        touchCleanupRef.current = null;
+
+        if (!dragActivated) return;
+        suppressTouchClickUntilRef.current = Date.now() + 450;
+
+        if (ev) {
+          const hitEls = document.elementsFromPoint(ev.clientX, ev.clientY);
+          let dropBookEl: HTMLElement | null = null;
+          let dropShelfEl: HTMLElement | null = null;
+          for (const node of hitEls) {
+            if (
+              !dropBookEl &&
+              node instanceof HTMLElement &&
+              node.dataset.bookDropId
+            ) {
+              dropBookEl = node;
+            }
+            if (
+              !dropShelfEl &&
+              node instanceof HTMLElement &&
+              node.dataset.genreShelf
+            ) {
+              dropShelfEl = node;
+            }
+          }
+
+          const currentTarget = dragOverTargetRef.current;
+          const destShelfKey =
+            currentTarget?.shelfKey ??
+            dropBookEl?.dataset.bookDropShelf ??
+            dropShelfEl?.dataset.genreShelf ??
+            null;
+          const destBookId =
+            currentTarget?.bookId ?? dropBookEl?.dataset.bookDropId;
+
+          if (destShelfKey) {
+            const destShelf = shelves.find((s) => s.genreKey === destShelfKey);
+            if (destShelf && destShelfKey !== shelfKey) {
+              onMoveBookAcrossShelves?.({
+                bookId,
+                fromShelfKey: shelfKey,
+                toShelfKey: destShelfKey,
+                targetBookId: destBookId,
+                position: currentTarget?.position ?? "before",
+              });
+            } else if (
+              destShelf &&
+              destShelfKey === shelfKey &&
+              destBookId &&
+              destBookId !== bookId
+            ) {
+              const reordered = reorderBookListByMove(
+                destShelf.books,
+                bookId,
+                destBookId,
+                currentTarget?.position ?? "before"
+              );
+              const newIndex = reordered.findIndex(
+                (b) => String(b.id) === bookId
+              );
+              const movedBook = reordered[newIndex];
+              if (movedBook && newIndex >= 0) {
+                onReorderWithinShelf(
+                  destShelf,
+                  reordered,
+                  movedBook.title,
+                  newIndex
+                );
+              }
+            }
+          }
+        }
+
+        clearDrag();
+      };
+
+      const onPointerMove = (mv: PointerEvent) => {
+        if (mv.pointerId !== pointerId) return;
+        if (!dragActivated) {
+          if (Math.hypot(mv.clientX - startX, mv.clientY - startY) > 8) {
+            finish();
+          }
+          return;
+        }
+
+        const hitEls = document.elementsFromPoint(mv.clientX, mv.clientY);
+        let hitBook: HTMLElement | null = null;
+        let hitShelf: HTMLElement | null = null;
+        for (const node of hitEls) {
+          if (
+            !hitBook &&
+            node instanceof HTMLElement &&
+            node.dataset.bookDropId
+          ) {
+            hitBook = node;
+          }
+          if (
+            !hitShelf &&
+            node instanceof HTMLElement &&
+            node.dataset.genreShelf
+          ) {
+            hitShelf = node;
+          }
+        }
+
+        const hoverShelfKey =
+          hitBook?.dataset.bookDropShelf ??
+          hitShelf?.dataset.genreShelf ??
+          null;
+        if (hoverShelfKey) {
+          setDragOverShelfKey((prev) =>
+            prev === hoverShelfKey ? prev : hoverShelfKey
+          );
+        }
+
+        const hoverBookId = hitBook?.dataset.bookDropId;
+        if (
+          hitBook &&
+          hoverShelfKey &&
+          hoverBookId &&
+          (hoverShelfKey !== shelfKey || hoverBookId !== bookId)
+        ) {
+          const rect = hitBook.getBoundingClientRect();
+          const pos: "before" | "after" =
+            mv.clientX >= rect.left + rect.width / 2 ? "after" : "before";
+          const nextTarget = {
+            shelfKey: hoverShelfKey,
+            bookId: hoverBookId,
+            position: pos,
+          };
+          dragOverTargetRef.current = nextTarget;
+          setDragOverTarget((prev) =>
+            prev &&
+            prev.shelfKey === hoverShelfKey &&
+            prev.bookId === hoverBookId &&
+            prev.position === pos
+              ? prev
+              : nextTarget
+          );
+        } else {
+          dragOverTargetRef.current = null;
+          setDragOverTarget(null);
+        }
+      };
+
+      const onPointerUp = (up: PointerEvent) => {
+        if (up.pointerId !== pointerId) return;
+        finish(up);
+      };
+
+      const onPointerCancel = (cancel: PointerEvent) => {
+        if (cancel.pointerId !== pointerId) return;
+        finish();
+      };
+
+      const holdTimer = window.setTimeout(() => {
+        dragActivated = true;
+        const payload = { shelfKey, bookId };
+        draggingBookRef.current = payload;
+        setDraggingBook(payload);
+        if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+          try {
+            navigator.vibrate(14);
+          } catch {
+            // Ignora ambientes sem suporte a vibração
+          }
+        }
+      }, 300);
+
+      window.addEventListener("pointermove", onPointerMove, { passive: true });
+      window.addEventListener("pointerup", onPointerUp, { passive: true });
+      window.addEventListener("pointercancel", onPointerCancel, {
+        passive: true,
+      });
+      window.addEventListener("touchmove", blockTouchMoveScroll, {
+        passive: false,
+      });
+
+      touchCleanupRef.current = () => {
+        window.clearTimeout(holdTimer);
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerup", onPointerUp);
+        window.removeEventListener("pointercancel", onPointerCancel);
+        window.removeEventListener("touchmove", blockTouchMoveScroll);
+      };
+    },
+    [clearDrag, isEdit, onMoveBookAcrossShelves, onReorderWithinShelf, shelves]
+  );
+
+  const handleBookcaseClickCapture = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (Date.now() < suppressTouchClickUntilRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    []
+  );
+
   const bookcaseElement = (
     <div
       ref={bookcaseRef}
       onMouseEnter={handleMouseEnter}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
+      onPointerDown={handleBookcasePointerDown}
+      onClickCapture={handleBookcaseClickCapture}
       data-shelf-mode={mode}
       data-shelf-material={shelfMaterial}
       data-shelf-material-v2={resolvedThemeConfig.material}

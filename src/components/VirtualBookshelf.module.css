@@ -1346,6 +1346,31 @@
   cursor: default;
 }
 
+@media (max-width: 1279px) {
+  .headerActionsPill {
+    flex-wrap: wrap;
+    min-height: 44px;
+    padding: 2px 6px;
+  }
+
+  .headerIconBtn,
+  .categoryEditBtn {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .dotsSortBtn,
+  .confirmDeleteBtn,
+  .cancelDeleteBtn,
+  .colorPresetBtn,
+  .shelfSuggestionChip {
+    min-height: 44px;
+    padding-inline: 12px;
+  }
+}
+
 .headerIconBtn:focus-visible,
 .dotsSortBtn:focus-visible,
 .addRoundBtn:focus-visible,
