@@ -20,6 +20,16 @@ import {
 } from "lucide-react";
 import { updateReadingProgressAction } from "@/features/reading/actions";
 import { formatFocusSessionSummaryPtBr } from "@/features/reading/rules";
+import {
+  FOCUS_POMODORO_SECONDS,
+  FOCUS_SESSION_STORAGE_KEY,
+  clearPersistedFocusSession,
+  computeElapsedFocusSeconds,
+  parsePersistedFocusSession,
+  readPersistedFocusSession,
+  writePersistedFocusSession,
+  type FocusSessionMode,
+} from "@/features/reading/focus-session-storage";
 import { BookCover } from "@/components/BookCover";
 import type { ReadingStatus } from "@/lib/domain";
 
@@ -38,10 +48,10 @@ export interface ActiveBookItem {
   progressPercent: number;
 }
 
-type FocusMode = "free" | "pomodoro" | "target_50";
+type FocusMode = FocusSessionMode;
 type QuickRegisterMode = "delta" | "current_page";
 
-const POMODORO_SECONDS = 25 * 60;
+const POMODORO_SECONDS = FOCUS_POMODORO_SECONDS;
 const SESSION_TARGET_PAGES = 50;
 
 export function FocusReadingSessionClient({
@@ -53,15 +63,19 @@ export function FocusReadingSessionClient({
 }) {
   const router = useRouter();
   const resolvedInitialId =
-    initialReadingId && activeBooks.some((b) => b.readingId === initialReadingId)
+    initialReadingId &&
+    activeBooks.some((b) => b.readingId === initialReadingId)
       ? initialReadingId
       : (activeBooks[0]?.readingId ?? "");
 
   const [progressOverrides, setProgressOverrides] = useState<
     Record<string, { progressValue: number; progressPercent: number }>
   >({});
-  const [selectedBookId, setSelectedBookId] = useState<string>(resolvedInitialId);
+  const [selectedBookId, setSelectedBookId] =
+    useState<string>(resolvedInitialId);
   const [focusMode, setFocusMode] = useState<FocusMode>("free");
+  const [accumulatedSeconds, setAccumulatedSeconds] = useState(0);
+  const [startedAtMs, setStartedAtMs] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
@@ -74,7 +88,9 @@ export function FocusReadingSessionClient({
   const [rawSessionInput, setRawSessionInput] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [savedNotesIncluded, setSavedNotesIncluded] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const hydratedStorageRef = useRef(false);
 
   const quickInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -91,6 +107,122 @@ export function FocusReadingSessionClient({
 
   const selectedBook = booksState.find((b) => b.readingId === selectedBookId);
 
+  // Restaura sessão em andamento após recarregamento sem erro de hidratação SSR
+  useEffect(() => {
+    const saved = readPersistedFocusSession();
+    hydratedStorageRef.current = true;
+    if (!saved) return;
+
+    const matchesExistingBook = activeBooks.some(
+      (b) => b.readingId === saved.readingId
+    );
+    const shouldRestore =
+      matchesExistingBook &&
+      (!initialReadingId || initialReadingId === saved.readingId);
+    if (!shouldRestore) return;
+
+    const restoredElapsed = computeElapsedFocusSeconds(saved, Date.now());
+    const finishedPomodoro =
+      saved.focusMode === "pomodoro" && restoredElapsed >= POMODORO_SECONDS;
+
+    setSelectedBookId(saved.readingId);
+    setFocusMode(saved.focusMode);
+    setAccumulatedSeconds(
+      finishedPomodoro ? POMODORO_SECONDS : saved.accumulatedSeconds
+    );
+    setStartedAtMs(
+      finishedPomodoro || !saved.isRunning ? null : saved.startedAtMs
+    );
+    setElapsedSeconds(restoredElapsed);
+    setIsRunning(!finishedPomodoro && saved.isRunning);
+    setHasStarted(saved.hasStarted || restoredElapsed > 0);
+    setPomodoroDone(finishedPomodoro);
+    if (finishedPomodoro || (!saved.isRunning && restoredElapsed > 0)) {
+      setShowQuickRegister(true);
+    }
+    setSessionNotes(saved.sessionNotes);
+    // Executa apenas na montagem para hidratar a sessão ativa
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persiste estado da sessão no localStorage (sobrevive a F5 e sincroniza entre abas)
+  useEffect(() => {
+    if (!hydratedStorageRef.current || !selectedBookId) return;
+    if (
+      !hasStarted &&
+      accumulatedSeconds === 0 &&
+      !isRunning &&
+      !sessionNotes.trim()
+    ) {
+      clearPersistedFocusSession();
+      return;
+    }
+    writePersistedFocusSession({
+      readingId: selectedBookId,
+      focusMode,
+      accumulatedSeconds,
+      startedAtMs,
+      isRunning,
+      hasStarted,
+      sessionNotes,
+      updatedAtMs: Date.now(),
+    });
+  }, [
+    selectedBookId,
+    focusMode,
+    accumulatedSeconds,
+    startedAtMs,
+    isRunning,
+    hasStarted,
+    sessionNotes,
+  ]);
+
+  // Sincroniza múltiplas abas abertas do Canto de Foco via evento `storage`
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== FOCUS_SESSION_STORAGE_KEY) return;
+      if (!e.newValue) {
+        setIsRunning(false);
+        setAccumulatedSeconds(0);
+        setStartedAtMs(null);
+        setElapsedSeconds(0);
+        setHasStarted(false);
+        setShowQuickRegister(false);
+        setPomodoroDone(false);
+        setSessionNotes("");
+        return;
+      }
+      const next = parsePersistedFocusSession(e.newValue);
+      if (!next) return;
+      const nextElapsed = computeElapsedFocusSeconds(next, Date.now());
+      setSelectedBookId((curr) =>
+        activeBooks.some((b) => b.readingId === next.readingId)
+          ? next.readingId
+          : curr
+      );
+      setFocusMode(next.focusMode);
+      setAccumulatedSeconds(next.accumulatedSeconds);
+      setStartedAtMs(next.startedAtMs);
+      setElapsedSeconds(nextElapsed);
+      setIsRunning(next.isRunning);
+      setHasStarted(next.hasStarted);
+      setSessionNotes(next.sessionNotes);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [activeBooks]);
+
+  // Alerta antes de fechar ou recarregar durante sessão ativa
+  useEffect(() => {
+    if (!isRunning) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isRunning]);
+
   // Auto-focus no campo numérico sempre que o card rápido abrir após Pausar/Encerrar Sessão
   useEffect(() => {
     if (showQuickRegister) {
@@ -101,23 +233,32 @@ export function FocusReadingSessionClient({
     }
   }, [showQuickRegister, quickRegisterMode]);
 
-  // Timer loop
+  // Timer loop baseado em relógio de parede (sem atraso quando a aba fica em segundo plano)
   useEffect(() => {
-    if (!isRunning) return;
-    const interval = setInterval(() => {
-      setElapsedSeconds((prev) => {
-        const next = prev + 1;
-        if (focusMode === "pomodoro" && next >= POMODORO_SECONDS) {
-          setIsRunning(false);
-          setPomodoroDone(true);
-          setShowQuickRegister(true);
-          return POMODORO_SECONDS;
-        }
-        return next;
-      });
-    }, 1000);
+    if (!isRunning || startedAtMs === null) return;
+    const tick = () => {
+      const next = computeElapsedFocusSeconds(
+        {
+          accumulatedSeconds,
+          startedAtMs,
+          isRunning: true,
+          focusMode,
+        },
+        Date.now()
+      );
+      setElapsedSeconds(next);
+      if (focusMode === "pomodoro" && next >= POMODORO_SECONDS) {
+        setAccumulatedSeconds(POMODORO_SECONDS);
+        setStartedAtMs(null);
+        setIsRunning(false);
+        setPomodoroDone(true);
+        setShowQuickRegister(true);
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 500);
     return () => clearInterval(interval);
-  }, [isRunning, focusMode]);
+  }, [isRunning, startedAtMs, accumulatedSeconds, focusMode]);
 
   // Alerta sonoro suave ao concluir um ciclo Pomodoro de 25 minutos
   useEffect(() => {
@@ -226,34 +367,59 @@ export function FocusReadingSessionClient({
   const handleSelectMode = (nextMode: FocusMode) => {
     setFocusMode(nextMode);
     setIsRunning(false);
+    setAccumulatedSeconds(0);
+    setStartedAtMs(null);
     setElapsedSeconds(0);
     setHasStarted(false);
     setShowQuickRegister(false);
     setPomodoroDone(false);
     setSaveSuccess(false);
+    setSavedNotesIncluded(false);
     setSaveError(null);
   };
 
   const handleTogglePlayPause = () => {
     if (isRunning) {
-      // Pausar abre imediatamente o card central de registro rápido
+      // Pausar consolida tempo real decorrido e abre imediatamente o card central de registro rápido
+      const consolidated = computeElapsedFocusSeconds(
+        { accumulatedSeconds, startedAtMs, isRunning: true, focusMode },
+        Date.now()
+      );
+      setAccumulatedSeconds(consolidated);
+      setStartedAtMs(null);
+      setElapsedSeconds(consolidated);
       setIsRunning(false);
       setShowQuickRegister(true);
       setSaveError(null);
       return;
     }
+    let nextAccum = accumulatedSeconds;
     if (focusMode === "pomodoro" && elapsedSeconds >= POMODORO_SECONDS) {
+      nextAccum = 0;
+      setAccumulatedSeconds(0);
       setElapsedSeconds(0);
     }
+    setAccumulatedSeconds(nextAccum);
+    setStartedAtMs(Date.now());
     setHasStarted(true);
     setPomodoroDone(false);
     setShowQuickRegister(false);
     setSaveSuccess(false);
+    setSavedNotesIncluded(false);
     setSaveError(null);
     setIsRunning(true);
   };
 
   const handleStopSession = () => {
+    if (isRunning) {
+      const consolidated = computeElapsedFocusSeconds(
+        { accumulatedSeconds, startedAtMs, isRunning: true, focusMode },
+        Date.now()
+      );
+      setAccumulatedSeconds(consolidated);
+      setElapsedSeconds(consolidated);
+    }
+    setStartedAtMs(null);
     setIsRunning(false);
     setHasStarted(true);
     setShowQuickRegister(true);
@@ -262,16 +428,26 @@ export function FocusReadingSessionClient({
 
   const handleResetSession = () => {
     setIsRunning(false);
+    setAccumulatedSeconds(0);
+    setStartedAtMs(null);
     setElapsedSeconds(0);
     setHasStarted(false);
     setShowQuickRegister(false);
     setPomodoroDone(false);
     setRawSessionInput("");
+    setSessionNotes("");
     setSaveSuccess(false);
+    setSavedNotesIncluded(false);
     setSaveError(null);
+    clearPersistedFocusSession();
   };
 
-  const numericInput = Math.max(0, Number.parseInt(rawSessionInput, 10) || 0);
+  const trimmedRawInput = rawSessionInput.trim();
+  const isRawInputValidInt =
+    trimmedRawInput === "" || /^\d+$/.test(trimmedRawInput);
+  const numericInput = isRawInputValidInt
+    ? Math.max(0, Number.parseInt(trimmedRawInput, 10) || 0)
+    : 0;
   const previousBookValue = selectedBook
     ? selectedBook.progressUnit === "seconds"
       ? Math.round(selectedBook.progressValue / 60)
@@ -284,24 +460,47 @@ export function FocusReadingSessionClient({
       : numericInput;
 
   const handleSaveProgress = async () => {
-    if (!selectedBook || pagesReadThisSession <= 0) return;
+    if (!selectedBook) return;
+    if (!isRawInputValidInt) {
+      setSaveError("Informe um número inteiro sem casas decimais.");
+      return;
+    }
+    if (pagesReadThisSession <= 0) {
+      setSaveError("Informe um avanço maior que zero para registrar a sessão.");
+      return;
+    }
+
+    const nextRawValue =
+      selectedBook.progressUnit === "seconds"
+        ? (previousBookValue + pagesReadThisSession) * 60
+        : previousBookValue + pagesReadThisSession;
+
+    if (selectedBook.progressUnit === "percent" && nextRawValue > 100) {
+      setSaveError("A porcentagem acumulada não pode exceder 100%.");
+      return;
+    }
+    if (
+      selectedBook.progressTotal &&
+      nextRawValue > selectedBook.progressTotal
+    ) {
+      setSaveError(
+        selectedBook.progressUnit === "pages"
+          ? `O avanço informado excede o total do livro (${selectedBook.progressTotal} pág.).`
+          : `O tempo informado excede a duração total (${Math.round(selectedBook.progressTotal / 60)} min).`
+      );
+      return;
+    }
+
     setIsSaving(true);
     setSaveError(null);
     try {
-      const nextRawValue =
-        selectedBook.progressUnit === "seconds"
-          ? (previousBookValue + pagesReadThisSession) * 60
-          : previousBookValue + pagesReadThisSession;
-
-      const clampedValue = selectedBook.progressTotal
-        ? Math.min(selectedBook.progressTotal, nextRawValue)
-        : nextRawValue;
-
+      const cleanNotes = sessionNotes.trim();
       const res = await updateReadingProgressAction({
         readingId: selectedBook.readingId,
         progressUnit: selectedBook.progressUnit,
-        progressValue: clampedValue,
+        progressValue: nextRawValue,
         progressTotal: selectedBook.progressTotal,
+        sessionNotes: cleanNotes || undefined,
       });
 
       if (!res.ok) {
@@ -310,24 +509,34 @@ export function FocusReadingSessionClient({
       }
 
       const nextPercent =
-        selectedBook.progressTotal && selectedBook.progressTotal > 0
-          ? Math.min(
-              100,
-              Math.round((clampedValue / selectedBook.progressTotal) * 100)
-            )
-          : selectedBook.progressPercent;
+        selectedBook.progressUnit === "percent"
+          ? Math.min(100, Math.round(nextRawValue))
+          : selectedBook.progressTotal && selectedBook.progressTotal > 0
+            ? Math.min(
+                100,
+                Math.round((nextRawValue / selectedBook.progressTotal) * 100)
+              )
+            : selectedBook.progressPercent;
 
       setProgressOverrides((prev) => ({
         ...prev,
         [selectedBook.readingId]: {
-          progressValue: clampedValue,
+          progressValue: nextRawValue,
           progressPercent: nextPercent,
         },
       }));
+      setSavedNotesIncluded(Boolean(cleanNotes));
       setSaveSuccess(true);
+      setSessionNotes("");
+      setAccumulatedSeconds(0);
+      setStartedAtMs(null);
+      setHasStarted(false);
+      clearPersistedFocusSession();
       router.refresh();
     } catch {
-      setSaveError("Não foi possível registrar o avanço agora. Tente novamente.");
+      setSaveError(
+        "Não foi possível registrar o avanço agora. Tente novamente."
+      );
     } finally {
       setIsSaving(false);
     }
@@ -404,7 +613,11 @@ export function FocusReadingSessionClient({
               {(
                 [
                   { id: "free", label: "Modo Livre", icon: Clock },
-                  { id: "pomodoro", label: "Pomodoro 25m", icon: TimerIconShim },
+                  {
+                    id: "pomodoro",
+                    label: "Pomodoro 25m",
+                    icon: TimerIconShim,
+                  },
                   { id: "target_50", label: "Meta 50 págs", icon: Target },
                 ] as const
               ).map((item) => {
@@ -432,7 +645,9 @@ export function FocusReadingSessionClient({
             {focusMode === "target_50" ? (
               <p className="inline-flex items-center gap-1.5 font-sans text-xs font-medium text-[#722F3E] tabular-nums">
                 <Target className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span>Objetivo desta sessão: {SESSION_TARGET_PAGES} páginas</span>
+                <span>
+                  Objetivo desta sessão: {SESSION_TARGET_PAGES} páginas
+                </span>
               </p>
             ) : focusMode === "pomodoro" ? (
               <p className="font-sans text-xs font-medium text-[#5B4D44] tabular-nums">
@@ -606,7 +821,9 @@ export function FocusReadingSessionClient({
                   id="focus-session-pages"
                   autoFocus
                   type="number"
-                  min={quickRegisterMode === "current_page" ? previousBookValue : 0}
+                  min={
+                    quickRegisterMode === "current_page" ? previousBookValue : 0
+                  }
                   placeholder={
                     quickRegisterMode === "current_page"
                       ? String(previousBookValue)
@@ -633,7 +850,8 @@ export function FocusReadingSessionClient({
                     "Salvando..."
                   ) : saveSuccess ? (
                     <>
-                      <Check className="h-4 w-4" aria-hidden="true" /> Atualizado!
+                      <Check className="h-4 w-4" aria-hidden="true" />{" "}
+                      Atualizado!
                     </>
                   ) : (
                     "Atualizar"
@@ -645,7 +863,9 @@ export function FocusReadingSessionClient({
                 pagesReadThisSession !== SESSION_TARGET_PAGES ? (
                   <button
                     type="button"
-                    onClick={() => setRawSessionInput(String(SESSION_TARGET_PAGES))}
+                    onClick={() =>
+                      setRawSessionInput(String(SESSION_TARGET_PAGES))
+                    }
                     className="inline-flex min-h-[40px] items-center rounded-full border border-[#C8A46E]/35 bg-[#222422] px-3 font-sans text-xs font-semibold text-[#DFBE88] hover:border-[#C8A46E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
                   >
                     Usar meta ({SESSION_TARGET_PAGES} págs)
@@ -665,7 +885,10 @@ export function FocusReadingSessionClient({
                   role="alert"
                   className="mt-3 inline-flex items-center gap-1.5 font-sans text-xs font-medium text-[#F28B82]"
                 >
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <AlertCircle
+                    className="h-3.5 w-3.5 shrink-0"
+                    aria-hidden="true"
+                  />
                   <span>{saveError}</span>
                 </p>
               ) : null}
@@ -676,14 +899,21 @@ export function FocusReadingSessionClient({
                 className="mt-5 rounded-xl border border-[#C8A46E]/25 bg-[#222422] px-4 py-3 text-center"
               >
                 <p className="inline-flex items-center justify-center gap-1.5 font-sans text-xs sm:text-sm font-semibold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[#DFBE88]">
-                  <Sparkles className="h-4 w-4 shrink-0 text-[#C8A46E]" aria-hidden="true" />
+                  <Sparkles
+                    className="h-4 w-4 shrink-0 text-[#C8A46E]"
+                    aria-hidden="true"
+                  />
                   <span>{sessionSummaryText}</span>
                 </p>
                 {selectedBook.progressTotal ? (
                   <p className="mt-1 font-sans text-[11px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[#E3DBD0]">
                     {saveSuccess
-                      ? `Progresso atualizado para ${selectedBook.progressValue} / ${selectedBook.progressTotal} (${selectedBook.progressPercent}%)`
+                      ? `Progresso atualizado para ${selectedBook.progressValue} / ${selectedBook.progressTotal} (${selectedBook.progressPercent}%)${savedNotesIncluded ? " · Anotações salvas no histórico da obra." : ""}`
                       : `Progresso atual: ${selectedBook.progressValue} / ${selectedBook.progressTotal} (${selectedBook.progressPercent}%)`}
+                  </p>
+                ) : saveSuccess && savedNotesIncluded ? (
+                  <p className="mt-1 font-sans text-[11px] text-[#E3DBD0]">
+                    Anotações salvas no histórico da obra.
                   </p>
                 ) : null}
               </div>
@@ -781,7 +1011,10 @@ export function FocusReadingSessionClient({
             </div>
           ) : (
             <div className="mt-4 text-center">
-              <BookOpen className="mx-auto mb-2 h-6 w-6 text-[#C4A77D]" aria-hidden="true" />
+              <BookOpen
+                className="mx-auto mb-2 h-6 w-6 text-[#C4A77D]"
+                aria-hidden="true"
+              />
               <p className="font-sans text-xs text-[#5B4D44]">
                 Nenhum livro marcado como &ldquo;Lendo agora&rdquo;.
               </p>
@@ -820,11 +1053,19 @@ export function FocusReadingSessionClient({
           >
             <span className="inline-flex items-center gap-2">
               {soundEnabled ? (
-                <Volume2 className="h-4 w-4 text-[#722F3E]" aria-hidden="true" />
+                <Volume2
+                  className="h-4 w-4 text-[#722F3E]"
+                  aria-hidden="true"
+                />
               ) : (
-                <VolumeX className="h-4 w-4 text-[#7A6A5E]" aria-hidden="true" />
+                <VolumeX
+                  className="h-4 w-4 text-[#7A6A5E]"
+                  aria-hidden="true"
+                />
               )}
-              <span>{soundEnabled ? "Chuva suave: ativo" : "Som ambiente"}</span>
+              <span>
+                {soundEnabled ? "Chuva suave: ativo" : "Som ambiente"}
+              </span>
             </span>
             <span className="font-mono text-[10px] uppercase text-[#7A5230]">
               {soundEnabled ? "ON" : "OFF"}

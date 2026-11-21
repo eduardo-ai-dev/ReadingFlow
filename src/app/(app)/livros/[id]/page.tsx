@@ -57,7 +57,8 @@ export default async function BookDetailPage({
           spineAccent={primaryEdition.coverAccentColor}
           seed={primaryEdition.isbn13 ?? work.id}
           readingStatus={
-            activeReading?.status ?? (hasFinishedBefore ? "finished" : undefined)
+            activeReading?.status ??
+            (hasFinishedBefore ? "finished" : undefined)
           }
           progressPercent={
             activeReading
@@ -226,6 +227,11 @@ export default async function BookDetailPage({
                     ? ` · Conclusão: ${formatDisplayDatePtBr(r.finishedOn)}`
                     : ""}
                 </span>
+                {r.notes ? (
+                  <p className="mt-1.5 w-full whitespace-pre-wrap rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-3 py-2 text-xs leading-relaxed text-[var(--text-primary)]">
+                    {r.notes}
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>

@@ -209,6 +209,15 @@ export async function updateReadingProgressAction(rawInput: unknown): Promise<
     nextSeconds,
   });
 
+  if (data.sessionNotes && data.sessionNotes.trim().length > 0) {
+    const cleanSessionNote = sanitizePlainText(data.sessionNotes, 2000);
+    if (cleanSessionNote) {
+      reading.notes = reading.notes
+        ? `${reading.notes}\n\n${cleanSessionNote}`.slice(-4000)
+        : cleanSessionNote;
+    }
+  }
+
   reading.updatedAt = nowIso;
   revalidatePath("/", "layout");
   return {

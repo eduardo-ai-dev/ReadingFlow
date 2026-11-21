@@ -21,6 +21,7 @@ export const updateReadingProgressSchema = z.object({
   progressValue: z.number().min(0).max(500000),
   progressTotal: z.number().positive().max(500000).optional(),
   convertFromPreviousUnit: z.boolean().optional(),
+  sessionNotes: z.string().trim().max(2000).optional(),
 });
 
 export const finishReadingSchema = z.object({

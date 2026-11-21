@@ -62,12 +62,7 @@ export interface Work {
 }
 
 export type BookCoverSource =
-  | "brasilapi"
-  | "google"
-  | "openlibrary"
-  | "hardcover"
-  | "apple"
-  | "upload";
+  "brasilapi" | "google" | "openlibrary" | "hardcover" | "apple" | "upload";
 
 export interface Edition {
   id: string;
@@ -157,6 +152,7 @@ export interface Reading {
     seconds?: number;
   }>;
   countsForGoals: boolean;
+  notes?: string;
   abandonReason?: string;
   importBatchId?: string;
   createdAt: string;
