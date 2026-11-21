@@ -8,10 +8,13 @@ import {
 } from "@/features/shelves/genres";
 import { getAllEnrichedItems } from "@/features/shelves/queries";
 import { getWishlistOverview } from "@/features/wishlist/queries";
+import { pickWishlistSuggestions } from "@/features/suggestions/rules";
+import { requireAuthenticatedWorkspace } from "@/server/store/memory-repository";
 import {
   ExplorarSearchAndDiscoveryClient,
   type ExplorarSearchItem,
 } from "@/components/ExplorarSearchAndDiscoveryClient";
+import { BookSuggestionsClient } from "@/components/BookSuggestionsClient";
 import {
   ExplorarWishlistSectionClient,
   type ExplorarWishlistCardItem,
@@ -40,12 +43,35 @@ const GENRE_ACCENT_VARS = [
 ] as const;
 
 export default async function ExplorarPage() {
-  const [allItems, wishlistOverview] = await Promise.all([
+  const [ws, allItems, wishlistOverview] = await Promise.all([
+    requireAuthenticatedWorkspace(),
     getAllEnrichedItems(),
     getWishlistOverview(),
   ]);
 
   const wantedWishes = wishlistOverview.wanted;
+  const ownedWorkIds = new Set(allItems.map((entry) => entry.work.id));
+  const initialWishlistSuggestions = pickWishlistSuggestions(
+    wantedWishes.map((entry) => ({
+      wishId: entry.wish.id,
+      workId: entry.work.id,
+      status: entry.wish.status,
+      title: entry.work.title,
+      author: entry.primaryAuthor,
+      genre: entry.work.primaryGenre,
+      priority: entry.wish.priority,
+      targetPrice: entry.wish.targetPrice,
+      coverUrl: entry.edition?.coverUrl,
+      spineColor: entry.edition?.coverColor,
+      spineAccent: entry.edition?.coverAccentColor,
+      seed: entry.edition?.isbn13 ?? entry.work.id,
+      createdAt: entry.wish.createdAt,
+    })),
+    {
+      ownedWorkIds,
+      readings: ws.readings,
+    }
+  );
 
   const searchItems: ExplorarSearchItem[] = [
     ...allItems.map((entry) => ({
@@ -113,12 +139,15 @@ export default async function ExplorarPage() {
       {/* Cabeçalho com marcador tipográfico e divisória fina */}
       <header className="flex flex-col gap-4 border-b border-[var(--rf-divider)] pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <span className="rf-section-marker">01 · Explorar &amp; Descoberta</span>
+          <span className="rf-section-marker">
+            01 · Explorar &amp; Descoberta
+          </span>
           <h1 className="rf-title-h1 mt-1.5 text-3xl text-[var(--rf-text-heading)] sm:text-4xl">
             Explorar &amp; Adicionar Livros
           </h1>
           <p className="mt-1 text-xs text-[var(--rf-text-secondary)] sm:text-sm">
-            Pesquise todo o seu acervo instantaneamente, gerencie desejos ou navegue pelos gêneros unificados.
+            Pesquise todo o seu acervo instantaneamente, gerencie desejos ou
+            navegue pelos gêneros unificados.
           </p>
         </div>
 
@@ -139,6 +168,11 @@ export default async function ExplorarPage() {
 
       {/* Busca Global Proeminente */}
       <ExplorarSearchAndDiscoveryClient items={searchItems} />
+
+      {/* Sugestões Interativas de Leitura: Lista de Desejos vs. Novos Livros */}
+      <BookSuggestionsClient
+        initialWishlistItems={initialWishlistSuggestions}
+      />
 
       {/* Destaque Visual — Secção Lista de Desejos */}
       <div className="space-y-3">
@@ -161,7 +195,8 @@ export default async function ExplorarPage() {
             Scanner de Código de Barras
           </h2>
           <p className="text-xs text-[var(--rf-text-secondary)] sm:text-sm">
-            Use a câmera do seu dispositivo para ler o código ISBN do livro físico e preencher dados automaticamente.
+            Use a câmera do seu dispositivo para ler o código ISBN do livro
+            físico e preencher dados automaticamente.
           </p>
         </Link>
 
@@ -176,7 +211,8 @@ export default async function ExplorarPage() {
             Estante 3D &amp; Coleções
           </h2>
           <p className="text-xs text-[var(--rf-text-secondary)] sm:text-sm">
-            Navegue pelos seus {allItems.length} volumes catalogados com filtros rápidos, lombadas 3D e reordenação livre.
+            Navegue pelos seus {allItems.length} volumes catalogados com filtros
+            rápidos, lombadas 3D e reordenação livre.
           </p>
         </Link>
       </div>
@@ -189,7 +225,8 @@ export default async function ExplorarPage() {
             Navegar por Gêneros Literários
           </h2>
           <p className="mt-1 text-xs text-[var(--rf-text-secondary)] sm:text-sm">
-            Taxonomia unificada entre sua Estante 3D e as alas literárias para explorar ou adicionar obras.
+            Taxonomia unificada entre sua Estante 3D e as alas literárias para
+            explorar ou adicionar obras.
           </p>
         </div>
 
