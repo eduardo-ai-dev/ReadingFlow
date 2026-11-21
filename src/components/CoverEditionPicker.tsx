@@ -16,11 +16,13 @@ import { BookCover } from "@/components/BookCover";
 import { COVER_UPLOAD_ACCEPTED_TYPES } from "@/features/catalog/cover-rules";
 import { processCoverFile } from "@/features/catalog/cover-upload";
 import {
+  isUnambiguousCoverMatch,
   recordDevCoverDiagnostic,
   type CoverProviderSource,
   type CoverSearchCandidate,
   type CoverSearchDiagnostic,
 } from "@/features/catalog/cover-search-rules";
+import { isCoverDebugEnabled } from "@/features/catalog/cover-url";
 import type { CoverSearchResponse } from "@/server/catalog/cover-search";
 
 export interface CoverEditionPickerSelection {
@@ -251,11 +253,35 @@ export function CoverEditionPicker({
           );
         }
 
-        // "Usar esta capa" só habilita com uma candidata selecionada:
-        // só mantém seleção se a candidata já selecionada continuar na lista
-        setSelectedId((prev) =>
-          prev && nextCandidates.some((c) => c.id === prev) ? prev : null
-        );
+        // Se não há capa salva e o resultado trouxe match inequívoco (ex.: "ol: 1 ok"),
+        // persiste automaticamente via onApply para não ficar em fallback.
+        const unambiguous = !selectedCoverUrl
+          ? isUnambiguousCoverMatch(
+              {
+                title: cleanTitle || title,
+                author: cleanAuthor || author,
+                isbn: cleanIsbn || isbn,
+              },
+              nextCandidates
+            )
+          : null;
+
+        if (unambiguous) {
+          setSelectedId(unambiguous.id);
+          onApply({
+            coverUrl: unambiguous.coverUrl,
+            coverSource: unambiguous.source,
+            candidate: unambiguous,
+            pageCount:
+              unambiguous.pageCount ?? safePayload.pageCount ?? undefined,
+          });
+        } else {
+          // "Usar esta capa" só habilita com uma candidata selecionada:
+          // só mantém seleção se a candidata já selecionada continuar na lista
+          setSelectedId((prev) =>
+            prev && nextCandidates.some((c) => c.id === prev) ? prev : null
+          );
+        }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setCandidates([]);
@@ -266,7 +292,17 @@ export function CoverEditionPicker({
         setIsLoading(false);
       }
     },
-    [searchTitle, searchAuthor, searchIsbn, effectiveSeed, title, isbn]
+    [
+      searchTitle,
+      searchAuthor,
+      searchIsbn,
+      effectiveSeed,
+      title,
+      author,
+      isbn,
+      selectedCoverUrl,
+      onApply,
+    ]
   );
 
   // Busca inicial automática quando título/autor/ISBN do livro mudam
@@ -416,7 +452,7 @@ export function CoverEditionPicker({
               </h3>
             </div>
 
-            {process.env.NODE_ENV !== "production" && devBadgeText ? (
+            {isCoverDebugEnabled() && devBadgeText ? (
               <span
                 data-testid="cover-picker-dev-badge"
                 className="rounded border border-[#C8A46E]/50 bg-[#141514] px-2 py-0.5 font-mono text-[10px] font-semibold text-[#DFBE88]"

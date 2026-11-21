@@ -3,6 +3,7 @@ import {
   cachedWorkspaceQuery,
   requireAuthenticatedWorkspace,
 } from "@/server/store/memory-repository";
+import { resolveWorkCoverEdition } from "@/features/catalog/cover-url";
 import { selectEligibleFinishedReadings } from "@/features/goals/rules";
 import {
   daysBetweenInclusive,
@@ -115,7 +116,13 @@ export async function getDashboardEditorialData(): Promise<DashboardEditorialDat
 
     const worksById = new Map(ws.works.map((w) => [w.id, w]));
     const editionsById = new Map(ws.editions.map((e) => [e.id, e]));
-    const editionsByWorkId = new Map(ws.editions.map((e) => [e.workId, e]));
+    const itemEditionIdByWorkId = new Map<string, string>();
+    for (const item of ws.items) {
+      const ed = editionsById.get(item.editionId);
+      if (ed && !itemEditionIdByWorkId.has(ed.workId)) {
+        itemEditionIdByWorkId.set(ed.workId, ed.id);
+      }
+    }
 
     // 1. Atividade Recente (lotes agrupados + prioridade a leitura e conclusão)
     const rawActivityEvents: RawDashboardActivityEvent[] = [];
@@ -281,7 +288,12 @@ export async function getDashboardEditorialData(): Promise<DashboardEditorialDat
     const ownedWorksList = ws.works.filter((w) => ownedWorkIds.has(w.id));
 
     const recentBooks: CollectionSummaryItem[] = ownedWorksList.map((w) => {
-      const ed = editionsByWorkId.get(w.id);
+      const ed = resolveWorkCoverEdition({
+        workId: w.id,
+        preferredEditionId: itemEditionIdByWorkId.get(w.id),
+        editions: ws.editions,
+        editionsById,
+      });
       const author =
         w.contributors.find((c) => c.role === "author")?.name ??
         "Autor desconhecido";
@@ -309,9 +321,12 @@ export async function getDashboardEditorialData(): Promise<DashboardEditorialDat
       .map((wish): CollectionSummaryItem | null => {
         const w = worksById.get(wish.workId);
         if (!w) return null;
-        const ed = wish.editionId
-          ? editionsById.get(wish.editionId)
-          : editionsByWorkId.get(w.id);
+        const ed = resolveWorkCoverEdition({
+          workId: w.id,
+          preferredEditionId: wish.editionId,
+          editions: ws.editions,
+          editionsById,
+        });
         const author =
           w.contributors.find((c) => c.role === "author")?.name ??
           "Autor desconhecido";

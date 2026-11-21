@@ -625,6 +625,22 @@ export async function updateEditionCoverAction(rawInput: unknown): Promise<
   edition.coverColor = spineColor;
   edition.coverAccentColor = spineAccent;
 
+  // Mantém consistência de capa persistida entre edições irmãs da mesma obra sem capa
+  if (safeCoverUrl) {
+    for (const sibling of ws.editions) {
+      if (
+        sibling.id !== edition.id &&
+        sibling.workId === edition.workId &&
+        !sibling.coverUrl?.trim()
+      ) {
+        sibling.coverUrl = safeCoverUrl;
+        sibling.coverSource = resolvedSource;
+        sibling.coverColor = spineColor;
+        sibling.coverAccentColor = spineAccent;
+      }
+    }
+  }
+
   revalidatePath("/", "layout");
   return {
     ok: true,

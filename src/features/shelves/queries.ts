@@ -3,6 +3,7 @@ import {
   cachedWorkspaceQuery,
   requireAuthenticatedWorkspace,
 } from "@/server/store/memory-repository";
+import { resolveWorkCoverEdition } from "@/features/catalog/cover-url";
 import {
   filterAndSortShelfItems,
   type EnrichedShelfItem,
@@ -34,11 +35,18 @@ export async function getAllEnrichedItems(): Promise<EnrichedShelfItem[]> {
 
     const entries: EnrichedShelfItem[] = [];
     for (const item of ws.items) {
-      const edition = editionsById.get(item.editionId);
+      const rawEdition = editionsById.get(item.editionId);
       const shelf = shelvesById.get(item.shelfId);
-      if (!edition || !shelf) continue;
-      const work = worksById.get(edition.workId);
+      if (!rawEdition || !shelf) continue;
+      const work = worksById.get(rawEdition.workId);
       if (!work) continue;
+      const edition =
+        resolveWorkCoverEdition({
+          workId: work.id,
+          preferredEditionId: rawEdition.id,
+          editions: ws.editions,
+          editionsById,
+        }) ?? rawEdition;
 
       const workReadings = readingsByWorkId.get(work.id) ?? [];
       const activeReading = workReadings.find(

@@ -9,8 +9,8 @@ import {
   resolveBookCoverFallbackPalette,
   subscribeDevCoverDiagnostics,
 } from "@/features/catalog/cover-search-rules";
+import { isCoverDebugEnabled } from "@/features/catalog/cover-url";
 
-const IS_DEV = process.env.NODE_ENV !== "production";
 const loggedDevCoverDiagnostics = new Set<string>();
 
 /**
@@ -139,17 +139,18 @@ function BookCoverBase({
   const isDataUrl = Boolean(normalizedCoverUrl?.startsWith("data:"));
 
   const isCompact = !fillContainer && size === "xs";
+  const coverDebugEnabled = isCoverDebugEnabled();
   const sharedDevDiag = useSyncExternalStore(
     subscribeDevCoverDiagnostics,
     () =>
-      IS_DEV
+      coverDebugEnabled
         ? (getDevCoverDiagnostic({ editionId: seed, title }) ?? null)
         : null,
     () => null
   );
 
   const devDiagReason: string | null =
-    IS_DEV && !disableDevDiagnostics && !showImage
+    coverDebugEnabled && !disableDevDiagnostics && !showImage
       ? imgFailed && failedState?.reason === "quality"
         ? "filtro: dimensão (1×1 / inválida)"
         : imgFailed && failedState?.reason === "error"
@@ -160,14 +161,14 @@ function BookCoverBase({
       : null;
 
   useEffect(() => {
-    if (!IS_DEV || !devDiagReason) return;
+    if (!coverDebugEnabled || !devDiagReason) return;
     const logKey = `${title}|${normalizedCoverUrl ?? ""}|${devDiagReason}`;
     if (loggedDevCoverDiagnostics.has(logKey)) return;
     loggedDevCoverDiagnostics.add(logKey);
     console.info(
       `[ReadingFlow/BookCover][dev] "${title}" sem capa real — motivo: ${devDiagReason}`
     );
-  }, [title, normalizedCoverUrl, devDiagReason]);
+  }, [coverDebugEnabled, title, normalizedCoverUrl, devDiagReason]);
 
   const palette = resolveBookCoverFallbackPalette({
     seed: seed || title,
@@ -412,10 +413,11 @@ function BookCoverBase({
         }}
       />
 
-      {/* Selo discreto de diagnóstico apenas em dev quando a obra está sem capa real */}
-      {IS_DEV && devDiagReason && !isCompact ? (
+      {/* Selo discreto de diagnóstico apenas quando NEXT_PUBLIC_COVER_DEBUG=1 fora de produção */}
+      {coverDebugEnabled && devDiagReason && !isCompact ? (
         <span
           aria-hidden="true"
+          data-testid="book-cover-dev-badge"
           className="pointer-events-none absolute bottom-2 left-2.5 z-[6] max-w-[calc(100%-16px)] truncate rounded bg-[#141514]/84 px-1.5 py-0.5 font-mono text-[8px] font-semibold tracking-tight text-[#DFBE88] shadow-xs ring-1 ring-[#C8A46E]/45"
         >
           dev: {devDiagReason}

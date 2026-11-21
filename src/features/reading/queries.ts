@@ -1,6 +1,7 @@
 import "server-only";
 import { requireAuthenticatedWorkspace } from "@/server/store/memory-repository";
 import { computeReadingPercent } from "@/features/reading/rules";
+import { resolveWorkCoverEdition } from "@/features/catalog/cover-url";
 import type { Edition, Reading, Review, Work } from "@/lib/domain";
 
 export interface EnrichedReadingEntry {
@@ -48,9 +49,12 @@ export async function getReadingsOverview(): Promise<{
   )) {
     const work = worksById.get(reading.workId);
     if (!work) continue;
-    const edition = reading.editionId
-      ? editionsById.get(reading.editionId)
-      : ws.editions.find((e) => e.workId === work.id);
+    const edition = resolveWorkCoverEdition({
+      workId: work.id,
+      preferredEditionId: reading.editionId,
+      editions: ws.editions,
+      editionsById,
+    });
 
     const percent = computeReadingPercent({
       progressUnit: reading.progressUnit,

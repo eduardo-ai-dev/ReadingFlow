@@ -1,6 +1,7 @@
 import "server-only";
 import { requireAuthenticatedWorkspace } from "@/server/store/memory-repository";
 import { detectWishlistOwnershipOverlap } from "@/features/wishlist/rules";
+import { resolveWorkCoverEdition } from "@/features/catalog/cover-url";
 import type { Edition, WishlistItem, Work } from "@/lib/domain";
 
 export interface EnrichedWishEntry {
@@ -23,9 +24,12 @@ export async function getWishlistOverview(): Promise<{
   const enrich = (wish: WishlistItem): EnrichedWishEntry | null => {
     const work = worksById.get(wish.workId);
     if (!work) return null;
-    const edition = wish.editionId
-      ? editionsById.get(wish.editionId)
-      : ws.editions.find((e) => e.workId === work.id);
+    const edition = resolveWorkCoverEdition({
+      workId: work.id,
+      preferredEditionId: wish.editionId,
+      editions: ws.editions,
+      editionsById,
+    });
 
     const overlap = detectWishlistOwnershipOverlap(
       work.id,
