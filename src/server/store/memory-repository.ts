@@ -19,6 +19,7 @@ import {
 import { formatDateInTimezone } from "@/lib/dates";
 import { createLiveCatalogPipeline } from "@/server/catalog/providers";
 import { ormSeedWorkspace } from "@/server/db/orm-repository";
+import { hashPassword } from "@/server/security/password";
 
 export const SESSION_COOKIE_NAME = "rf_session_id";
 export const DEMO_SESSION_COOKIE_NAME = "rf_demo_session";
@@ -44,10 +45,16 @@ export interface UserWorkspaceData {
   };
 }
 
+export interface PasswordResetTokenRecord {
+  userId: string;
+  expiresAtMs: number;
+}
+
 interface GlobalStoreShape {
   usersById: Map<string, UserWorkspaceData>;
   userIdByEmail: Map<string, string>;
   sessions: Map<string, string>; // sessionToken -> userId
+  passwordResetTokens: Map<string, PasswordResetTokenRecord>; // sha256(token) -> record
 }
 
 declare global {
@@ -96,7 +103,9 @@ function buildDemoWorkspace(): UserWorkspaceData {
   const baseDateUtc = new Date(`${todayYmd}T12:00:00.000Z`);
   const demoDailyLogs = demoDailyPageSlices.map((pages, idx) => {
     const logDate = new Date(baseDateUtc);
-    logDate.setUTCDate(logDate.getUTCDate() - (demoDailyPageSlices.length - 1 - idx));
+    logDate.setUTCDate(
+      logDate.getUTCDate() - (demoDailyPageSlices.length - 1 - idx)
+    );
     return {
       ymd: logDate.toISOString().slice(0, 10),
       pages,
@@ -667,7 +676,10 @@ function buildDemoWorkspace(): UserWorkspaceData {
         format: b.format ?? "paperback",
         pages: b.pages,
         coverColor: clampPaperHsl(b.color),
-        coverAccentColor: deriveSpineAccentHex(clampPaperHsl(b.color), editionId),
+        coverAccentColor: deriveSpineAccentHex(
+          clampPaperHsl(b.color),
+          editionId
+        ),
         contributors: [{ name: b.author, role: "author" }],
         source: "manual",
         createdAt: "2026-08-20T12:00:00.000Z",
@@ -883,7 +895,7 @@ function buildDemoWorkspace(): UserWorkspaceData {
       acceptedTermsVersion: "1.0",
       acceptedTermsAt: "2026-01-01T10:00:00.000Z",
     },
-    passwordHashSim: "demo1234",
+    passwordHashSim: hashPassword("demo1234"),
     works,
     editions,
     shelves,
@@ -906,21 +918,28 @@ export function getMemoryStore(): GlobalStoreShape {
       [demo.profile.email.toLowerCase(), DEMO_USER_ID],
     ]);
     const sessions = new Map<string, string>();
+    const passwordResetTokens = new Map<string, PasswordResetTokenRecord>();
     globalThis.__readingFlowMemoryStore = {
       usersById,
       userIdByEmail,
       sessions,
+      passwordResetTokens,
     };
     void ormSeedWorkspace(demo).catch(() => {});
-  } else if (!globalThis.__readingFlowMemoryStore.usersById.has(DEMO_USER_ID)) {
-    const demo = buildDemoWorkspace();
-    globalThis.__readingFlowMemoryStore.usersById.set(DEMO_USER_ID, demo);
-    globalThis.__readingFlowMemoryStore.userIdByEmail.set(
-      demo.profile.email.toLowerCase(),
-      DEMO_USER_ID
-    );
-    globalThis.__readingFlowMemoryStore.usersById.delete("user-demo-helena");
-    void ormSeedWorkspace(demo).catch(() => {});
+  } else {
+    if (!globalThis.__readingFlowMemoryStore.passwordResetTokens) {
+      globalThis.__readingFlowMemoryStore.passwordResetTokens = new Map();
+    }
+    if (!globalThis.__readingFlowMemoryStore.usersById.has(DEMO_USER_ID)) {
+      const demo = buildDemoWorkspace();
+      globalThis.__readingFlowMemoryStore.usersById.set(DEMO_USER_ID, demo);
+      globalThis.__readingFlowMemoryStore.userIdByEmail.set(
+        demo.profile.email.toLowerCase(),
+        DEMO_USER_ID
+      );
+      globalThis.__readingFlowMemoryStore.usersById.delete("user-demo-helena");
+      void ormSeedWorkspace(demo).catch(() => {});
+    }
   }
   return globalThis.__readingFlowMemoryStore;
 }

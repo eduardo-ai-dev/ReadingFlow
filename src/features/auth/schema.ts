@@ -20,7 +20,10 @@ export const signUpSchema = z.object({
   displayName: z.string().optional(),
   confirmMinimumAge16: z
     .boolean()
-    .refine((val) => val === true, "É necessário confirmar ter pelo menos 16 anos."),
+    .refine(
+      (val) => val === true,
+      "É necessário confirmar ter pelo menos 16 anos."
+    ),
   acceptTerms: z
     .boolean()
     .refine(
@@ -29,8 +32,17 @@ export const signUpSchema = z.object({
     ),
 });
 
+export const requestPasswordResetSchema = z.object({
+  email: z.string().email("Informe um e-mail válido."),
+});
+
 export const resetPasswordSchema = z.object({
   email: z.string().email("Informe um e-mail válido."),
+  token: z
+    .string()
+    .trim()
+    .min(16, "Informe o código de verificação enviado ao seu e-mail.")
+    .max(128, "Código de verificação inválido."),
   password: strongPasswordSchema,
 });
 

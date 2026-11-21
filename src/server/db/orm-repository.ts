@@ -57,10 +57,7 @@ export async function ormFindUserByEmail(email: string) {
 
 export async function ormFindUserById(id: string) {
   const db = getOrmDb();
-  const rows = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.id, id));
+  const rows = await db.select().from(usersTable).where(eq(usersTable.id, id));
   return rows[0] ?? null;
 }
 
@@ -92,6 +89,7 @@ export async function ormUpdateUser(
   id: string,
   partial: Partial<{
     displayName: string;
+    passwordHash: string;
     locale: string;
     timezone: string;
     theme: string;
@@ -106,10 +104,7 @@ export async function ormUpdateUser(
   }>
 ) {
   const db = getOrmDb();
-  await db
-    .update(usersTable)
-    .set(partial)
-    .where(eq(usersTable.id, id));
+  await db.update(usersTable).set(partial).where(eq(usersTable.id, id));
 }
 
 export async function ormDeleteUser(id: string) {
@@ -149,6 +144,11 @@ export async function ormDeleteSession(token: string) {
   await db.delete(sessionsTable).where(eq(sessionsTable.token, token));
 }
 
+export async function ormDeleteSessionsByUserId(userId: string) {
+  const db = getOrmDb();
+  await db.delete(sessionsTable).where(eq(sessionsTable.userId, userId));
+}
+
 // ============================================================================
 // OBRAS E EDIÇÕES
 // ============================================================================
@@ -177,7 +177,10 @@ export async function ormGetWorks(userId: string): Promise<Work[]> {
   }));
 }
 
-export async function ormGetWorkById(workId: string, userId: string): Promise<Work | null> {
+export async function ormGetWorkById(
+  workId: string,
+  userId: string
+): Promise<Work | null> {
   const db = getOrmDb();
   const rows = await db
     .select()
@@ -311,7 +314,9 @@ export async function ormInsertShelves(shelves: Shelf[]): Promise<void> {
   }
 }
 
-export async function ormGetLibraryItems(userId: string): Promise<LibraryItem[]> {
+export async function ormGetLibraryItems(
+  userId: string
+): Promise<LibraryItem[]> {
   const db = getOrmDb();
   const rows = await db
     .select()
@@ -418,15 +423,25 @@ export async function ormUpdateReading(
     .update(readingsTable)
     .set({
       ...(data.status !== undefined ? { status: data.status } : {}),
-      ...(data.progressValue !== undefined ? { progressValue: data.progressValue } : {}),
-      ...(data.progressUnit !== undefined ? { progressUnit: data.progressUnit } : {}),
-      ...(data.progressTotal !== undefined ? { progressTotal: data.progressTotal } : {}),
+      ...(data.progressValue !== undefined
+        ? { progressValue: data.progressValue }
+        : {}),
+      ...(data.progressUnit !== undefined
+        ? { progressUnit: data.progressUnit }
+        : {}),
+      ...(data.progressTotal !== undefined
+        ? { progressTotal: data.progressTotal }
+        : {}),
       ...(data.startedOn !== undefined ? { startedOn: data.startedOn } : {}),
       ...(data.finishedOn !== undefined ? { finishedOn: data.finishedOn } : {}),
-      ...(data.abandonReason !== undefined ? { abandonReason: data.abandonReason } : {}),
+      ...(data.abandonReason !== undefined
+        ? { abandonReason: data.abandonReason }
+        : {}),
       updatedAt: new Date().toISOString(),
     })
-    .where(and(eq(readingsTable.id, readingId), eq(readingsTable.userId, userId)));
+    .where(
+      and(eq(readingsTable.id, readingId), eq(readingsTable.userId, userId))
+    );
 }
 
 // ============================================================================
@@ -458,7 +473,12 @@ export async function ormUpsertReview(review: Review): Promise<void> {
   const existing = await db
     .select()
     .from(reviewsTable)
-    .where(and(eq(reviewsTable.workId, review.workId), eq(reviewsTable.userId, review.userId)));
+    .where(
+      and(
+        eq(reviewsTable.workId, review.workId),
+        eq(reviewsTable.userId, review.userId)
+      )
+    );
 
   if (existing.length > 0) {
     await db
@@ -470,7 +490,12 @@ export async function ormUpsertReview(review: Review): Promise<void> {
         isPrivate: review.isPrivate,
         updatedAt: review.updatedAt,
       })
-      .where(and(eq(reviewsTable.workId, review.workId), eq(reviewsTable.userId, review.userId)));
+      .where(
+        and(
+          eq(reviewsTable.workId, review.workId),
+          eq(reviewsTable.userId, review.userId)
+        )
+      );
   } else {
     await db.insert(reviewsTable).values({
       id: review.id,
@@ -530,7 +555,10 @@ export async function ormInsertGoal(goal: ReadingGoal): Promise<void> {
   });
 }
 
-export async function ormDeleteGoal(goalId: string, userId: string): Promise<void> {
+export async function ormDeleteGoal(
+  goalId: string,
+  userId: string
+): Promise<void> {
   const db = getOrmDb();
   await db
     .delete(goalsTable)
@@ -579,7 +607,10 @@ export async function ormInsertWishlistItem(item: WishlistItem): Promise<void> {
   });
 }
 
-export async function ormDeleteWishlistItem(wishId: string, userId: string): Promise<void> {
+export async function ormDeleteWishlistItem(
+  wishId: string,
+  userId: string
+): Promise<void> {
   const db = getOrmDb();
   await db
     .delete(wishlistTable)

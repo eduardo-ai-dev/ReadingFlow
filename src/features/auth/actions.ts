@@ -15,6 +15,7 @@ import {
 import {
   deleteAccountSchema,
   onboardingSchema,
+  requestPasswordResetSchema,
   resetPasswordSchema,
   signInSchema,
   signUpSchema,
@@ -43,8 +44,17 @@ import {
   sanitizePlainText,
 } from "@/server/security/sanitize";
 import {
+  generatePasswordResetToken,
+  hashPassword,
+  hashResetToken,
+  isHashedPassword,
+  verifyPassword,
+} from "@/server/security/password";
+import { formatDateInTimezone } from "@/lib/dates";
+import {
   ormCreateSession,
   ormDeleteSession,
+  ormDeleteSessionsByUserId,
   ormCreateUser,
   ormInsertShelves,
   ormUpdateUser,
@@ -194,8 +204,17 @@ export async function signInWithEmailAction(rawInput: {
   const ws = userId ? store.usersById.get(userId) : undefined;
 
   // Generic error message so we never reveal whether an email exists (§11.2)
-  if (!ws || ws.passwordHashSim !== parsed.data.password) {
+  if (!ws || !verifyPassword(parsed.data.password, ws.passwordHashSim)) {
     return { ok: false, error: "E-mail ou senha incorretos." };
+  }
+
+  // Migra registros legados sem hash para scrypt salgado no login bem-sucedido
+  if (!isHashedPassword(ws.passwordHashSim)) {
+    const upgraded = hashPassword(parsed.data.password);
+    ws.passwordHashSim = upgraded;
+    await ormUpdateUser(ws.profile.id, { passwordHash: upgraded }).catch(
+      () => {}
+    );
   }
 
   await createSessionCookie(ws.profile.id, rawInput.rememberMe ?? true);
@@ -239,8 +258,9 @@ export async function signUpAction(rawInput: {
   const nowIso = new Date().toISOString();
   const cleanName = parsed.data.displayName
     ? sanitizePlainText(parsed.data.displayName, 60)
-    : emailKey.split("@")[0] ?? "Leitor";
+    : (emailKey.split("@")[0] ?? "Leitor");
 
+  const passwordHash = hashPassword(parsed.data.password);
   const defaultShelves = createDefaultShelves(userId);
   store.usersById.set(userId, {
     profile: {
@@ -260,7 +280,7 @@ export async function signUpAction(rawInput: {
       acceptedTermsVersion: CURRENT_TERMS_VERSION,
       acceptedTermsAt: nowIso,
     },
-    passwordHashSim: parsed.data.password,
+    passwordHashSim: passwordHash,
     works: [],
     editions: [],
     shelves: defaultShelves,
@@ -277,7 +297,7 @@ export async function signUpAction(rawInput: {
     id: userId,
     email: emailKey,
     displayName: cleanName,
-    passwordHash: parsed.data.password,
+    passwordHash,
     locale: "pt-BR",
     timezone: "America/Sao_Paulo",
     theme: "light",
@@ -298,8 +318,70 @@ export async function signUpAction(rawInput: {
   return { ok: true };
 }
 
+const PASSWORD_RESET_TTL_MS = 15 * 60 * 1000;
+
+export async function requestPasswordResetAction(rawInput: {
+  email: string;
+}): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const parsed = requestPasswordResetSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Informe um e-mail válido.",
+    };
+  }
+
+  const emailKey = parsed.data.email.toLowerCase().trim();
+  const rl = checkSlidingRateLimit(`reset-req:${emailKey}`, 5);
+  if (!rl.allowed) {
+    return {
+      ok: false,
+      error: "Muitas tentativas. Aguarde um minuto e tente novamente.",
+    };
+  }
+
+  const store = getMemoryStore();
+  const nowMs = Date.now();
+  // Remove tokens expirados antes de emitir um novo
+  for (const [hash, entry] of store.passwordResetTokens.entries()) {
+    if (entry.expiresAtMs <= nowMs) {
+      store.passwordResetTokens.delete(hash);
+    }
+  }
+
+  const userId = store.userIdByEmail.get(emailKey);
+  if (userId && store.usersById.has(userId)) {
+    // Invalida tokens anteriores do mesmo usuário (apenas o mais recente permanece válido)
+    for (const [hash, entry] of store.passwordResetTokens.entries()) {
+      if (entry.userId === userId) {
+        store.passwordResetTokens.delete(hash);
+      }
+    }
+
+    const { rawToken, tokenHash } = generatePasswordResetToken();
+    store.passwordResetTokens.set(tokenHash, {
+      userId,
+      expiresAtMs: nowMs + PASSWORD_RESET_TTL_MS,
+    });
+
+    if (process.env.NODE_ENV !== "production") {
+      console.info(
+        `[ReadingFlow/auth][dev] Código único de recuperação para ${emailKey} (válido por 15 min): ${rawToken}`
+      );
+    }
+  }
+
+  // Mensagem neutra: nunca revela se o e-mail existe no cadastro
+  return {
+    ok: true,
+    message:
+      "Se houver uma conta associada a este endereço, enviamos um código único de redefinição (válido por 15 minutos).",
+  };
+}
+
 export async function resetPasswordAction(rawInput: {
   email: string;
+  token: string;
   password: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const parsed = resetPasswordSchema.safeParse(rawInput);
@@ -322,9 +404,42 @@ export async function resetPasswordAction(rawInput: {
   const store = getMemoryStore();
   const userId = store.userIdByEmail.get(emailKey);
   const ws = userId ? store.usersById.get(userId) : undefined;
-  if (ws) {
-    ws.passwordHashSim = parsed.data.password;
+  const tokenHash = hashResetToken(parsed.data.token);
+  const record = store.passwordResetTokens.get(tokenHash);
+
+  if (
+    !ws ||
+    !record ||
+    record.userId !== ws.profile.id ||
+    record.expiresAtMs <= Date.now()
+  ) {
+    if (record && record.expiresAtMs <= Date.now()) {
+      store.passwordResetTokens.delete(tokenHash);
+    }
+    return {
+      ok: false,
+      error:
+        "Código de verificação inválido ou expirado. Solicite um novo código.",
+    };
   }
+
+  // Token de uso único: remove imediatamente após validação
+  store.passwordResetTokens.delete(tokenHash);
+
+  const nextHash = hashPassword(parsed.data.password);
+  ws.passwordHashSim = nextHash;
+
+  // Revoga todas as sessões ativas do usuário após troca de senha
+  for (const [sessionToken, uid] of store.sessions.entries()) {
+    if (uid === ws.profile.id) {
+      store.sessions.delete(sessionToken);
+    }
+  }
+
+  await ormUpdateUser(ws.profile.id, { passwordHash: nextHash }).catch(
+    () => {}
+  );
+  await ormDeleteSessionsByUserId(ws.profile.id).catch(() => {});
 
   return { ok: true };
 }
@@ -348,7 +463,9 @@ export async function completeOnboardingAction(rawInput: {
   ws.profile.onboardingCompleted = true;
 
   if (parsed.data.annualTargetBooks && ws.goals.length === 0) {
-    const year = new Date().getFullYear();
+    const year = Number(
+      formatDateInTimezone(new Date(), ws.profile.timezone).slice(0, 4)
+    );
     ws.goals.push({
       id: `goal-${crypto.randomUUID()}`,
       userId: ws.profile.id,
@@ -363,6 +480,10 @@ export async function completeOnboardingAction(rawInput: {
       createdAt: new Date().toISOString(),
     });
   }
+
+  await ormUpdateUser(ws.profile.id, { onboardingCompleted: true }).catch(
+    () => {}
+  );
 
   revalidatePath("/", "layout");
   return { ok: true };
