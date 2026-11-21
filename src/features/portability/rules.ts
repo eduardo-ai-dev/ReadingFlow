@@ -10,6 +10,7 @@ import type {
   ReadingStatus,
   Review,
   Shelf,
+  UserSettings,
   WishlistItem,
   Work,
 } from "@/lib/domain";
@@ -23,6 +24,14 @@ import {
 } from "@/features/catalog/rules";
 import { inferShelfKindFromFormat } from "@/features/wishlist/rules";
 import { isValidHalfStar } from "@/features/ratings/rules";
+import { parsePersistedShelfLayout } from "@/features/shelves/arrange-shelves";
+import { normalizeAmbientPreferences } from "@/features/reading/ambient-catalog";
+import {
+  normalizeDensityPreference,
+  normalizeFxPreference,
+  normalizeMotionPreference,
+  normalizeThemePreference,
+} from "@/lib/themes/themes.config";
 
 export interface PortableLibraryState {
   works: Work[];
@@ -33,6 +42,7 @@ export interface PortableLibraryState {
   goals: ReadingGoal[];
   wishlist: WishlistItem[];
   shelves: Shelf[];
+  userSettings?: UserSettings;
 }
 
 function cleanGoodreadsIsbn(raw: string): string {
@@ -395,6 +405,7 @@ const portableBackupSchema = z.object({
     goals: z.array(z.any()),
     wishlist: z.array(z.any()),
     shelves: z.array(z.any()),
+    userSettings: z.any().optional(),
   }),
 });
 
@@ -420,6 +431,30 @@ export function restorePortableBackupJson(
   const parsed = portableBackupSchema.parse(JSON.parse(rawJson));
   const data = parsed.data as PortableLibraryState;
 
+  let restoredSettings: UserSettings | undefined;
+  if (data.userSettings && typeof data.userSettings === "object") {
+    const rawSettings = data.userSettings as Partial<UserSettings>;
+    restoredSettings = {
+      userId: targetUserId,
+      theme: normalizeThemePreference(rawSettings.theme),
+      density: normalizeDensityPreference(rawSettings.density),
+      motion: normalizeMotionPreference(rawSettings.motion),
+      fx: normalizeFxPreference(rawSettings.fx),
+      shelfLayout: parsePersistedShelfLayout(
+        rawSettings.shelfLayout ? JSON.stringify(rawSettings.shelfLayout) : null
+      ),
+      ambientPreferences: normalizeAmbientPreferences(
+        rawSettings.ambientPreferences
+      ),
+      focusDefaultMode:
+        rawSettings.focusDefaultMode === "pomodoro" ||
+        rawSettings.focusDefaultMode === "target_50"
+          ? rawSettings.focusDefaultMode
+          : "free",
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
   return {
     works: data.works.map((w) => ({
       ...w,
@@ -428,6 +463,10 @@ export function restorePortableBackupJson(
     editions: data.editions.map((e) => ({
       ...e,
       ownerId: e.ownerId ? targetUserId : null,
+      coverLocked:
+        typeof e.coverLocked === "boolean" ? e.coverLocked : undefined,
+      coverSelectedAt:
+        typeof e.coverSelectedAt === "string" ? e.coverSelectedAt : undefined,
     })),
     shelves: data.shelves.map((s) => ({ ...s, userId: targetUserId })),
     items: data.items.map((i) => ({ ...i, userId: targetUserId })),
@@ -435,5 +474,6 @@ export function restorePortableBackupJson(
     reviews: data.reviews.map((rev) => ({ ...rev, userId: targetUserId })),
     goals: data.goals.map((g) => ({ ...g, userId: targetUserId })),
     wishlist: data.wishlist.map((w) => ({ ...w, userId: targetUserId })),
+    ...(restoredSettings ? { userSettings: restoredSettings } : {}),
   };
 }

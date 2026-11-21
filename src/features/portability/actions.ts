@@ -3,6 +3,7 @@
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import {
+  invalidateUserWorkspaceCache,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
 } from "@/server/store/memory-repository";
@@ -62,6 +63,7 @@ export async function importCsvBatchAction(
   ws.readings = nextState.readings;
   ws.reviews = nextState.reviews;
   ws.importJobs.unshift(job);
+  invalidateUserWorkspaceCache(ws.profile.id);
 
   revalidatePath("/", "layout");
   return { ok: true, job };
@@ -101,6 +103,7 @@ export async function rollbackImportBatchAction(
   ws.readings = rolledBack.readings;
   ws.reviews = rolledBack.reviews;
   job.status = "rolled_back";
+  invalidateUserWorkspaceCache(ws.profile.id);
 
   revalidatePath("/", "layout");
   return { ok: true };
@@ -133,6 +136,18 @@ export async function restoreBackupJsonAction(
     ws.reviews = restored.reviews;
     ws.goals = restored.goals;
     ws.wishlist = restored.wishlist;
+    if (restored.userSettings) {
+      ws.settings = restored.userSettings;
+      ws.profile = {
+        ...ws.profile,
+        theme: restored.userSettings.theme,
+        density: restored.userSettings.density,
+        motion: restored.userSettings.motion,
+        fx: restored.userSettings.fx,
+        focusAmbientPreferences: restored.userSettings.ambientPreferences,
+      };
+    }
+    invalidateUserWorkspaceCache(ws.profile.id);
 
     revalidatePath("/", "layout");
     return { ok: true, restoredWorks: restored.works.length };

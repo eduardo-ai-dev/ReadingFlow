@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getAuthenticatedWorkspace } from "@/server/store/memory-repository";
+import {
+  ensureWorkspaceSettings,
+  getAuthenticatedWorkspace,
+} from "@/server/store/memory-repository";
 import { createPortableBackupJson } from "@/features/portability/rules";
 import { serializeRowsToSafeCsv } from "@/server/security/csv";
 import { formatDateInTimezone } from "@/lib/dates";
@@ -176,6 +179,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         item.currency,
         item.notes ?? "",
         review?.rating ? String(review.rating) : "",
+        edition?.coverUrl ?? "",
+        edition?.coverSource ?? "",
+        edition?.coverLocked ? "sim" : "nao",
+        edition?.coverSelectedAt ?? "",
       ];
     });
 
@@ -191,6 +198,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       "moeda",
       "notas",
       "avaliacao",
+      "capa_url",
+      "capa_fonte",
+      "capa_travada",
+      "capa_escolhida_em",
     ];
 
     const csvContent = serializeRowsToSafeCsv(headers, rows);
@@ -204,7 +215,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
   }
 
-  // Backup JSON completo e restaurável
+  // Backup JSON completo e restaurável (inclui capas escolhidas/travadas, estantes 3D e user_settings da conta)
+  const userSettings = ensureWorkspaceSettings(ws);
   const backupJson = createPortableBackupJson({
     exportedAtIso: new Date().toISOString(),
     state: {
@@ -216,6 +228,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       goals: ws.goals,
       wishlist: ws.wishlist,
       shelves: ws.shelves,
+      userSettings,
     },
   });
   return new NextResponse(backupJson, {
