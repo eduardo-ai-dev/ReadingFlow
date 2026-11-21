@@ -36,6 +36,20 @@ describe("Bug 3 regression — Empacotamento unificado, zero overflow e vãos ap
     }
   });
 
+  it("retorna resultado determinístico para o mesmo rowSeed e nunca insere vão entre livros individuais", () => {
+    const first = computeRowGroupBreakIndices(16, "estante-classicos:row:0");
+    const second = computeRowGroupBreakIndices(16, "estante-classicos:row:0");
+    expect(second).toEqual(first);
+    expect(first.length).toBeGreaterThanOrEqual(2);
+
+    const boundaries = [0, ...first, 16];
+    for (let i = 0; i < boundaries.length - 1; i += 1) {
+      const groupSize = boundaries[i + 1]! - boundaries[i]!;
+      expect(groupSize).toBeGreaterThanOrEqual(3);
+      expect(groupSize).toBeLessThanOrEqual(7);
+    }
+  });
+
   it("empacota 29 livros sem jamais ultrapassar maxRowWidthPx em larguras mobile e desktop (lombada, capa_frente, inclinado e covers)", () => {
     const books = makeBooks(29);
     const displayModes: Record<string, ShelfBookLayoutDisplayMode> = {
