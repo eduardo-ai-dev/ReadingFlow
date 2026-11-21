@@ -40,6 +40,7 @@ import type {
   MotionPreference,
   ThemePreference,
 } from "@/lib/themes/themes.types";
+import type { AmbientPreferences } from "@/features/reading/ambient-catalog";
 
 export type ThreeDPreference = "auto" | "on" | "off";
 
@@ -225,6 +226,7 @@ export interface UserProfile {
   density?: DensityPreference;
   motion?: MotionPreference;
   fx?: FxPreference;
+  focusAmbientPreferences?: AmbientPreferences;
   threeD: ThreeDPreference;
   goalsCountRereads: boolean;
   maxSimultaneousReadings: number;

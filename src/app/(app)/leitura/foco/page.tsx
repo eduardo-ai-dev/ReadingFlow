@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import { getCurrentProfile } from "@/features/auth/queries";
 import { getReadingsOverview } from "@/features/reading/queries";
-import { FocusReadingSessionClient, type ActiveBookItem } from "@/components/FocusReadingSessionClient";
+import {
+  FocusReadingSessionClient,
+  type ActiveBookItem,
+} from "@/components/FocusReadingSessionClient";
 
 export const metadata: Metadata = {
   title: "Sessão de Leitura (Canto de Foco) — ReadingFlow",
@@ -11,12 +15,16 @@ export default async function FocusSessionPage({
 }: {
   searchParams: Promise<{ readingId?: string }>;
 }) {
-  const [{ readingId }, overview] = await Promise.all([
+  const [{ readingId }, overview, profile] = await Promise.all([
     searchParams,
     getReadingsOverview(),
+    getCurrentProfile(),
   ]);
 
-  const activeBooks: ActiveBookItem[] = [...overview.active, ...overview.paused].map((entry) => ({
+  const activeBooks: ActiveBookItem[] = [
+    ...overview.active,
+    ...overview.paused,
+  ].map((entry) => ({
     readingId: entry.reading.id,
     title: entry.work.title,
     author: entry.primaryAuthor,
@@ -36,6 +44,7 @@ export default async function FocusSessionPage({
       <FocusReadingSessionClient
         activeBooks={activeBooks}
         initialReadingId={readingId}
+        initialAmbientPreferences={profile?.focusAmbientPreferences}
       />
     </div>
   );

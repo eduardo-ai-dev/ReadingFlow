@@ -13,6 +13,7 @@ import {
   requireAuthenticatedWorkspace,
 } from "@/server/store/memory-repository";
 import {
+  ambientPreferencesSchema,
   deleteAccountSchema,
   onboardingSchema,
   requestPasswordResetSchema,
@@ -22,6 +23,10 @@ import {
   updateProfileSchema,
   updateThemePreferencesSchema,
 } from "@/features/auth/schema";
+import {
+  normalizeAmbientPreferences,
+  type AmbientPreferences,
+} from "@/features/reading/ambient-catalog";
 import {
   DENSITY_COOKIE_NAME,
   FX_COOKIE_NAME,
@@ -568,6 +573,32 @@ export async function updateThemePreferencesAction(rawInput: {
     fx: nextFx,
     persistedToProfile: Boolean(ws),
   };
+}
+
+export async function updateAmbientPreferencesAction(
+  rawInput: AmbientPreferences
+): Promise<
+  { ok: true; persistedToProfile: boolean } | { ok: false; error: string }
+> {
+  const parsed = ambientPreferencesSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error:
+        parsed.error.issues[0]?.message ??
+        "Preferências de som ambiente inválidas.",
+    };
+  }
+
+  const normalized = normalizeAmbientPreferences(parsed.data);
+  const ws = await getAuthenticatedWorkspace();
+  if (ws) {
+    ws.profile = {
+      ...ws.profile,
+      focusAmbientPreferences: normalized,
+    };
+  }
+  return { ok: true, persistedToProfile: Boolean(ws) };
 }
 
 export async function updateProfileAction(rawInput: {

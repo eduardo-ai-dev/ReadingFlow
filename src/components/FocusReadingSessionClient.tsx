@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { memo, useCallback, useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -8,8 +9,6 @@ import {
   Pause,
   Square,
   RotateCcw,
-  Volume2,
-  VolumeX,
   BookOpen,
   Check,
   ArrowLeft,
@@ -30,8 +29,270 @@ import {
   writePersistedFocusSession,
   type FocusSessionMode,
 } from "@/features/reading/focus-session-storage";
+import type { AmbientPreferences } from "@/features/reading/ambient-catalog";
 import { BookCover } from "@/components/BookCover";
 import type { ReadingStatus } from "@/lib/domain";
+
+const AmbientSoundMixer = dynamic(
+  () =>
+    import("@/components/AmbientSoundMixer").then(
+      (mod) => mod.AmbientSoundMixer
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-2 py-1" aria-hidden="true">
+        <div className="h-4 w-28 animate-pulse rounded bg-[var(--rf-surface-subtle)]" />
+        <div className="grid grid-cols-2 gap-1.5">
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-8 animate-pulse rounded-lg bg-[var(--rf-surface-subtle)]"
+            />
+          ))}
+        </div>
+      </div>
+    ),
+  }
+);
+
+function formatTimer(totalSeconds: number): string {
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Hook isolado de relógio de parede: atualiza apenas o componente consumidor a cada 1s
+ * e pausa automaticamente quando a aba fica oculta (`document.visibilityState === "hidden"`),
+ * evitando re-renderizar toda a página do Canto de Foco durante a sessão.
+ */
+function useLiveElapsedSeconds(params: {
+  accumulatedSeconds: number;
+  startedAtMs: number | null;
+  isRunning: boolean;
+  focusMode: FocusSessionMode;
+  onPomodoroFinished?: () => void;
+}): number {
+  const {
+    accumulatedSeconds,
+    startedAtMs,
+    isRunning,
+    focusMode,
+    onPomodoroFinished,
+  } = params;
+  const [liveSeconds, setLiveSeconds] = useState<number>(() =>
+    computeElapsedFocusSeconds(
+      { accumulatedSeconds, startedAtMs, isRunning, focusMode },
+      Date.now()
+    )
+  );
+  const onFinishRef = useRef(onPomodoroFinished);
+  useEffect(() => {
+    onFinishRef.current = onPomodoroFinished;
+  }, [onPomodoroFinished]);
+
+  useEffect(() => {
+    const syncNow = () => {
+      const next = computeElapsedFocusSeconds(
+        { accumulatedSeconds, startedAtMs, isRunning, focusMode },
+        Date.now()
+      );
+      setLiveSeconds(next);
+      if (
+        isRunning &&
+        focusMode === "pomodoro" &&
+        next >= FOCUS_POMODORO_SECONDS
+      ) {
+        onFinishRef.current?.();
+      }
+    };
+
+    syncNow();
+    if (!isRunning || startedAtMs === null) return;
+
+    let intervalId: number | null = null;
+    const startInterval = () => {
+      if (intervalId !== null) return;
+      intervalId = window.setInterval(syncNow, 1000);
+    };
+    const stopInterval = () => {
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    if (document.visibilityState !== "hidden") {
+      startInterval();
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        stopInterval();
+      } else {
+        syncNow();
+        startInterval();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      stopInterval();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [accumulatedSeconds, startedAtMs, isRunning, focusMode]);
+
+  return liveSeconds;
+}
+
+const FocusStopwatchDisplay = memo(function FocusStopwatchDisplay({
+  accumulatedSeconds,
+  startedAtMs,
+  isRunning,
+  hasStarted,
+  focusMode,
+  pomodoroDone,
+  onPomodoroFinished,
+}: {
+  accumulatedSeconds: number;
+  startedAtMs: number | null;
+  isRunning: boolean;
+  hasStarted: boolean;
+  focusMode: FocusSessionMode;
+  pomodoroDone: boolean;
+  onPomodoroFinished: () => void;
+}) {
+  const elapsedSeconds = useLiveElapsedSeconds({
+    accumulatedSeconds,
+    startedAtMs,
+    isRunning,
+    focusMode,
+    onPomodoroFinished,
+  });
+
+  const displayedTimerSeconds =
+    focusMode === "pomodoro"
+      ? Math.max(0, FOCUS_POMODORO_SECONDS - elapsedSeconds)
+      : elapsedSeconds;
+
+  const pomodoroProgressPercent =
+    focusMode === "pomodoro"
+      ? Math.min(
+          100,
+          Math.round((elapsedSeconds / FOCUS_POMODORO_SECONDS) * 100)
+        )
+      : 0;
+
+  const ringRadius = 112;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringProgressRatio =
+    focusMode === "pomodoro"
+      ? Math.min(1, elapsedSeconds / FOCUS_POMODORO_SECONDS)
+      : Math.min(1, (elapsedSeconds % 3600) / 3600);
+  const ringStrokeDashoffset = ringCircumference * (1 - ringProgressRatio);
+
+  return (
+    <>
+      {focusMode === "pomodoro" ? (
+        <p className="mt-2 font-sans text-xs font-medium text-[#5B4D44] tabular-nums">
+          {pomodoroDone
+            ? "Ciclo Pomodoro de 25 minutos concluído!"
+            : `Bloco focado de 25 minutos (${pomodoroProgressPercent}%)`}
+        </p>
+      ) : null}
+
+      {/* Mostrador Principal com Anel Dourado Sutil */}
+      <div className="relative mx-auto my-7 flex h-64 w-64 items-center justify-center sm:h-72 sm:w-72">
+        <svg
+          viewBox="0 0 256 256"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full -rotate-90"
+        >
+          <circle
+            cx="128"
+            cy="128"
+            r={ringRadius}
+            fill="none"
+            stroke="rgba(140, 122, 99, 0.2)"
+            strokeWidth="3"
+          />
+          <circle
+            cx="128"
+            cy="128"
+            r={ringRadius}
+            fill="none"
+            stroke={isRunning ? "#D4AF37" : "#C4A77D"}
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={ringCircumference}
+            strokeDashoffset={ringStrokeDashoffset}
+            className="transition-[stroke-dashoffset] duration-700 ease-out"
+          />
+        </svg>
+
+        <div className="relative z-10 flex flex-col items-center">
+          <div
+            aria-live="off"
+            className="font-serif text-6xl font-bold tracking-tight tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[#1C1815] sm:text-7xl"
+          >
+            {formatTimer(displayedTimerSeconds)}
+          </div>
+          <span className="mt-2 font-sans text-[11px] font-semibold uppercase tracking-[0.16em] text-[#722F3E]">
+            {isRunning
+              ? "Em leitura"
+              : pomodoroDone
+                ? "Ciclo concluído"
+                : hasStarted
+                  ? "Pausado"
+                  : focusMode === "pomodoro"
+                    ? "Pomodoro 25 min"
+                    : "Cronômetro livre"}
+          </span>
+        </div>
+      </div>
+
+      {/* Linha de progresso dourada fina animada via transform: scaleX (zero layout) */}
+      <div
+        role="progressbar"
+        aria-label="Progresso da sessão de leitura"
+        aria-valuenow={Math.round(ringProgressRatio * 100)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        className="mx-auto mb-6 h-1 w-full max-w-xs overflow-hidden rounded-full bg-[#8C7A63]/20"
+      >
+        <div
+          className="h-full w-full origin-left rounded-full bg-gradient-to-r from-[#C4A77D] to-[#D4AF37] transition-transform duration-500"
+          style={{ transform: `scaleX(${ringProgressRatio})` }}
+        />
+      </div>
+    </>
+  );
+});
+
+const FocusElapsedText = memo(function FocusElapsedText({
+  accumulatedSeconds,
+  startedAtMs,
+  isRunning,
+  focusMode,
+}: {
+  accumulatedSeconds: number;
+  startedAtMs: number | null;
+  isRunning: boolean;
+  focusMode: FocusSessionMode;
+}) {
+  const live = useLiveElapsedSeconds({
+    accumulatedSeconds,
+    startedAtMs,
+    isRunning,
+    focusMode,
+  });
+  return (
+    <strong className="font-semibold text-[#1C1815]">
+      {formatTimer(live)}
+    </strong>
+  );
+});
 
 export interface ActiveBookItem {
   readingId: string;
@@ -57,9 +318,11 @@ const SESSION_TARGET_PAGES = 50;
 export function FocusReadingSessionClient({
   activeBooks,
   initialReadingId,
+  initialAmbientPreferences,
 }: {
   activeBooks: ActiveBookItem[];
   initialReadingId?: string;
+  initialAmbientPreferences?: AmbientPreferences | null;
 }) {
   const router = useRouter();
   const resolvedInitialId =
@@ -76,14 +339,13 @@ export function FocusReadingSessionClient({
   const [focusMode, setFocusMode] = useState<FocusMode>("free");
   const [accumulatedSeconds, setAccumulatedSeconds] = useState(0);
   const [startedAtMs, setStartedAtMs] = useState<number | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [showQuickRegister, setShowQuickRegister] = useState(false);
   const [pomodoroDone, setPomodoroDone] = useState(false);
   const [quickRegisterMode, setQuickRegisterMode] =
     useState<QuickRegisterMode>("delta");
-  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [stopAudioSignal, setStopAudioSignal] = useState(0);
   const [sessionNotes, setSessionNotes] = useState("");
   const [rawSessionInput, setRawSessionInput] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
@@ -125,22 +387,24 @@ export function FocusReadingSessionClient({
     const finishedPomodoro =
       saved.focusMode === "pomodoro" && restoredElapsed >= POMODORO_SECONDS;
 
-    setSelectedBookId(saved.readingId);
-    setFocusMode(saved.focusMode);
-    setAccumulatedSeconds(
-      finishedPomodoro ? POMODORO_SECONDS : saved.accumulatedSeconds
-    );
-    setStartedAtMs(
-      finishedPomodoro || !saved.isRunning ? null : saved.startedAtMs
-    );
-    setElapsedSeconds(restoredElapsed);
-    setIsRunning(!finishedPomodoro && saved.isRunning);
-    setHasStarted(saved.hasStarted || restoredElapsed > 0);
-    setPomodoroDone(finishedPomodoro);
-    if (finishedPomodoro || (!saved.isRunning && restoredElapsed > 0)) {
-      setShowQuickRegister(true);
-    }
-    setSessionNotes(saved.sessionNotes);
+    const frameId = window.requestAnimationFrame(() => {
+      setSelectedBookId(saved.readingId);
+      setFocusMode(saved.focusMode);
+      setAccumulatedSeconds(
+        finishedPomodoro ? POMODORO_SECONDS : saved.accumulatedSeconds
+      );
+      setStartedAtMs(
+        finishedPomodoro || !saved.isRunning ? null : saved.startedAtMs
+      );
+      setIsRunning(!finishedPomodoro && saved.isRunning);
+      setHasStarted(saved.hasStarted || restoredElapsed > 0);
+      setPomodoroDone(finishedPomodoro);
+      if (finishedPomodoro || (!saved.isRunning && restoredElapsed > 0)) {
+        setShowQuickRegister(true);
+      }
+      setSessionNotes(saved.sessionNotes);
+    });
+    return () => window.cancelAnimationFrame(frameId);
     // Executa apenas na montagem para hidratar a sessão ativa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -185,7 +449,6 @@ export function FocusReadingSessionClient({
         setIsRunning(false);
         setAccumulatedSeconds(0);
         setStartedAtMs(null);
-        setElapsedSeconds(0);
         setHasStarted(false);
         setShowQuickRegister(false);
         setPomodoroDone(false);
@@ -194,7 +457,6 @@ export function FocusReadingSessionClient({
       }
       const next = parsePersistedFocusSession(e.newValue);
       if (!next) return;
-      const nextElapsed = computeElapsedFocusSeconds(next, Date.now());
       setSelectedBookId((curr) =>
         activeBooks.some((b) => b.readingId === next.readingId)
           ? next.readingId
@@ -203,7 +465,6 @@ export function FocusReadingSessionClient({
       setFocusMode(next.focusMode);
       setAccumulatedSeconds(next.accumulatedSeconds);
       setStartedAtMs(next.startedAtMs);
-      setElapsedSeconds(nextElapsed);
       setIsRunning(next.isRunning);
       setHasStarted(next.hasStarted);
       setSessionNotes(next.sessionNotes);
@@ -233,32 +494,13 @@ export function FocusReadingSessionClient({
     }
   }, [showQuickRegister, quickRegisterMode]);
 
-  // Timer loop baseado em relógio de parede (sem atraso quando a aba fica em segundo plano)
-  useEffect(() => {
-    if (!isRunning || startedAtMs === null) return;
-    const tick = () => {
-      const next = computeElapsedFocusSeconds(
-        {
-          accumulatedSeconds,
-          startedAtMs,
-          isRunning: true,
-          focusMode,
-        },
-        Date.now()
-      );
-      setElapsedSeconds(next);
-      if (focusMode === "pomodoro" && next >= POMODORO_SECONDS) {
-        setAccumulatedSeconds(POMODORO_SECONDS);
-        setStartedAtMs(null);
-        setIsRunning(false);
-        setPomodoroDone(true);
-        setShowQuickRegister(true);
-      }
-    };
-    tick();
-    const interval = setInterval(tick, 500);
-    return () => clearInterval(interval);
-  }, [isRunning, startedAtMs, accumulatedSeconds, focusMode]);
+  const handlePomodoroFinished = useCallback(() => {
+    setAccumulatedSeconds(POMODORO_SECONDS);
+    setStartedAtMs(null);
+    setIsRunning(false);
+    setPomodoroDone(true);
+    setShowQuickRegister(true);
+  }, []);
 
   // Alerta sonoro suave ao concluir um ciclo Pomodoro de 25 minutos
   useEffect(() => {
@@ -288,88 +530,11 @@ export function FocusReadingSessionClient({
     }
   }, [pomodoroDone]);
 
-  // Ambient sound generator via Web Audio API
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
-
-  useEffect(() => {
-    if (soundEnabled) {
-      try {
-        const AudioContextClass =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext })
-            .webkitAudioContext;
-        const ctx = new AudioContextClass();
-        audioCtxRef.current = ctx;
-
-        const bufferSize = ctx.sampleRate * 2;
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        let b0 = 0,
-          b1 = 0,
-          b2 = 0;
-        for (let i = 0; i < bufferSize; i++) {
-          const white = Math.random() * 2 - 1;
-          b0 = 0.99886 * b0 + white * 0.0555179;
-          b1 = 0.99332 * b1 + white * 0.0750759;
-          b2 = 0.969 * b2 + white * 0.153852;
-          data[i] = (b0 + b1 + b2) * 0.04;
-        }
-
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-        noise.loop = true;
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = "lowpass";
-        filter.frequency.value = 450;
-
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gainNodeRef.current = gain;
-
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-        noise.start();
-      } catch {
-        // Fallback gracefully if Web Audio is unsupported
-      }
-    } else if (audioCtxRef.current) {
-      audioCtxRef.current.close();
-      audioCtxRef.current = null;
-    }
-
-    return () => {
-      if (audioCtxRef.current) {
-        audioCtxRef.current.close();
-        audioCtxRef.current = null;
-      }
-    };
-  }, [soundEnabled]);
-
-  const displayedTimerSeconds =
-    focusMode === "pomodoro"
-      ? Math.max(0, POMODORO_SECONDS - elapsedSeconds)
-      : elapsedSeconds;
-
-  const pomodoroProgressPercent =
-    focusMode === "pomodoro"
-      ? Math.min(100, Math.round((elapsedSeconds / POMODORO_SECONDS) * 100))
-      : 0;
-
-  const formatTimer = (totalSeconds: number) => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
   const handleSelectMode = (nextMode: FocusMode) => {
     setFocusMode(nextMode);
     setIsRunning(false);
     setAccumulatedSeconds(0);
     setStartedAtMs(null);
-    setElapsedSeconds(0);
     setHasStarted(false);
     setShowQuickRegister(false);
     setPomodoroDone(false);
@@ -387,17 +552,15 @@ export function FocusReadingSessionClient({
       );
       setAccumulatedSeconds(consolidated);
       setStartedAtMs(null);
-      setElapsedSeconds(consolidated);
       setIsRunning(false);
       setShowQuickRegister(true);
       setSaveError(null);
       return;
     }
     let nextAccum = accumulatedSeconds;
-    if (focusMode === "pomodoro" && elapsedSeconds >= POMODORO_SECONDS) {
+    if (focusMode === "pomodoro" && accumulatedSeconds >= POMODORO_SECONDS) {
       nextAccum = 0;
       setAccumulatedSeconds(0);
-      setElapsedSeconds(0);
     }
     setAccumulatedSeconds(nextAccum);
     setStartedAtMs(Date.now());
@@ -417,20 +580,19 @@ export function FocusReadingSessionClient({
         Date.now()
       );
       setAccumulatedSeconds(consolidated);
-      setElapsedSeconds(consolidated);
     }
     setStartedAtMs(null);
     setIsRunning(false);
     setHasStarted(true);
     setShowQuickRegister(true);
     setSaveError(null);
+    setStopAudioSignal((s) => s + 1);
   };
 
   const handleResetSession = () => {
     setIsRunning(false);
     setAccumulatedSeconds(0);
     setStartedAtMs(null);
-    setElapsedSeconds(0);
     setHasStarted(false);
     setShowQuickRegister(false);
     setPomodoroDone(false);
@@ -546,7 +708,7 @@ export function FocusReadingSessionClient({
     ? formatFocusSessionSummaryPtBr({
         amount: pagesReadThisSession,
         unit: selectedBook.progressUnit,
-        elapsedSeconds,
+        elapsedSeconds: accumulatedSeconds,
       })
     : "";
 
@@ -562,14 +724,6 @@ export function FocusReadingSessionClient({
         : selectedBook?.progressUnit === "percent"
           ? "Porcentagem lida nesta sessão"
           : "Páginas Lidas nesta sessão";
-
-  const ringRadius = 112;
-  const ringCircumference = 2 * Math.PI * ringRadius;
-  const ringProgressRatio =
-    focusMode === "pomodoro"
-      ? Math.min(1, elapsedSeconds / POMODORO_SECONDS)
-      : Math.min(1, (elapsedSeconds % 3600) / 3600);
-  const ringStrokeDashoffset = ringCircumference * (1 - ringProgressRatio);
 
   return (
     <div className="space-y-6">
@@ -601,7 +755,7 @@ export function FocusReadingSessionClient({
         {/* CENTRO (6 cols desktop · order-first no mobile): HIERARQUIA ABSOLUTA NO CRONÔMETRO */}
         <section
           aria-label="Cronômetro de leitura"
-          className="order-first rounded-2xl border border-[#C4A77D]/30 bg-[#FAF7F1]/88 p-6 text-center shadow-[0_8px_32px_-16px_rgba(44,34,30,0.14)] backdrop-blur-md sm:p-8 lg:order-2 lg:col-span-6"
+          className="order-first rounded-2xl border border-[#C4A77D]/30 bg-[#FAF7F1] p-6 text-center shadow-[0_8px_32px_-16px_rgba(44,34,30,0.14)] sm:p-8 lg:order-2 lg:col-span-6"
         >
           {/* Seletor de Modo (Livre / Pomodoro / Meta 50 págs) */}
           <div className="flex flex-col items-center gap-2.5">
@@ -649,79 +803,18 @@ export function FocusReadingSessionClient({
                   Objetivo desta sessão: {SESSION_TARGET_PAGES} páginas
                 </span>
               </p>
-            ) : focusMode === "pomodoro" ? (
-              <p className="font-sans text-xs font-medium text-[#5B4D44] tabular-nums">
-                {pomodoroDone
-                  ? "Ciclo Pomodoro de 25 minutos concluído!"
-                  : `Bloco focado de 25 minutos (${pomodoroProgressPercent}%)`}
-              </p>
             ) : null}
           </div>
 
-          {/* Mostrador Principal com Anel Dourado Sutil */}
-          <div className="relative mx-auto my-7 flex h-64 w-64 items-center justify-center sm:h-72 sm:w-72">
-            <svg
-              viewBox="0 0 256 256"
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 h-full w-full -rotate-90"
-            >
-              <circle
-                cx="128"
-                cy="128"
-                r={ringRadius}
-                fill="none"
-                stroke="rgba(140, 122, 99, 0.2)"
-                strokeWidth="3"
-              />
-              <circle
-                cx="128"
-                cy="128"
-                r={ringRadius}
-                fill="none"
-                stroke={isRunning ? "#D4AF37" : "#C4A77D"}
-                strokeWidth="4"
-                strokeLinecap="round"
-                strokeDasharray={ringCircumference}
-                strokeDashoffset={ringStrokeDashoffset}
-                className="transition-all duration-700 ease-out"
-              />
-            </svg>
-
-            <div className="relative z-10 flex flex-col items-center">
-              <div
-                aria-live="off"
-                className="font-serif text-6xl font-bold tracking-tight tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[#1C1815] sm:text-7xl"
-              >
-                {formatTimer(displayedTimerSeconds)}
-              </div>
-              <span className="mt-2 font-sans text-[11px] font-semibold uppercase tracking-[0.16em] text-[#722F3E]">
-                {isRunning
-                  ? "Em leitura"
-                  : pomodoroDone
-                    ? "Ciclo concluído"
-                    : hasStarted
-                      ? "Pausado"
-                      : focusMode === "pomodoro"
-                        ? "Pomodoro 25 min"
-                        : "Cronômetro livre"}
-              </span>
-            </div>
-          </div>
-
-          {/* Linha de progresso dourada fina */}
-          <div
-            role="progressbar"
-            aria-label="Progresso da sessão de leitura"
-            aria-valuenow={Math.round(ringProgressRatio * 100)}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            className="mx-auto mb-6 h-1 w-full max-w-xs overflow-hidden rounded-full bg-[#8C7A63]/20"
-          >
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-[#C4A77D] to-[#D4AF37] transition-all duration-500"
-              style={{ width: `${Math.round(ringProgressRatio * 100)}%` }}
-            />
-          </div>
+          <FocusStopwatchDisplay
+            accumulatedSeconds={accumulatedSeconds}
+            startedAtMs={startedAtMs}
+            isRunning={isRunning}
+            hasStarted={hasStarted}
+            focusMode={focusMode}
+            pomodoroDone={pomodoroDone}
+            onPomodoroFinished={handlePomodoroFinished}
+          />
 
           {/* Controles Diretos do Cronômetro */}
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -745,7 +838,7 @@ export function FocusReadingSessionClient({
             <button
               type="button"
               onClick={handleStopSession}
-              disabled={!isRunning && !hasStarted && elapsedSeconds === 0}
+              disabled={!isRunning && !hasStarted && accumulatedSeconds === 0}
               className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-full border border-[#722F3E]/35 bg-[#722F3E] px-5 font-sans text-sm font-semibold text-[#F4EFE6] hover:bg-[#5E2431] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E] disabled:opacity-45 disabled:cursor-not-allowed transition-all active:scale-[0.99]"
             >
               <Square className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
@@ -924,7 +1017,7 @@ export function FocusReadingSessionClient({
         {/* LATERAL ESQUERDA (3 cols desktop · order-2 mobile): LIVRO EM LEITURA + PROGRESSO */}
         <aside
           aria-label="Livro em foco e progresso"
-          className="order-2 rounded-2xl border border-[#8C7A63]/18 bg-[#FAF7F1]/65 p-5 shadow-[0_4px_24px_-12px_rgba(44,34,30,0.08)] backdrop-blur-md lg:order-1 lg:col-span-3"
+          className="order-2 rounded-2xl border border-[#8C7A63]/18 bg-[#FAF7F1] p-5 shadow-[0_4px_24px_-12px_rgba(44,34,30,0.08)] lg:order-1 lg:col-span-3"
         >
           <div className="border-b border-[#8C7A63]/22 pb-3">
             <p className="font-sans text-[10px] font-bold uppercase tracking-[0.18em] text-[#722F3E]">
@@ -1031,7 +1124,7 @@ export function FocusReadingSessionClient({
         {/* LATERAL DIREITA (3 cols desktop · order-3 mobile): AMBIENTE, RESUMO E ANOTAÇÕES RÁPIDAS */}
         <aside
           aria-label="Ambiente e anotações rápidas da sessão"
-          className="order-3 space-y-4 rounded-2xl border border-[#8C7A63]/18 bg-[#FAF7F1]/65 p-5 shadow-[0_4px_24px_-12px_rgba(44,34,30,0.08)] backdrop-blur-md lg:order-3 lg:col-span-3"
+          className="order-3 space-y-4 rounded-2xl border border-[#8C7A63]/18 bg-[#FAF7F1] p-5 shadow-[0_4px_24px_-12px_rgba(44,34,30,0.08)] lg:order-3 lg:col-span-3"
         >
           <div className="border-b border-[#8C7A63]/22 pb-3">
             <p className="font-sans text-[10px] font-bold uppercase tracking-[0.18em] text-[#7A5230]">
@@ -1042,35 +1135,10 @@ export function FocusReadingSessionClient({
             </h2>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`flex w-full items-center justify-between rounded-xl border px-3.5 py-2.5 font-sans text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4A77D] ${
-              soundEnabled
-                ? "border-[#C4A77D] bg-[#C4A77D]/18 text-[#1C1815]"
-                : "border-[#8C7A63]/22 bg-[#F4EFE6]/80 text-[#5B4D44] hover:border-[#C4A77D]"
-            }`}
-          >
-            <span className="inline-flex items-center gap-2">
-              {soundEnabled ? (
-                <Volume2
-                  className="h-4 w-4 text-[#722F3E]"
-                  aria-hidden="true"
-                />
-              ) : (
-                <VolumeX
-                  className="h-4 w-4 text-[#7A6A5E]"
-                  aria-hidden="true"
-                />
-              )}
-              <span>
-                {soundEnabled ? "Chuva suave: ativo" : "Som ambiente"}
-              </span>
-            </span>
-            <span className="font-mono text-[10px] uppercase text-[#7A5230]">
-              {soundEnabled ? "ON" : "OFF"}
-            </span>
-          </button>
+          <AmbientSoundMixer
+            initialPreferences={initialAmbientPreferences}
+            stopSignal={stopAudioSignal}
+          />
 
           <div className="border-t border-[#8C7A63]/22 pt-3.5">
             <p className="font-sans text-[11px] font-semibold uppercase tracking-wider text-[#5B4D44]">
@@ -1078,9 +1146,12 @@ export function FocusReadingSessionClient({
             </p>
             <p className="mt-1 font-sans text-xs tabular-nums text-[#5B4D44]">
               Tempo decorrido:{" "}
-              <strong className="font-semibold text-[#1C1815]">
-                {formatTimer(elapsedSeconds)}
-              </strong>
+              <FocusElapsedText
+                accumulatedSeconds={accumulatedSeconds}
+                startedAtMs={startedAtMs}
+                isRunning={isRunning}
+                focusMode={focusMode}
+              />
             </p>
             <p className="mt-0.5 font-sans text-[11px] text-[#7A6A5E]">
               Pause ou encerre para registrar páginas e calcular o ritmo.

@@ -76,6 +76,28 @@ export const motionPreferenceSchema = z.enum(["system", "reduced", "full"]);
 
 export const fxPreferenceSchema = z.enum(["full", "min"]);
 
+export const ambientSoundIdSchema = z.enum([
+  "chuva-suave",
+  "tempestade",
+  "lareira",
+  "biblioteca",
+  "cafeteria",
+  "floresta",
+  "ondas-mar",
+  "vento",
+  "noite-grilos",
+  "ruido-branco",
+  "ruido-rosa",
+  "ruido-marrom",
+]);
+
+export const ambientPreferencesSchema = z.object({
+  selectedIds: z.array(ambientSoundIdSchema).max(3),
+  volumes: z.record(z.string(), z.number().min(0).max(1)).default({}),
+  masterVolume: z.number().min(0).max(1),
+  continueAcrossPages: z.boolean().default(false),
+});
+
 export const updateThemePreferencesSchema = z.object({
   theme: themePreferenceSchema.optional(),
   density: densityPreferenceSchema.optional(),

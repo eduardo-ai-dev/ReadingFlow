@@ -662,6 +662,39 @@ function Book3DBase({
     [publisherMark, resolvedSeed]
   );
 
+  // Mantém todos os hooks incondicionalmente acima dos early returns (`showcase`/`desk`)
+  const geometry = useMemo(
+    () =>
+      computeShelfBookGeometry({
+        pages: resolvedPages,
+        format: resolvedFormat,
+        seed: resolvedSeed,
+      }),
+    [resolvedPages, resolvedFormat, resolvedSeed]
+  );
+
+  const typography = useMemo(
+    () =>
+      computeFittedSpineTypography({
+        title: itemTitle,
+        authorSurname: resolvedSurname,
+        heightPx: geometry.heightPx,
+        spineWidthPx: geometry.spineWidthPx,
+        template: resolvedTemplate,
+        hasPublisherMark: Boolean(resolvedPublisherMark),
+        typoStyle: geometry.typoStyle,
+      }),
+    [
+      itemTitle,
+      resolvedSurname,
+      geometry.heightPx,
+      geometry.spineWidthPx,
+      resolvedTemplate,
+      resolvedPublisherMark,
+      geometry.typoStyle,
+    ]
+  );
+
   // Handlers sempre atualizados sem invalidar o React.memo
   const latest = useRef({
     onActivate,
@@ -899,38 +932,6 @@ function Book3DBase({
   }
 
   // 3. MODO SPINE REALISTA (CSS 3D com alturas orgânicas e auto-fit 15px..8px sem reticências)
-  const geometry = useMemo(
-    () =>
-      computeShelfBookGeometry({
-        pages: resolvedPages,
-        format: resolvedFormat,
-        seed: resolvedSeed,
-      }),
-    [resolvedPages, resolvedFormat, resolvedSeed]
-  );
-
-  const typography = useMemo(
-    () =>
-      computeFittedSpineTypography({
-        title: itemTitle,
-        authorSurname: resolvedSurname,
-        heightPx: geometry.heightPx,
-        spineWidthPx: geometry.spineWidthPx,
-        template: resolvedTemplate,
-        hasPublisherMark: Boolean(resolvedPublisherMark),
-        typoStyle: geometry.typoStyle,
-      }),
-    [
-      itemTitle,
-      resolvedSurname,
-      geometry.heightPx,
-      geometry.spineWidthPx,
-      resolvedTemplate,
-      resolvedPublisherMark,
-      geometry.typoStyle,
-    ]
-  );
-
   // Faces 3D auxiliares + <BookCover> lateral são montadas sob demanda (hover/foco/seleção/modo capas),
   // reduzindo drasticamente o número de nós DOM em estantes grandes (150+ livros).
   const mount3DFaces = hovered || focused || isSelected || showCoverFace;
