@@ -3,6 +3,7 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { isDemoSessionAllowed } from "@/lib/auth-demo";
 import {
   DEMO_SESSION_COOKIE_NAME,
   DEMO_USER_ID,
@@ -152,10 +153,16 @@ async function createSessionCookie(
   }
 }
 
-export async function signInDemoAction(): Promise<{
-  ok: true;
-  redirectTo: string;
-}> {
+export async function signInDemoAction(): Promise<
+  { ok: true; redirectTo: string } | { ok: false; error: string }
+> {
+  if (!isDemoSessionAllowed()) {
+    return {
+      ok: false,
+      error: "Sessão demonstrativa desativada em produção.",
+    };
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

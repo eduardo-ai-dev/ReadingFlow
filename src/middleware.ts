@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isDemoSessionAllowed } from "@/lib/auth-demo";
 
 const PROTECTED_PREFIXES = [
   "/painel",
@@ -41,6 +42,7 @@ export function middleware(request: NextRequest) {
   }
 
   const isDemoSession =
+    isDemoSessionAllowed() &&
     request.cookies.get("rf_demo_session")?.value === "true";
   const hasAppSession = Boolean(request.cookies.get("rf_session_id")?.value);
   const hasSupabaseSession = hasSupabaseAuthCookie(request);

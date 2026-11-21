@@ -51,6 +51,10 @@ export function DemoLoginButton({
         startTransition(async () => {
           try {
             const res = await signInDemoAction();
+            if (!res.ok) {
+              router.push("/entrar");
+              return;
+            }
             const target = redirectTo || res.redirectTo || "/painel";
             router.push(target);
             router.refresh();

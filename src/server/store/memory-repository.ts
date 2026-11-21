@@ -1,4 +1,6 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { isDemoSessionAllowed } from "@/lib/auth-demo";
 import type {
   Edition,
   ImportJob,
@@ -952,8 +954,9 @@ export async function getAuthenticatedWorkspace(): Promise<UserWorkspaceData | n
     }
   }
 
-  // Fallback de sessão demonstrativa via cookie rf_demo_session=true
+  // Fallback de sessão demonstrativa via cookie rf_demo_session=true (bloqueado em produção por padrão)
   const isDemoCookie =
+    isDemoSessionAllowed() &&
     cookieStore.get(DEMO_SESSION_COOKIE_NAME)?.value === "true";
   if (isDemoCookie) {
     let demoWs = store.usersById.get(DEMO_USER_ID);
@@ -970,7 +973,7 @@ export async function getAuthenticatedWorkspace(): Promise<UserWorkspaceData | n
 export async function requireAuthenticatedWorkspace(): Promise<UserWorkspaceData> {
   const ws = await getAuthenticatedWorkspace();
   if (!ws) {
-    throw new Error("Sessão não autenticada.");
+    redirect("/entrar");
   }
   return ws;
 }
