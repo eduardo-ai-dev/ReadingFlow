@@ -101,7 +101,10 @@ class AmbientAudioEngine {
   private activeLayers = new Map<AmbientSoundId, ActiveLayerNodes>();
   private bufferCache = new Map<AmbientSoundId, AudioBuffer>();
   private loadingPromises = new Map<AmbientSoundId, Promise<AudioBuffer>>();
-  private stopTimers = new Map<AmbientSoundId, number>();
+  private pendingStops = new Map<
+    AmbientSoundId,
+    { timer: number; layer: ActiveLayerNodes }
+  >();
   private visibilityBound = false;
 
   private ensureVisibilityListener(): void {
@@ -199,6 +202,11 @@ class AmbientAudioEngine {
     return Array.from(this.activeLayers.keys());
   }
 
+  /** Quantidade de fades de parada pendentes (para inspeção e testes de vazamento em rajada). */
+  getPendingStopCount(): number {
+    return this.pendingStops.size;
+  }
+
   async startLayer(
     id: AmbientSoundId,
     volume: number,
@@ -206,10 +214,12 @@ class AmbientAudioEngine {
   ): Promise<{ ok: true } | { ok: false; error: string }> {
     const targetVol = clampVolume(volume);
 
+    // Se havia um fade-out anterior em andamento para o mesmo som, encerra e desconecta seus nós antes de recriar
+    this.flushPendingStop(id);
+
     // Se já está tocando, apenas ajusta volume com fade
     const existing = this.activeLayers.get(id);
     if (existing) {
-      this.cancelPendingStop(id);
       this.setLayerVolume(id, targetVol, 180);
       return { ok: true };
     }
@@ -266,19 +276,23 @@ class AmbientAudioEngine {
     }
   }
 
-  private cancelPendingStop(id: AmbientSoundId): void {
-    const timer = this.stopTimers.get(id);
-    if (timer !== undefined) {
-      window.clearTimeout(timer);
-      this.stopTimers.delete(id);
+  private flushPendingStop(id: AmbientSoundId): void {
+    const pending = this.pendingStops.get(id);
+    if (pending !== undefined) {
+      window.clearTimeout(pending.timer);
+      this.pendingStops.delete(id);
+      this.cleanupLayerNodes(pending.layer);
     }
   }
 
   stopLayer(id: AmbientSoundId, fadeMs = AMBIENT_FADE_MS): void {
     const layer = this.activeLayers.get(id);
-    if (!layer) return;
+    if (!layer) {
+      this.flushPendingStop(id);
+      return;
+    }
 
-    this.cancelPendingStop(id);
+    this.flushPendingStop(id);
     this.activeLayers.delete(id);
 
     const ctx = this.ctx;
@@ -301,10 +315,10 @@ class AmbientAudioEngine {
     }
 
     const timer = window.setTimeout(() => {
-      this.stopTimers.delete(id);
+      this.pendingStops.delete(id);
       this.cleanupLayerNodes(layer);
     }, fadeMs + 60);
-    this.stopTimers.set(id, timer);
+    this.pendingStops.set(id, { timer, layer });
   }
 
   private cleanupLayerNodes(layer: ActiveLayerNodes): void {
@@ -357,10 +371,11 @@ class AmbientAudioEngine {
 
   /** Libera nós ativos imediatamente (útil em encerramento forçado/desmontagem). */
   disposeImmediate(): void {
-    for (const timer of this.stopTimers.values()) {
-      window.clearTimeout(timer);
+    for (const pending of this.pendingStops.values()) {
+      window.clearTimeout(pending.timer);
+      this.cleanupLayerNodes(pending.layer);
     }
-    this.stopTimers.clear();
+    this.pendingStops.clear();
     for (const layer of this.activeLayers.values()) {
       this.cleanupLayerNodes(layer);
     }

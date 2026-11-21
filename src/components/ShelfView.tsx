@@ -602,26 +602,40 @@ const ConnectedBookQuickPanel = memo(function ConnectedBookQuickPanel({
     () => null
   );
 
-  const quickPanelBook = useMemo<NormalizedVirtualBook | null>(() => {
-    const allBooks: NormalizedVirtualBook[] = [];
+  const booksLookup = useMemo(() => {
+    const byId = new Map<string, NormalizedVirtualBook>();
+    let firstBook: NormalizedVirtualBook | null = null;
+    let firstReadingBook: NormalizedVirtualBook | null = null;
+
     for (const shelf of shelves) {
-      for (const b of shelf.books) allBooks.push(b);
+      for (const b of shelf.books) {
+        if (!firstBook) firstBook = b;
+        if (!firstReadingBook && b.readingStatus === "reading") {
+          firstReadingBook = b;
+        }
+        byId.set(String(b.id), b);
+      }
     }
-    if (allBooks.length === 0) return null;
+
+    return {
+      byId,
+      defaultBook: firstReadingBook ?? firstBook,
+    };
+  }, [shelves]);
+
+  const quickPanelBook = useMemo<NormalizedVirtualBook | null>(() => {
+    if (booksLookup.byId.size === 0) return null;
 
     if (previewBookId) {
-      const matched = allBooks.find((b) => String(b.id) === previewBookId);
+      const matched = booksLookup.byId.get(previewBookId);
       if (matched) return matched;
     }
     if (activeBookId !== null && activeBookId !== undefined) {
-      const matched = allBooks.find(
-        (b) => String(b.id) === String(activeBookId)
-      );
+      const matched = booksLookup.byId.get(String(activeBookId));
       if (matched) return matched;
     }
-    const readingBook = allBooks.find((b) => b.readingStatus === "reading");
-    return readingBook ?? allBooks[0] ?? null;
-  }, [shelves, previewBookId, activeBookId]);
+    return booksLookup.defaultBook;
+  }, [booksLookup, previewBookId, activeBookId]);
 
   return <MemoBookQuickPanel book={quickPanelBook} />;
 });
