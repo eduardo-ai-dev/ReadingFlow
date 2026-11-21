@@ -18,6 +18,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "loadtest:seed": "node loadtest/seed.mjs",
+    "loadtest:http": "node loadtest/run-http-load.mjs",
+    "loadtest:smoke": "node loadtest/smoke.mjs",
+    "loadtest:cleanup": "node loadtest/cleanup.mjs",
     "prepare": "husky"
   },
   "dependencies": {

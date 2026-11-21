@@ -106,6 +106,27 @@ export function isLoadtestUserEmail(email) {
 }
 
 /**
+ * PRNG determinístico (Mulberry32) para reprodutibilidade exata com semente.
+ */
+export function createSeededRng(seedInput = 20261121) {
+  let a = Number(seedInput) >>> 0;
+  return {
+    nextFloat() {
+      let t = (a += 0x6d2b79f5);
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    },
+    nextInt(min, maxInclusive) {
+      return min + Math.floor(this.nextFloat() * (maxInclusive - min + 1));
+    },
+    pick(arr) {
+      return arr[Math.floor(this.nextFloat() * arr.length)];
+    },
+  };
+}
+
+/**
  * Monitora CPU e RAM do host durante os testes de carga para separar gargalos da aplicação
  * de limites físicos da máquina local.
  */

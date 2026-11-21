@@ -2,6 +2,7 @@ import "server-only";
 
 import sharp from "sharp";
 import { getServerEnv, type ServerEnv } from "@/lib/env";
+import { getCatalogFetch } from "@/server/catalog/http-client";
 import { normalizeToIsbn13 } from "@/lib/isbn";
 import {
   buildOpenLibraryCoverUrlById,
@@ -374,7 +375,12 @@ export async function validateChosenCoverWithSharp(
       if (commaIdx < 0) return { ok: false, error: "Data URL inválida." };
       const buf = Buffer.from(trimmed.slice(commaIdx + 1), "base64");
       const meta = await sharp(buf).metadata();
-      if (!meta.width || !meta.height || meta.width <= 10 || meta.height <= 10) {
+      if (
+        !meta.width ||
+        !meta.height ||
+        meta.width <= 10 ||
+        meta.height <= 10
+      ) {
         return {
           ok: false,
           error: "A imagem enviada tem dimensões inválidas.",
@@ -388,7 +394,10 @@ export async function validateChosenCoverWithSharp(
 
   const safeUrl = validateExternalCoverUrl(trimmed);
   if (!safeUrl || isInvalidCoverPlaceholder({ url: safeUrl })) {
-    return { ok: false, error: "URL de capa externa não permitida ou inválida." };
+    return {
+      ok: false,
+      error: "URL de capa externa não permitida ou inválida.",
+    };
   }
 
   // Em ambiente de teste unitário sem rede real, não bloqueia URLs sintéticas se o fetch falhar
@@ -423,7 +432,8 @@ export async function validateChosenCoverWithSharp(
     if (!meta.width || !meta.height || meta.width <= 10 || meta.height <= 10) {
       return {
         ok: false,
-        error: "A capa escolhida é um placeholder inválido (1×1). Escolha outra edição.",
+        error:
+          "A capa escolhida é um placeholder inválido (1×1). Escolha outra edição.",
       };
     }
 
@@ -2292,7 +2302,7 @@ export async function searchBookCovers(
   const isDev = env.NODE_ENV !== "production";
   const appleEnabled = Boolean(env.ENABLE_APPLE_BOOKS_COVERS);
   const hardcoverEnabled = Boolean(env.HARDCOVER_API_TOKEN);
-  const fetchImpl = params.fetchImpl ?? fetch;
+  const fetchImpl = getCatalogFetch(params.fetchImpl);
   const pauseMs = params.pauseBetweenCallsMs ?? DEFAULT_INTER_CALL_PAUSE_MS;
   const enableRetry = pauseMs > 0;
   const bypassCooldown = Boolean(params.bypassCache);
@@ -2504,15 +2514,13 @@ export async function searchBookCovers(
         bypassCooldown,
         signal,
       });
-      if (
-        !(
-          normalizedIsbn &&
-          hcTitle.attempt.status === "skipped" &&
-          attempts.some(
-            (a) => a.provider === "hardcover" && a.status === "skipped"
-          )
+      if (!(
+        normalizedIsbn &&
+        hcTitle.attempt.status === "skipped" &&
+        attempts.some(
+          (a) => a.provider === "hardcover" && a.status === "skipped"
         )
-      ) {
+      )) {
         attempts.push(hcTitle.attempt);
       }
       if (hcTitle.pageCount && !resolvedPageCount) {

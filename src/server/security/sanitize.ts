@@ -49,7 +49,18 @@ export function validateExternalCoverUrl(
 ): string | undefined {
   if (!rawUrl) return undefined;
   try {
-    const parsed = new URL(rawUrl.replace(/^http:\/\//i, "https://"));
+    const trimmed = rawUrl.trim();
+    if (
+      process.env.LOADTEST_ALLOW === "1" &&
+      process.env.MOCK_CATALOG_BASE_URL
+    ) {
+      const mockOrigin = new URL(process.env.MOCK_CATALOG_BASE_URL).origin;
+      const candidate = new URL(trimmed);
+      if (candidate.origin === mockOrigin) {
+        return candidate.toString();
+      }
+    }
+    const parsed = new URL(trimmed.replace(/^http:\/\//i, "https://"));
     if (parsed.protocol !== "https:") return undefined;
     if (!isAllowedCoverHost(parsed.hostname)) {
       return undefined;

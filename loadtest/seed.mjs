@@ -363,9 +363,6 @@ export function generateDeterministicUserWorkspace({
       const progressValue = isFinished
         ? pages
         : Math.max(5, Math.floor(pages * rng.nextFloat() * 0.85));
-      const progressPercent = isFinished
-        ? 100
-        : Math.min(99, Math.max(1, Math.round((progressValue / pages) * 100)));
 
       // ~10 sessões de leitura por livro lido
       const sessionCount = isFinished ? rng.nextInt(8, 12) : rng.nextInt(2, 4);

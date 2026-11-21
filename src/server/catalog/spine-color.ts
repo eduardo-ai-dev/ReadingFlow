@@ -1,4 +1,5 @@
 import { pickDominantSpinePalette } from "@/features/catalog/spine-color-rules";
+import { getCatalogFetch } from "@/server/catalog/http-client";
 import { validateExternalCoverUrl } from "@/server/security/sanitize";
 
 const MAX_IMAGE_BYTES = 3_000_000;
@@ -8,9 +9,10 @@ async function loadImageBuffer(
   signal?: AbortSignal
 ): Promise<Buffer | null> {
   if (coverUrl.startsWith("data:")) {
-    const match = /^data:image\/(?:png|jpe?g|webp);base64,([A-Za-z0-9+/=]+)$/i.exec(
-      coverUrl
-    );
+    const match =
+      /^data:image\/(?:png|jpe?g|webp);base64,([A-Za-z0-9+/=]+)$/i.exec(
+        coverUrl
+      );
     if (!match?.[1]) return null;
     const buf = Buffer.from(match[1], "base64");
     return buf.byteLength <= MAX_IMAGE_BYTES ? buf : null;
@@ -19,12 +21,16 @@ async function loadImageBuffer(
   const safeUrl = validateExternalCoverUrl(coverUrl);
   if (!safeUrl) return null;
 
-  const res = await fetch(safeUrl, { signal, redirect: "follow" });
+  const catalogFetch = getCatalogFetch();
+  const res = await catalogFetch(safeUrl, { signal, redirect: "follow" });
   if (!res.ok) return null;
   const contentType = res.headers.get("content-type") ?? "";
   if (contentType && !contentType.startsWith("image/")) return null;
   const arrayBuffer = await res.arrayBuffer();
-  if (arrayBuffer.byteLength < 200 || arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
+  if (
+    arrayBuffer.byteLength < 200 ||
+    arrayBuffer.byteLength > MAX_IMAGE_BYTES
+  ) {
     return null;
   }
   return Buffer.from(arrayBuffer);

@@ -138,7 +138,10 @@ function BookCoverBase({
   const isImageLoaded = Boolean(showImage && loadedUrl === normalizedCoverUrl);
   const isInlineOrPrivateUrl = Boolean(
     normalizedCoverUrl?.startsWith("data:") ||
-    normalizedCoverUrl?.startsWith("/api/covers/file/")
+    normalizedCoverUrl?.startsWith("/api/covers/file/") ||
+    /^https?:\/\/(127\.0\.0\.1|localhost):\d+\/covers\//i.test(
+      normalizedCoverUrl ?? ""
+    )
   );
 
   const isCompact = !fillContainer && size === "xs";

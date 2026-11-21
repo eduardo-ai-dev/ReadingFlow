@@ -1,4 +1,5 @@
 import { getServerEnv } from "@/lib/env";
+import { getCatalogFetch } from "@/server/catalog/http-client";
 import {
   sanitizePlainText,
   validateExternalCoverUrl,
@@ -22,10 +23,14 @@ export async function fetchFromBrasilApi(
   isbn13: string,
   signal: AbortSignal
 ): Promise<ResolvedCatalogMetadata | null> {
-  const res = await fetch(`https://brasilapi.com.br/api/isbn/v1/${isbn13}`, {
-    signal,
-    headers: { Accept: "application/json" },
-  });
+  const catalogFetch = getCatalogFetch();
+  const res = await catalogFetch(
+    `https://brasilapi.com.br/api/isbn/v1/${isbn13}`,
+    {
+      signal,
+      headers: { Accept: "application/json" },
+    }
+  );
   if (!res.ok) return null;
   const data = (await res.json()) as {
     title?: string;
@@ -84,7 +89,8 @@ export async function fetchFromGoogleBooks(
     url.searchParams.set("key", env.GOOGLE_BOOKS_API_KEY);
   }
 
-  const res = await fetch(url, {
+  const catalogFetch = getCatalogFetch();
+  const res = await catalogFetch(url, {
     signal,
     headers: { Accept: "application/json" },
   });
@@ -143,7 +149,8 @@ export async function fetchFromOpenLibrary(
   const key = `ISBN:${isbn13}`;
   const url = `https://openlibrary.org/api/books?bibkeys=${encodeURIComponent(key)}&format=json&jscmd=data`;
 
-  const res = await fetch(url, {
+  const catalogFetch = getCatalogFetch();
+  const res = await catalogFetch(url, {
     signal,
     headers: {
       Accept: "application/json",

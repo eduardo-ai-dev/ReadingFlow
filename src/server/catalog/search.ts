@@ -1,4 +1,5 @@
 import { getServerEnv } from "@/lib/env";
+import { getCatalogFetch } from "@/server/catalog/http-client";
 import {
   buildGoogleBooksSearchUrl,
   buildOpenLibrarySearchUrl,
@@ -51,7 +52,7 @@ export async function searchBooksOnline(
   options: SearchBooksOptions = {}
 ): Promise<BookSearchResponse> {
   const env = options.fetchImpl ? null : getServerEnv();
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = getCatalogFetch(options.fetchImpl);
   const apiKey = options.apiKey ?? env?.GOOGLE_BOOKS_API_KEY;
   const userAgent = options.userAgent ?? env?.OPEN_LIBRARY_USER_AGENT;
   const timeoutMs = options.timeoutMs ?? env?.CATALOG_LOOKUP_TIMEOUT_MS ?? 4000;
@@ -68,10 +69,10 @@ export async function searchBooksOnline(
 
   let googleResults: BookSearchResult[] | null = null;
   try {
-    const payload = await fetchJson(
-      buildGoogleBooksSearchUrl(query, apiKey),
-      { signal, fetchImpl }
-    );
+    const payload = await fetchJson(buildGoogleBooksSearchUrl(query, apiKey), {
+      signal,
+      fetchImpl,
+    });
     if (payload !== null) googleResults = normalizeGoogleResponse(payload);
   } catch {
     throwIfClientAborted();
