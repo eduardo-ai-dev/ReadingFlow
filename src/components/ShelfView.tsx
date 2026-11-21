@@ -658,6 +658,643 @@ function getShelfButtons(from: Element | null): HTMLButtonElement[] {
   );
 }
 
+function focusButtonAt(buttons: HTMLButtonElement[], index: number) {
+  buttons[index]?.focus();
+}
+
+const EMPTY_DECOR_LIST: ShelfDecorPlacement[] = [];
+
+interface PackedShelfRowProps {
+  row: PackedDisplayRow;
+  rowIndex: number;
+  shelvesCount: number;
+  shouldVirtualize: boolean;
+  mode: ShelfViewMode;
+  isEdit: boolean;
+  view3dMode: "spines" | "covers";
+  bookDisplayModes: Record<string, BookDisplayMode>;
+  bookTiltDirections: Record<string, "left" | "right">;
+  shelfDecor: ShelfDecorPlacement[];
+  rowActiveBookId: string | number | null;
+  draggingBookIdInRow: string | null;
+  dragOverBookTarget: {
+    bookId: string;
+    position: "before" | "after";
+  } | null;
+  isDropTargetShelf: boolean;
+  isDeleting: boolean;
+  isEditing: boolean;
+  onRemoveDecor?: (shelfKey: string, decorId: string) => void;
+  onSelectBook: (book: NormalizedVirtualBook) => void;
+  setPreviewBookId: (id: string | null) => void;
+  onReorderWithinShelf: (
+    shelf: ShelfRenderGroup,
+    nextBooks: NormalizedVirtualBook[],
+    movedTitle: string,
+    newIndex: number
+  ) => void;
+  onMoveBookAcrossShelves?: (params: MoveBookParams) => void;
+  onEditShelf?: (shelfKey: string) => void;
+  renderShelfEditor?: (shelf: ShelfRenderGroup) => ReactNode;
+  onMoveShelf?: (shelfKey: string, delta: -1 | 1) => void;
+  onDeleteShelf?: (shelfKey: string) => void;
+  onAddBook?: (shelfKey: string) => void;
+  onSortShelfByColor?: (shelfKey: string) => void;
+  setConfirmDeleteKey: (key: string | null) => void;
+  onBookDragStart: (
+    e: DragEvent<HTMLElement>,
+    shelfKey: string,
+    bookId: string | number
+  ) => void;
+  onBookDragOver: (
+    e: DragEvent<HTMLElement>,
+    shelfKey: string,
+    targetId: string | number
+  ) => void;
+  onBookDrop: (
+    e: DragEvent<HTMLElement>,
+    shelf: ShelfRenderGroup,
+    targetId: string | number
+  ) => void;
+  onClearDrag: () => void;
+  onShelfContainerDragOver: (
+    e: DragEvent<HTMLElement>,
+    shelfKey: string
+  ) => void;
+  onShelfContainerDrop: (
+    e: DragEvent<HTMLElement>,
+    shelf: ShelfRenderGroup
+  ) => void;
+}
+
+const PackedShelfRow = memo(function PackedShelfRow({
+  row,
+  rowIndex,
+  shelvesCount,
+  shouldVirtualize,
+  mode,
+  isEdit,
+  view3dMode,
+  bookDisplayModes,
+  bookTiltDirections,
+  shelfDecor,
+  rowActiveBookId,
+  draggingBookIdInRow,
+  dragOverBookTarget,
+  isDropTargetShelf,
+  isDeleting,
+  isEditing,
+  onRemoveDecor,
+  onSelectBook,
+  setPreviewBookId,
+  onReorderWithinShelf,
+  onMoveBookAcrossShelves,
+  onEditShelf,
+  renderShelfEditor,
+  onMoveShelf,
+  onDeleteShelf,
+  onAddBook,
+  onSortShelfByColor,
+  setConfirmDeleteKey,
+  onBookDragStart,
+  onBookDragOver,
+  onBookDrop,
+  onClearDrag,
+  onShelfContainerDragOver,
+  onShelfContainerDrop,
+}: PackedShelfRowProps) {
+  const { sourceShelf: shelf, sourceShelfIndex: shelfIdx } = row;
+  const [focusedIdx, setFocusedIdx] = useState(0);
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const eagerMount = !shouldVirtualize || rowIndex < 4;
+  const [isNearViewport, setIsNearViewport] = useState(eagerMount);
+
+  useEffect(() => {
+    if (!shouldVirtualize || eagerMount) return;
+    const node = rowRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        setIsNearViewport(entry.isIntersecting);
+      },
+      { rootMargin: "420px 0px", threshold: 0 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [shouldVirtualize, eagerMount]);
+
+  const showRowBooks =
+    eagerMount || isNearViewport || rowActiveBookId !== null || isEditing;
+  const currentFocusIdx = Math.min(
+    focusedIdx,
+    Math.max(0, row.books.length - 1)
+  );
+  const rowHeightPx = row.maxBookHeightPx + 14;
+  const rowVisuals = row.visuals;
+
+  const pencil =
+    isEdit && row.isFirstChunk && onEditShelf ? (
+      <button
+        type="button"
+        onClick={() => onEditShelf(shelf.genreKey)}
+        aria-expanded={isEditing}
+        aria-label={`Editar nome e cores de ${shelf.genre}`}
+        className={styles.categoryEditBtn}
+      >
+        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+    ) : null;
+
+  return (
+    <div
+      ref={rowRef}
+      data-genre-shelf={shelf.genreKey}
+      data-shelf-row={row.rowKey}
+      data-shelf-virtualized={shouldVirtualize ? "true" : undefined}
+      data-shelf-row-mounted={showRowBooks ? "true" : "false"}
+      data-arrange-shelf={
+        isEdit && row.isFirstChunk ? shelf.genreKey : undefined
+      }
+      onDragOver={(e) => onShelfContainerDragOver(e, shelf.genreKey)}
+      onDrop={(e) => onShelfContainerDrop(e, shelf)}
+      className={`rf-shelf-row ${styles.shelfSection} ${
+        isDropTargetShelf ? styles.shelfSectionDropActive : ""
+      }`}
+    >
+      {/* 1. Pill de cabeçalho acima de cada prateleira */}
+      <div className={`rf-shelf-header ${styles.shelfHeaderRail}`}>
+        <div className={styles.shelfHeaderBadges}>
+          {shelf.kind === "color" ? (
+            <div
+              data-shelf-pill="true"
+              className={styles.colorDotsPill}
+              role="group"
+              aria-label={`Cores da prateleira ${shelf.genre}`}
+            >
+              {isEdit && row.isFirstChunk && onSortShelfByColor ? (
+                <button
+                  type="button"
+                  onClick={() => onSortShelfByColor(shelf.genreKey)}
+                  title="Ordenar livros desta prateleira por cor"
+                  aria-label={`Ordenar livros de ${shelf.genre} por cor`}
+                  className={styles.dotsSortBtn}
+                >
+                  {row.colors.map((hex, i) => (
+                    <span
+                      key={`${row.rowKey}-dot-${i}`}
+                      className={styles.colorDotItem}
+                      style={{ backgroundColor: hex }}
+                      aria-hidden="true"
+                    />
+                  ))}
+                </button>
+              ) : (
+                row.colors.map((hex, i) => (
+                  <span
+                    key={`${row.rowKey}-dot-${i}`}
+                    className={styles.colorDotItem}
+                    style={{ backgroundColor: hex }}
+                    aria-hidden="true"
+                  />
+                ))
+              )}
+              {pencil}
+            </div>
+          ) : (
+            <div data-shelf-pill="true" className={styles.categoryPill}>
+              <span>{shelf.genre}</span>
+              {pencil}
+            </div>
+          )}
+        </div>
+
+        {isEdit && row.isFirstChunk ? (
+          <div className={styles.headerActionsPill}>
+            {shelf.kind === "title" && onSortShelfByColor ? (
+              <button
+                type="button"
+                onClick={() => onSortShelfByColor(shelf.genreKey)}
+                title="Ordenar por cor"
+                aria-label={`Ordenar livros de ${shelf.genre} por cor`}
+                className={styles.headerIconBtn}
+              >
+                <Palette className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              disabled={shelfIdx === 0}
+              onClick={() => onMoveShelf?.(shelf.genreKey, -1)}
+              aria-label={`Subir prateleira ${shelf.genre}`}
+              className={styles.headerIconBtn}
+            >
+              <ChevronUp className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              disabled={shelfIdx === shelvesCount - 1}
+              onClick={() => onMoveShelf?.(shelf.genreKey, 1)}
+              aria-label={`Descer prateleira ${shelf.genre}`}
+              className={styles.headerIconBtn}
+            >
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            </button>
+            {shelvesCount > 1 && onDeleteShelf ? (
+              isDeleting ? (
+                <span className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDeleteShelf(shelf.genreKey);
+                      setConfirmDeleteKey(null);
+                    }}
+                    className={styles.confirmDeleteBtn}
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteKey(null)}
+                    className={styles.cancelDeleteBtn}
+                  >
+                    Cancelar
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteKey(shelf.genreKey)}
+                  aria-label={`Excluir prateleira ${shelf.genre}`}
+                  className={styles.headerIconBtn}
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              )
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      {isEditing && renderShelfEditor ? renderShelfEditor(shelf) : null}
+
+      {/* 2. Fileira de livros (altura = livro mais alto + 14px) -> 3. Tábua de madeira quente */}
+      <div className={styles.shelfTier}>
+        <div
+          className={styles.shelfScroller}
+          tabIndex={0}
+          role="region"
+          aria-label={`Prateleira ${shelf.genre}`}
+        >
+          <div className={styles.shelfTrack}>
+            <ul
+              aria-label={`Prateleira de ${shelf.genre}`}
+              className={`${styles.booksRow} ${
+                view3dMode === "covers" ? "rf-covers-mode" : ""
+              }`}
+              style={
+                {
+                  "--row-h": `${rowHeightPx}px`,
+                } as CSSProperties
+              }
+            >
+              {showRowBooks ? (
+                <>
+                  {/* Objetos decorativos posicionados no início da prateleira */}
+                  {row.isFirstChunk
+                    ? shelfDecor
+                        .filter((d) => d.afterBookIndex < 0)
+                        .map((decor) => (
+                          <ShelfDecorObject
+                            key={decor.id}
+                            id={decor.id}
+                            decorType={decor.decorType}
+                            mode={mode}
+                            onRemove={
+                              onRemoveDecor
+                                ? (id) => onRemoveDecor(shelf.genreKey, id)
+                                : undefined
+                            }
+                          />
+                        ))
+                    : null}
+
+                  {row.books.map((book, idx) => {
+                    const visual = rowVisuals[idx]!;
+                    const bookIdStr = String(book.id);
+                    const globalIdx = row.startBookIndex + idx;
+                    const displayMode =
+                      bookDisplayModes[bookIdStr] ?? "lombada";
+                    const tiltDir = bookTiltDirections[bookIdStr] ?? "right";
+                    const inlineDecors = shelfDecor.filter(
+                      (d) => d.afterBookIndex === globalIdx
+                    );
+                    const isBookDragging = draggingBookIdInRow === bookIdStr;
+                    const dropPos =
+                      dragOverBookTarget &&
+                      dragOverBookTarget.bookId === bookIdStr
+                        ? dragOverBookTarget.position
+                        : null;
+                    const canDrag =
+                      !book.isWishlist &&
+                      (isEdit ||
+                        shelf.books.length >= 2 ||
+                        Boolean(onMoveBookAcrossShelves));
+
+                    const handleBookKeyDown = (
+                      e: React.KeyboardEvent<HTMLElement>
+                    ) => {
+                      const total = row.books.length;
+                      if (total === 0) return;
+                      const buttons = getShelfButtons(e.currentTarget);
+
+                      if (
+                        e.altKey &&
+                        (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
+                        !book.isWishlist &&
+                        shelf.books.length >= 2
+                      ) {
+                        e.preventDefault();
+                        const fullIdx = shelf.books.findIndex(
+                          (b) => b.id === book.id
+                        );
+                        const targetIdx =
+                          fullIdx + (e.key === "ArrowRight" ? 1 : -1);
+                        if (
+                          fullIdx < 0 ||
+                          targetIdx < 0 ||
+                          targetIdx >= shelf.books.length
+                        ) {
+                          return;
+                        }
+                        const copy = [...shelf.books];
+                        const [moved] = copy.splice(fullIdx, 1);
+                        if (!moved) return;
+                        copy.splice(targetIdx, 0, moved);
+                        onReorderWithinShelf(
+                          shelf,
+                          copy,
+                          moved.title,
+                          targetIdx
+                        );
+                        return;
+                      }
+
+                      let nextIdx: number | null = null;
+                      if (e.key === "ArrowRight") nextIdx = (idx + 1) % total;
+                      else if (e.key === "ArrowLeft")
+                        nextIdx = (idx - 1 + total) % total;
+                      else if (e.key === "Home") nextIdx = 0;
+                      else if (e.key === "End") nextIdx = total - 1;
+                      if (nextIdx === null) return;
+
+                      e.preventDefault();
+                      setFocusedIdx(nextIdx);
+                      focusButtonAt(buttons, nextIdx);
+                    };
+
+                    const bookLayout = measureBookRenderLayout(book, {
+                      displayMode,
+                      view3dMode,
+                    });
+                    const coverShowcaseHeight =
+                      bookLayout.coverShowcaseHeightPx;
+                    const coverShowcaseWidth = bookLayout.coverShowcaseWidthPx;
+                    const bookGroupGapPx = row.groupBreakIndices.includes(idx)
+                      ? row.groupGapPx
+                      : 0;
+
+                    return (
+                      <Fragment key={book.id}>
+                        {displayMode === "capa_frente" ? (
+                          <li
+                            data-book-display="capa_frente"
+                            data-group-start={
+                              bookGroupGapPx > 0 ? "true" : undefined
+                            }
+                            style={
+                              bookGroupGapPx > 0
+                                ? ({
+                                    "--rf-group-gap": `${bookGroupGapPx}px`,
+                                  } as CSSProperties)
+                                : undefined
+                            }
+                            draggable={canDrag}
+                            onDragStart={(e) =>
+                              onBookDragStart(e, shelf.genreKey, book.id)
+                            }
+                            onDragOver={(e) =>
+                              onBookDragOver(e, shelf.genreKey, book.id)
+                            }
+                            onDrop={(e) => onBookDrop(e, shelf, book.id)}
+                            onDragEnd={onClearDrag}
+                            className={`${styles.bookFrontSlot} ${
+                              rowActiveBookId === book.id
+                                ? styles.bookFrontSelected
+                                : ""
+                            } ${
+                              dropPos === "before"
+                                ? styles.bookFrontDropBefore
+                                : dropPos === "after"
+                                  ? styles.bookFrontDropAfter
+                                  : ""
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              className={`rf-book-prism ${styles.bookFrontButton}`}
+                              aria-label={`${book.title}${book.author ? `, ${book.author}` : ""} — capa em destaque`}
+                              aria-pressed={rowActiveBookId === book.id}
+                              tabIndex={currentFocusIdx === idx ? 0 : -1}
+                              onMouseEnter={() => setPreviewBookId(bookIdStr)}
+                              onFocus={() => setPreviewBookId(bookIdStr)}
+                              onKeyDown={handleBookKeyDown}
+                              onClick={() => {
+                                setPreviewBookId(bookIdStr);
+                                onSelectBook(book);
+                              }}
+                            >
+                              <span
+                                className={styles.bookFrontCoverFrame}
+                                style={{
+                                  width: `${coverShowcaseWidth}px`,
+                                  height: `${coverShowcaseHeight}px`,
+                                }}
+                              >
+                                <BookCover
+                                  fillContainer
+                                  title={book.title}
+                                  author={book.author}
+                                  coverUrl={book.coverUrl}
+                                  spineColor={visual.spineBg}
+                                  spineAccent={visual.spineAccentHex}
+                                  seed={book.resolvedSeed}
+                                  readingStatus={book.readingStatus}
+                                  isWishlist={book.isWishlist}
+                                  progressPercent={book.progressPercent ?? 0}
+                                  sizes="112px"
+                                  className="rounded-none border-0 shadow-none"
+                                />
+                              </span>
+                            </button>
+                          </li>
+                        ) : (
+                          <Book3D
+                            groupGapPx={bookGroupGapPx}
+                            className={
+                              displayMode === "inclinado"
+                                ? `${styles.bookTiltedWrap} ${
+                                    tiltDir === "left"
+                                      ? styles.bookTiltedLeft
+                                      : styles.bookTiltedRight
+                                  }`
+                                : undefined
+                            }
+                            pages={book.pages}
+                            format={book.realisticFormat}
+                            title={book.title}
+                            author={book.author}
+                            authorSurname={book.authorSurname}
+                            publisher={book.publisher}
+                            seed={book.resolvedSeed}
+                            color={visual.spineBg}
+                            accentColor={visual.spineAccentHex}
+                            avoidNeighborHex={visual.avoidNeighborHex}
+                            spineTemplate={visual.template}
+                            publisherMark={book.publisherMark}
+                            textColor={visual.spineInk}
+                            coverUrl={book.coverUrl}
+                            readingStatus={book.readingStatus}
+                            isWishlist={book.isWishlist}
+                            progressPercent={book.progressPercent ?? 0}
+                            showCoverFace={view3dMode === "covers"}
+                            draggable={canDrag}
+                            isDragging={isBookDragging}
+                            dropPosition={dropPos}
+                            onDragStart={(e) =>
+                              onBookDragStart(e, shelf.genreKey, book.id)
+                            }
+                            onDragOver={(e) =>
+                              onBookDragOver(e, shelf.genreKey, book.id)
+                            }
+                            onDrop={(e) => onBookDrop(e, shelf, book.id)}
+                            onDragEnd={onClearDrag}
+                            onHoverBook={() => setPreviewBookId(bookIdStr)}
+                            onFocusBook={() => setPreviewBookId(bookIdStr)}
+                            tabIndex={currentFocusIdx === idx ? 0 : -1}
+                            onKeyDown={handleBookKeyDown}
+                            isSelected={rowActiveBookId === book.id}
+                            suppressSelectedTooltip={isEdit}
+                            onActivate={() => {
+                              setPreviewBookId(bookIdStr);
+                              onSelectBook(book);
+                            }}
+                          />
+                        )}
+
+                        {inlineDecors.map((decor) => (
+                          <ShelfDecorObject
+                            key={decor.id}
+                            id={decor.id}
+                            decorType={decor.decorType}
+                            mode={mode}
+                            onRemove={
+                              onRemoveDecor
+                                ? (id) => onRemoveDecor(shelf.genreKey, id)
+                                : undefined
+                            }
+                          />
+                        ))}
+                      </Fragment>
+                    );
+                  })}
+
+                  {/* Objetos decorativos posicionados ao final da prateleira */}
+                  {row.isLastChunk
+                    ? shelfDecor
+                        .filter((d) => d.afterBookIndex >= shelf.books.length)
+                        .map((decor) => (
+                          <ShelfDecorObject
+                            key={decor.id}
+                            id={decor.id}
+                            decorType={decor.decorType}
+                            mode={mode}
+                            onRemove={
+                              onRemoveDecor
+                                ? (id) => onRemoveDecor(shelf.genreKey, id)
+                                : undefined
+                            }
+                          />
+                        ))
+                    : null}
+
+                  {/* Aparador de livros em L (CSS puro) quando sobra espaço confortável na tábua e não há decor custom */}
+                  {!isEdit &&
+                  row.books.length > 0 &&
+                  shelfDecor.length === 0 &&
+                  row.rowBooksWidthPx + SHELF_BOOKEND_WIDTH_PX + 6 <=
+                    row.effectiveMaxRowW ? (
+                    <li
+                      className={styles.bookendSlot}
+                      data-bookend="true"
+                      aria-hidden="true"
+                    >
+                      <span className={styles.bookendUpright}>
+                        <span className={styles.bookendBrassTrim} />
+                      </span>
+                      <span className={styles.bookendFoot} />
+                      <span className={styles.bookendShadow} />
+                    </li>
+                  ) : null}
+
+                  {/* Modo edição: "+" no vão ao final da prateleira */}
+                  {isEdit && row.isLastChunk && onAddBook ? (
+                    <li className={styles.addRoundSlot}>
+                      <button
+                        type="button"
+                        onClick={() => onAddBook(shelf.genreKey)}
+                        aria-label={`Adicionar livro à prateleira ${shelf.genre}`}
+                        className={styles.addRoundBtn}
+                      >
+                        <Plus className="h-5 w-5" aria-hidden="true" />
+                      </button>
+                    </li>
+                  ) : null}
+                </>
+              ) : (
+                <li
+                  aria-hidden="true"
+                  style={{
+                    width: `${Math.max(120, row.rowBooksWidthPx)}px`,
+                    height: `${row.maxBookHeightPx}px`,
+                  }}
+                />
+              )}
+            </ul>
+
+            <div
+              className={`rf-shelf-plank ${styles.shelfPlank}`}
+              aria-hidden="true"
+            >
+              <span className={styles.shelfLedStrip} />
+              <span
+                className={`rf-shelf-bracket ${styles.shelfBracket} ${styles.shelfBracketLeft}`}
+              />
+              <span
+                className={`rf-shelf-bracket ${styles.shelfBracket} ${styles.shelfBracketRight}`}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export function ShelfView({
   mode = "view",
   shelfMaterial = "classic-wood",
@@ -704,9 +1341,6 @@ export function ShelfView({
   } | null>(null);
   const [dragOverShelfKey, setDragOverShelfKey] = useState<string | null>(null);
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
-  const [focusedIndexByRow, setFocusedIndexByRow] = useState<
-    Record<string, number>
-  >({});
   const [previewStore] = useState<PreviewStore>(() => createPreviewStore());
   const setPreviewBookId = useCallback(
     (id: string | null) => {
@@ -850,141 +1484,143 @@ export function ShelfView({
   ]);
 
   const bookcaseWidthPx = FIXED_SHELF_WIDTH_PX;
+  const shouldVirtualizeRows = totalBooksCount > 60 && packedRows.length > 5;
 
-  const clearDrag = () => {
+  const clearDrag = useCallback(() => {
     draggingBookRef.current = null;
     dragOverTargetRef.current = null;
     setDraggingBook(null);
     setDragOverTarget(null);
     setDragOverShelfKey(null);
-  };
+  }, []);
 
-  const handleBookDragStart = (
-    e: DragEvent<HTMLElement>,
-    shelfKey: string,
-    bookId: string | number
-  ) => {
-    const idStr = String(bookId);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", idStr);
-    const payload = { shelfKey, bookId: idStr };
-    draggingBookRef.current = payload;
-    setDraggingBook(payload);
-  };
+  const handleBookDragStart = useCallback(
+    (e: DragEvent<HTMLElement>, shelfKey: string, bookId: string | number) => {
+      const idStr = String(bookId);
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", idStr);
+      const payload = { shelfKey, bookId: idStr };
+      draggingBookRef.current = payload;
+      setDraggingBook(payload);
+    },
+    []
+  );
 
-  const handleBookDragOver = (
-    e: DragEvent<HTMLElement>,
-    shelfKey: string,
-    targetId: string | number
-  ) => {
-    const currentDrag = draggingBookRef.current;
-    if (!currentDrag) return;
-    const isCrossShelf = currentDrag.shelfKey !== shelfKey;
-    if (isCrossShelf && !onMoveBookAcrossShelves) return;
+  const handleBookDragOver = useCallback(
+    (
+      e: DragEvent<HTMLElement>,
+      shelfKey: string,
+      targetId: string | number
+    ) => {
+      const currentDrag = draggingBookRef.current;
+      if (!currentDrag) return;
+      const isCrossShelf = currentDrag.shelfKey !== shelfKey;
+      if (isCrossShelf && !onMoveBookAcrossShelves) return;
 
-    const targetStr = String(targetId);
-    if (!isCrossShelf && currentDrag.bookId === targetStr) return;
+      const targetStr = String(targetId);
+      if (!isCrossShelf && currentDrag.bookId === targetStr) return;
 
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = "move";
-    setDragOverShelfKey(shelfKey);
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "move";
+      setDragOverShelfKey(shelfKey);
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pos: "before" | "after" =
-      e.clientX >= rect.left + rect.width / 2 ? "after" : "before";
+      const rect = e.currentTarget.getBoundingClientRect();
+      const pos: "before" | "after" =
+        e.clientX >= rect.left + rect.width / 2 ? "after" : "before";
 
-    const nextTarget = { shelfKey, bookId: targetStr, position: pos };
-    dragOverTargetRef.current = nextTarget;
-    setDragOverTarget((prev) =>
-      prev &&
-      prev.shelfKey === shelfKey &&
-      prev.bookId === targetStr &&
-      prev.position === pos
-        ? prev
-        : nextTarget
-    );
-  };
+      const nextTarget = { shelfKey, bookId: targetStr, position: pos };
+      dragOverTargetRef.current = nextTarget;
+      setDragOverTarget((prev) =>
+        prev &&
+        prev.shelfKey === shelfKey &&
+        prev.bookId === targetStr &&
+        prev.position === pos
+          ? prev
+          : nextTarget
+      );
+    },
+    [onMoveBookAcrossShelves]
+  );
 
-  const handleBookDrop = (
-    e: DragEvent<HTMLElement>,
-    shelf: ShelfRenderGroup,
-    targetId: string | number
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const currentDrag = draggingBookRef.current;
-    if (!currentDrag) {
+  const handleBookDrop = useCallback(
+    (
+      e: DragEvent<HTMLElement>,
+      shelf: ShelfRenderGroup,
+      targetId: string | number
+    ) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const currentDrag = draggingBookRef.current;
+      if (!currentDrag) {
+        clearDrag();
+        return;
+      }
+
+      const targetStr = String(targetId);
+      const currentTarget = dragOverTargetRef.current;
+      const pos =
+        currentTarget &&
+        currentTarget.shelfKey === shelf.genreKey &&
+        currentTarget.bookId === targetStr
+          ? currentTarget.position
+          : "before";
+
+      if (currentDrag.shelfKey !== shelf.genreKey) {
+        onMoveBookAcrossShelves?.({
+          bookId: currentDrag.bookId,
+          fromShelfKey: currentDrag.shelfKey,
+          toShelfKey: shelf.genreKey,
+          targetBookId: targetStr,
+          position: pos,
+        });
+      } else {
+        const reordered = reorderBookListByMove(
+          shelf.books,
+          currentDrag.bookId,
+          targetStr,
+          pos
+        );
+        const newIndex = reordered.findIndex(
+          (b) => String(b.id) === currentDrag.bookId
+        );
+        const movedBook = reordered[newIndex];
+        if (movedBook && newIndex >= 0) {
+          onReorderWithinShelf(shelf, reordered, movedBook.title, newIndex);
+        }
+      }
       clearDrag();
-      return;
-    }
+    },
+    [clearDrag, onMoveBookAcrossShelves, onReorderWithinShelf]
+  );
 
-    const targetStr = String(targetId);
-    const currentTarget = dragOverTargetRef.current;
-    const pos =
-      currentTarget &&
-      currentTarget.shelfKey === shelf.genreKey &&
-      currentTarget.bookId === targetStr
-        ? currentTarget.position
-        : "before";
+  const handleShelfContainerDragOver = useCallback(
+    (e: DragEvent<HTMLElement>, shelfKey: string) => {
+      const currentDrag = draggingBookRef.current;
+      if (!currentDrag || !onMoveBookAcrossShelves) return;
+      if (currentDrag.shelfKey === shelfKey) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      setDragOverShelfKey((prev) => (prev === shelfKey ? prev : shelfKey));
+    },
+    [onMoveBookAcrossShelves]
+  );
 
-    if (currentDrag.shelfKey !== shelf.genreKey) {
-      onMoveBookAcrossShelves?.({
+  const handleShelfContainerDrop = useCallback(
+    (e: DragEvent<HTMLElement>, shelf: ShelfRenderGroup) => {
+      const currentDrag = draggingBookRef.current;
+      if (!currentDrag || !onMoveBookAcrossShelves) return;
+      if (currentDrag.shelfKey === shelf.genreKey) return;
+      e.preventDefault();
+      onMoveBookAcrossShelves({
         bookId: currentDrag.bookId,
         fromShelfKey: currentDrag.shelfKey,
         toShelfKey: shelf.genreKey,
-        targetBookId: targetStr,
-        position: pos,
       });
-    } else {
-      const reordered = reorderBookListByMove(
-        shelf.books,
-        currentDrag.bookId,
-        targetStr,
-        pos
-      );
-      const newIndex = reordered.findIndex(
-        (b) => String(b.id) === currentDrag.bookId
-      );
-      const movedBook = reordered[newIndex];
-      if (movedBook && newIndex >= 0) {
-        onReorderWithinShelf(shelf, reordered, movedBook.title, newIndex);
-      }
-    }
-    clearDrag();
-  };
-
-  const handleShelfContainerDragOver = (
-    e: DragEvent<HTMLElement>,
-    shelfKey: string
-  ) => {
-    const currentDrag = draggingBookRef.current;
-    if (!currentDrag || !onMoveBookAcrossShelves) return;
-    if (currentDrag.shelfKey === shelfKey) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (dragOverShelfKey !== shelfKey) setDragOverShelfKey(shelfKey);
-  };
-
-  const handleShelfContainerDrop = (
-    e: DragEvent<HTMLElement>,
-    shelf: ShelfRenderGroup
-  ) => {
-    const currentDrag = draggingBookRef.current;
-    if (!currentDrag || !onMoveBookAcrossShelves) return;
-    if (currentDrag.shelfKey === shelf.genreKey) return;
-    e.preventDefault();
-    onMoveBookAcrossShelves({
-      bookId: currentDrag.bookId,
-      fromShelfKey: currentDrag.shelfKey,
-      toShelfKey: shelf.genreKey,
-    });
-    clearDrag();
-  };
-
-  const focusButtonAt = (buttons: HTMLButtonElement[], index: number) => {
-    buttons[index]?.focus();
-  };
+      clearDrag();
+    },
+    [clearDrag, onMoveBookAcrossShelves]
+  );
 
   const bookcaseElement = (
     <div
@@ -1000,6 +1636,7 @@ export function ShelfView({
       data-shelf-led={resolvedThemeConfig.ledWarm3000K ? "on" : "off"}
       data-shelf-spotlights={resolvedThemeConfig.topSpotlights ? "on" : "off"}
       data-shelf-density={resolvedThemeConfig.density}
+      data-total-books={totalBooksCount}
       className={styles.bookcase}
       style={
         {
@@ -1013,529 +1650,68 @@ export function ShelfView({
         <span className={styles.topSpotDot} />
       </div>
       <div className={styles.shelvesColumn}>
-        {packedRows.map((row) => {
-          const { sourceShelf: shelf, sourceShelfIndex: shelfIdx } = row;
-          const currentFocusIdx = focusedIndexByRow[row.rowKey] ?? 0;
-          const isDropTargetShelf =
-            dragOverShelfKey === shelf.genreKey &&
-            draggingBook?.shelfKey !== shelf.genreKey;
-          const isDeleting = confirmDeleteKey === shelf.genreKey;
-          const isEditing =
-            row.isFirstChunk && editingShelfKey === shelf.genreKey;
-          const rowHeightPx = row.maxBookHeightPx + 14;
-          const rowVisuals = row.visuals;
-
-          const pencil =
-            isEdit && row.isFirstChunk && onEditShelf ? (
-              <button
-                type="button"
-                onClick={() => onEditShelf(shelf.genreKey)}
-                aria-expanded={isEditing}
-                aria-label={`Editar nome e cores de ${shelf.genre}`}
-                className={styles.categoryEditBtn}
-              >
-                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            ) : null;
+        {packedRows.map((row, rowIndex) => {
+          const { sourceShelf: shelf } = row;
+          const rowHasActive =
+            activeBookId !== null &&
+            activeBookId !== undefined &&
+            row.books.some((b) => String(b.id) === String(activeBookId));
+          const rowActiveBookId = rowHasActive ? activeBookId : null;
+          const draggingInRow =
+            draggingBook?.shelfKey === shelf.genreKey &&
+            row.books.some((b) => String(b.id) === draggingBook.bookId)
+              ? draggingBook.bookId
+              : null;
+          const rowDropTarget =
+            dragOverTarget?.shelfKey === shelf.genreKey &&
+            row.books.some((b) => String(b.id) === dragOverTarget.bookId)
+              ? {
+                  bookId: dragOverTarget.bookId,
+                  position: dragOverTarget.position,
+                }
+              : null;
 
           return (
-            <div
+            <PackedShelfRow
               key={row.rowKey}
-              data-genre-shelf={shelf.genreKey}
-              data-shelf-row={row.rowKey}
-              data-arrange-shelf={
-                isEdit && row.isFirstChunk ? shelf.genreKey : undefined
+              row={row}
+              rowIndex={rowIndex}
+              shelvesCount={shelves.length}
+              shouldVirtualize={shouldVirtualizeRows}
+              mode={mode}
+              isEdit={isEdit}
+              view3dMode={view3dMode}
+              bookDisplayModes={bookDisplayModes}
+              bookTiltDirections={bookTiltDirections}
+              shelfDecor={shelfDecorByRow[shelf.genreKey] ?? EMPTY_DECOR_LIST}
+              rowActiveBookId={rowActiveBookId}
+              draggingBookIdInRow={draggingInRow}
+              dragOverBookTarget={rowDropTarget}
+              isDropTargetShelf={
+                dragOverShelfKey === shelf.genreKey &&
+                draggingBook?.shelfKey !== shelf.genreKey
               }
-              onDragOver={(e) =>
-                handleShelfContainerDragOver(e, shelf.genreKey)
-              }
-              onDrop={(e) => handleShelfContainerDrop(e, shelf)}
-              className={`rf-shelf-row ${styles.shelfSection} ${
-                isDropTargetShelf ? styles.shelfSectionDropActive : ""
-              }`}
-            >
-              {/* 1. Pill de cabeçalho acima de cada prateleira */}
-              <div className={`rf-shelf-header ${styles.shelfHeaderRail}`}>
-                <div className={styles.shelfHeaderBadges}>
-                  {shelf.kind === "color" ? (
-                    <div
-                      data-shelf-pill="true"
-                      className={styles.colorDotsPill}
-                      role="group"
-                      aria-label={`Cores da prateleira ${shelf.genre}`}
-                    >
-                      {isEdit && row.isFirstChunk && onSortShelfByColor ? (
-                        <button
-                          type="button"
-                          onClick={() => onSortShelfByColor(shelf.genreKey)}
-                          title="Ordenar livros desta prateleira por cor"
-                          aria-label={`Ordenar livros de ${shelf.genre} por cor`}
-                          className={styles.dotsSortBtn}
-                        >
-                          {row.colors.map((hex, i) => (
-                            <span
-                              key={`${row.rowKey}-dot-${i}`}
-                              className={styles.colorDotItem}
-                              style={{ backgroundColor: hex }}
-                              aria-hidden="true"
-                            />
-                          ))}
-                        </button>
-                      ) : (
-                        row.colors.map((hex, i) => (
-                          <span
-                            key={`${row.rowKey}-dot-${i}`}
-                            className={styles.colorDotItem}
-                            style={{ backgroundColor: hex }}
-                            aria-hidden="true"
-                          />
-                        ))
-                      )}
-                      {pencil}
-                    </div>
-                  ) : (
-                    <div data-shelf-pill="true" className={styles.categoryPill}>
-                      <span>{shelf.genre}</span>
-                      {pencil}
-                    </div>
-                  )}
-                </div>
-
-                {isEdit && row.isFirstChunk ? (
-                  <div className={styles.headerActionsPill}>
-                    {shelf.kind === "title" && onSortShelfByColor ? (
-                      <button
-                        type="button"
-                        onClick={() => onSortShelfByColor(shelf.genreKey)}
-                        title="Ordenar por cor"
-                        aria-label={`Ordenar livros de ${shelf.genre} por cor`}
-                        className={styles.headerIconBtn}
-                      >
-                        <Palette className="h-3.5 w-3.5" aria-hidden="true" />
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      disabled={shelfIdx === 0}
-                      onClick={() => onMoveShelf?.(shelf.genreKey, -1)}
-                      aria-label={`Subir prateleira ${shelf.genre}`}
-                      className={styles.headerIconBtn}
-                    >
-                      <ChevronUp className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={shelfIdx === shelves.length - 1}
-                      onClick={() => onMoveShelf?.(shelf.genreKey, 1)}
-                      aria-label={`Descer prateleira ${shelf.genre}`}
-                      className={styles.headerIconBtn}
-                    >
-                      <ChevronDown className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                    {shelves.length > 1 && onDeleteShelf ? (
-                      isDeleting ? (
-                        <span className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onDeleteShelf(shelf.genreKey);
-                              setConfirmDeleteKey(null);
-                            }}
-                            className={styles.confirmDeleteBtn}
-                          >
-                            Confirmar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteKey(null)}
-                            className={styles.cancelDeleteBtn}
-                          >
-                            Cancelar
-                          </button>
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteKey(shelf.genreKey)}
-                          aria-label={`Excluir prateleira ${shelf.genre}`}
-                          className={styles.headerIconBtn}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                      )
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-
-              {isEditing && renderShelfEditor ? renderShelfEditor(shelf) : null}
-
-              {/* 2. Fileira de livros (altura = livro mais alto + 14px) -> 3. Tábua de madeira quente */}
-              <div className={styles.shelfTier}>
-                <div
-                  className={styles.shelfScroller}
-                  tabIndex={0}
-                  role="region"
-                  aria-label={`Prateleira ${shelf.genre}`}
-                >
-                  <div className={styles.shelfTrack}>
-                    <ul
-                      aria-label={`Prateleira de ${shelf.genre}`}
-                      className={`${styles.booksRow} ${
-                        view3dMode === "covers" ? "rf-covers-mode" : ""
-                      }`}
-                      style={
-                        {
-                          "--row-h": `${rowHeightPx}px`,
-                        } as CSSProperties
-                      }
-                    >
-                      {/* Objetos decorativos posicionados no início da prateleira */}
-                      {row.isFirstChunk
-                        ? (shelfDecorByRow[shelf.genreKey] ?? [])
-                            .filter((d) => d.afterBookIndex < 0)
-                            .map((decor) => (
-                              <ShelfDecorObject
-                                key={decor.id}
-                                id={decor.id}
-                                decorType={decor.decorType}
-                                mode={mode}
-                                onRemove={
-                                  onRemoveDecor
-                                    ? (id) => onRemoveDecor(shelf.genreKey, id)
-                                    : undefined
-                                }
-                              />
-                            ))
-                        : null}
-
-                      {row.books.map((book, idx) => {
-                        const visual = rowVisuals[idx]!;
-                        const bookIdStr = String(book.id);
-                        const globalIdx = row.startBookIndex + idx;
-                        const displayMode =
-                          bookDisplayModes[bookIdStr] ?? "lombada";
-                        const tiltDir =
-                          bookTiltDirections[bookIdStr] ?? "right";
-                        const inlineDecors = (
-                          shelfDecorByRow[shelf.genreKey] ?? []
-                        ).filter((d) => d.afterBookIndex === globalIdx);
-                        const isBookDragging =
-                          draggingBook?.shelfKey === shelf.genreKey &&
-                          draggingBook.bookId === bookIdStr;
-                        const dropPos =
-                          dragOverTarget?.shelfKey === shelf.genreKey &&
-                          dragOverTarget.bookId === bookIdStr
-                            ? dragOverTarget.position
-                            : null;
-                        const canDrag =
-                          !book.isWishlist &&
-                          (isEdit ||
-                            shelf.books.length >= 2 ||
-                            Boolean(onMoveBookAcrossShelves));
-
-                        const handleBookKeyDown = (
-                          e: React.KeyboardEvent<HTMLElement>
-                        ) => {
-                          const total = row.books.length;
-                          if (total === 0) return;
-                          const buttons = getShelfButtons(e.currentTarget);
-
-                          if (
-                            e.altKey &&
-                            (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
-                            !book.isWishlist &&
-                            shelf.books.length >= 2
-                          ) {
-                            e.preventDefault();
-                            const fullIdx = shelf.books.findIndex(
-                              (b) => b.id === book.id
-                            );
-                            const targetIdx =
-                              fullIdx + (e.key === "ArrowRight" ? 1 : -1);
-                            if (
-                              fullIdx < 0 ||
-                              targetIdx < 0 ||
-                              targetIdx >= shelf.books.length
-                            ) {
-                              return;
-                            }
-                            const copy = [...shelf.books];
-                            const [moved] = copy.splice(fullIdx, 1);
-                            if (!moved) return;
-                            copy.splice(targetIdx, 0, moved);
-                            onReorderWithinShelf(
-                              shelf,
-                              copy,
-                              moved.title,
-                              targetIdx
-                            );
-                            return;
-                          }
-
-                          let nextIdx: number | null = null;
-                          if (e.key === "ArrowRight")
-                            nextIdx = (idx + 1) % total;
-                          else if (e.key === "ArrowLeft")
-                            nextIdx = (idx - 1 + total) % total;
-                          else if (e.key === "Home") nextIdx = 0;
-                          else if (e.key === "End") nextIdx = total - 1;
-                          if (nextIdx === null) return;
-
-                          e.preventDefault();
-                          setFocusedIndexByRow((prev) => ({
-                            ...prev,
-                            [row.rowKey]: nextIdx,
-                          }));
-                          focusButtonAt(buttons, nextIdx);
-                        };
-
-                        const bookLayout = measureBookRenderLayout(book, {
-                          displayMode,
-                          view3dMode,
-                        });
-                        const coverShowcaseHeight =
-                          bookLayout.coverShowcaseHeightPx;
-                        const coverShowcaseWidth =
-                          bookLayout.coverShowcaseWidthPx;
-                        const bookGroupGapPx = row.groupBreakIndices.includes(
-                          idx
-                        )
-                          ? row.groupGapPx
-                          : 0;
-
-                        return (
-                          <Fragment key={book.id}>
-                            {displayMode === "capa_frente" ? (
-                              <li
-                                data-book-display="capa_frente"
-                                data-group-start={
-                                  bookGroupGapPx > 0 ? "true" : undefined
-                                }
-                                style={
-                                  bookGroupGapPx > 0
-                                    ? ({
-                                        "--rf-group-gap": `${bookGroupGapPx}px`,
-                                      } as CSSProperties)
-                                    : undefined
-                                }
-                                draggable={canDrag}
-                                onDragStart={(e) =>
-                                  handleBookDragStart(
-                                    e,
-                                    shelf.genreKey,
-                                    book.id
-                                  )
-                                }
-                                onDragOver={(e) =>
-                                  handleBookDragOver(e, shelf.genreKey, book.id)
-                                }
-                                onDrop={(e) =>
-                                  handleBookDrop(e, shelf, book.id)
-                                }
-                                onDragEnd={clearDrag}
-                                className={`${styles.bookFrontSlot} ${
-                                  activeBookId === book.id
-                                    ? styles.bookFrontSelected
-                                    : ""
-                                } ${
-                                  dropPos === "before"
-                                    ? styles.bookFrontDropBefore
-                                    : dropPos === "after"
-                                      ? styles.bookFrontDropAfter
-                                      : ""
-                                }`}
-                              >
-                                <button
-                                  type="button"
-                                  className={`rf-book-prism ${styles.bookFrontButton}`}
-                                  aria-label={`${book.title}${book.author ? `, ${book.author}` : ""} — capa em destaque`}
-                                  aria-pressed={activeBookId === book.id}
-                                  tabIndex={currentFocusIdx === idx ? 0 : -1}
-                                  onMouseEnter={() =>
-                                    setPreviewBookId(bookIdStr)
-                                  }
-                                  onFocus={() => setPreviewBookId(bookIdStr)}
-                                  onKeyDown={handleBookKeyDown}
-                                  onClick={() => {
-                                    setPreviewBookId(bookIdStr);
-                                    onSelectBook(book);
-                                  }}
-                                >
-                                  <span
-                                    className={styles.bookFrontCoverFrame}
-                                    style={{
-                                      width: `${coverShowcaseWidth}px`,
-                                      height: `${coverShowcaseHeight}px`,
-                                    }}
-                                  >
-                                    <BookCover
-                                      fillContainer
-                                      title={book.title}
-                                      author={book.author}
-                                      coverUrl={book.coverUrl}
-                                      spineColor={visual.spineBg}
-                                      spineAccent={visual.spineAccentHex}
-                                      seed={book.resolvedSeed}
-                                      readingStatus={book.readingStatus}
-                                      isWishlist={book.isWishlist}
-                                      progressPercent={
-                                        book.progressPercent ?? 0
-                                      }
-                                      sizes="112px"
-                                      className="rounded-none border-0 shadow-none"
-                                    />
-                                  </span>
-                                </button>
-                              </li>
-                            ) : (
-                              <Book3D
-                                groupGapPx={bookGroupGapPx}
-                                className={
-                                  displayMode === "inclinado"
-                                    ? `${styles.bookTiltedWrap} ${
-                                        tiltDir === "left"
-                                          ? styles.bookTiltedLeft
-                                          : styles.bookTiltedRight
-                                      }`
-                                    : undefined
-                                }
-                                pages={book.pages}
-                                format={book.realisticFormat}
-                                title={book.title}
-                                author={book.author}
-                                authorSurname={book.authorSurname}
-                                publisher={book.publisher}
-                                seed={book.resolvedSeed}
-                                color={visual.spineBg}
-                                accentColor={visual.spineAccentHex}
-                                avoidNeighborHex={visual.avoidNeighborHex}
-                                spineTemplate={visual.template}
-                                publisherMark={book.publisherMark}
-                                textColor={visual.spineInk}
-                                coverUrl={book.coverUrl}
-                                readingStatus={book.readingStatus}
-                                isWishlist={book.isWishlist}
-                                progressPercent={book.progressPercent ?? 0}
-                                showCoverFace={view3dMode === "covers"}
-                                draggable={canDrag}
-                                isDragging={isBookDragging}
-                                dropPosition={dropPos}
-                                onDragStart={(e) =>
-                                  handleBookDragStart(
-                                    e,
-                                    shelf.genreKey,
-                                    book.id
-                                  )
-                                }
-                                onDragOver={(e) =>
-                                  handleBookDragOver(e, shelf.genreKey, book.id)
-                                }
-                                onDrop={(e) =>
-                                  handleBookDrop(e, shelf, book.id)
-                                }
-                                onDragEnd={clearDrag}
-                                onHoverBook={() => setPreviewBookId(bookIdStr)}
-                                onFocusBook={() => setPreviewBookId(bookIdStr)}
-                                tabIndex={currentFocusIdx === idx ? 0 : -1}
-                                onKeyDown={handleBookKeyDown}
-                                isSelected={activeBookId === book.id}
-                                suppressSelectedTooltip={isEdit}
-                                onActivate={() => {
-                                  setPreviewBookId(bookIdStr);
-                                  onSelectBook(book);
-                                }}
-                              />
-                            )}
-
-                            {inlineDecors.map((decor) => (
-                              <ShelfDecorObject
-                                key={decor.id}
-                                id={decor.id}
-                                decorType={decor.decorType}
-                                mode={mode}
-                                onRemove={
-                                  onRemoveDecor
-                                    ? (id) => onRemoveDecor(shelf.genreKey, id)
-                                    : undefined
-                                }
-                              />
-                            ))}
-                          </Fragment>
-                        );
-                      })}
-
-                      {/* Objetos decorativos posicionados ao final da prateleira */}
-                      {row.isLastChunk
-                        ? (shelfDecorByRow[shelf.genreKey] ?? [])
-                            .filter(
-                              (d) => d.afterBookIndex >= shelf.books.length
-                            )
-                            .map((decor) => (
-                              <ShelfDecorObject
-                                key={decor.id}
-                                id={decor.id}
-                                decorType={decor.decorType}
-                                mode={mode}
-                                onRemove={
-                                  onRemoveDecor
-                                    ? (id) => onRemoveDecor(shelf.genreKey, id)
-                                    : undefined
-                                }
-                              />
-                            ))
-                        : null}
-
-                      {/* Aparador de livros em L (CSS puro) quando sobra espaço confortável na tábua e não há decor custom */}
-                      {!isEdit &&
-                      row.books.length > 0 &&
-                      (shelfDecorByRow[shelf.genreKey]?.length ?? 0) === 0 &&
-                      row.rowBooksWidthPx + SHELF_BOOKEND_WIDTH_PX + 6 <=
-                        row.effectiveMaxRowW ? (
-                        <li
-                          className={styles.bookendSlot}
-                          data-bookend="true"
-                          aria-hidden="true"
-                        >
-                          <span className={styles.bookendUpright}>
-                            <span className={styles.bookendBrassTrim} />
-                          </span>
-                          <span className={styles.bookendFoot} />
-                          <span className={styles.bookendShadow} />
-                        </li>
-                      ) : null}
-
-                      {/* Modo edição: "+" no vão ao final da prateleira */}
-                      {isEdit && row.isLastChunk && onAddBook ? (
-                        <li className={styles.addRoundSlot}>
-                          <button
-                            type="button"
-                            onClick={() => onAddBook(shelf.genreKey)}
-                            aria-label={`Adicionar livro à prateleira ${shelf.genre}`}
-                            className={styles.addRoundBtn}
-                          >
-                            <Plus className="h-5 w-5" aria-hidden="true" />
-                          </button>
-                        </li>
-                      ) : null}
-                    </ul>
-
-                    <div
-                      className={`rf-shelf-plank ${styles.shelfPlank}`}
-                      aria-hidden="true"
-                    >
-                      <span className={styles.shelfLedStrip} />
-                      <span
-                        className={`rf-shelf-bracket ${styles.shelfBracket} ${styles.shelfBracketLeft}`}
-                      />
-                      <span
-                        className={`rf-shelf-bracket ${styles.shelfBracket} ${styles.shelfBracketRight}`}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+              isDeleting={confirmDeleteKey === shelf.genreKey}
+              isEditing={row.isFirstChunk && editingShelfKey === shelf.genreKey}
+              onRemoveDecor={onRemoveDecor}
+              onSelectBook={onSelectBook}
+              setPreviewBookId={setPreviewBookId}
+              onReorderWithinShelf={onReorderWithinShelf}
+              onMoveBookAcrossShelves={onMoveBookAcrossShelves}
+              onEditShelf={onEditShelf}
+              renderShelfEditor={renderShelfEditor}
+              onMoveShelf={onMoveShelf}
+              onDeleteShelf={onDeleteShelf}
+              onAddBook={onAddBook}
+              onSortShelfByColor={onSortShelfByColor}
+              setConfirmDeleteKey={setConfirmDeleteKey}
+              onBookDragStart={handleBookDragStart}
+              onBookDragOver={handleBookDragOver}
+              onBookDrop={handleBookDrop}
+              onClearDrag={clearDrag}
+              onShelfContainerDragOver={handleShelfContainerDragOver}
+              onShelfContainerDrop={handleShelfContainerDrop}
+            />
           );
         })}
       </div>
