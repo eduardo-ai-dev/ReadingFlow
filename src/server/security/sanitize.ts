@@ -65,7 +65,9 @@ export function validateExternalCoverUrl(
  * JPEG/PNG/WebP em base64 estrito, até COVER_DATA_URL_MAX_BYTES, e cujos
  * primeiros bytes confirmem o mesmo formato declarado (nunca SVG nem HTML).
  */
-export function validateCoverDataUrl(rawUrl?: string | null): string | undefined {
+export function validateCoverDataUrl(
+  rawUrl?: string | null
+): string | undefined {
   if (!rawUrl) return undefined;
   const parsed = parseCoverDataUrl(rawUrl);
   if (!parsed) return undefined;
@@ -83,9 +85,17 @@ export function validateCoverDataUrl(rawUrl?: string | null): string | undefined
 /** Aceita capa por upload (data URL validada) ou URL externa de host permitido. */
 export function sanitizeCoverInput(rawUrl?: string | null): string | undefined {
   if (!rawUrl) return undefined;
-  return rawUrl.startsWith("data:")
-    ? validateCoverDataUrl(rawUrl)
-    : validateExternalCoverUrl(rawUrl);
+  const trimmed = rawUrl.trim();
+  if (
+    /^\/api\/covers\/file\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(
+      trimmed
+    )
+  ) {
+    return trimmed;
+  }
+  return trimmed.startsWith("data:")
+    ? validateCoverDataUrl(trimmed)
+    : validateExternalCoverUrl(trimmed);
 }
 const buckets = new Map<string, number[]>();
 

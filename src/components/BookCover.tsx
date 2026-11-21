@@ -136,7 +136,10 @@ function BookCoverBase({
   );
   const showImage = Boolean(normalizedCoverUrl && !imgFailed);
   const isImageLoaded = Boolean(showImage && loadedUrl === normalizedCoverUrl);
-  const isDataUrl = Boolean(normalizedCoverUrl?.startsWith("data:"));
+  const isInlineOrPrivateUrl = Boolean(
+    normalizedCoverUrl?.startsWith("data:") ||
+    normalizedCoverUrl?.startsWith("/api/covers/file/")
+  );
 
   const isCompact = !fillContainer && size === "xs";
   const coverDebugEnabled = isCoverDebugEnabled();
@@ -305,7 +308,7 @@ function BookCoverBase({
               quality={75}
               priority={priority}
               loading={priority ? undefined : "lazy"}
-              unoptimized={isDataUrl}
+              unoptimized={isInlineOrPrivateUrl}
               referrerPolicy="no-referrer"
               onLoad={(event) => {
                 const img = event.currentTarget;
@@ -335,7 +338,7 @@ function BookCoverBase({
               quality={75}
               priority={priority}
               loading={priority ? undefined : "lazy"}
-              unoptimized={isDataUrl}
+              unoptimized={isInlineOrPrivateUrl}
               referrerPolicy="no-referrer"
               onLoad={(event) => {
                 const img = event.currentTarget;

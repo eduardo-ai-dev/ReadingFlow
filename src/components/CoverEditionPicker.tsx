@@ -41,6 +41,10 @@ export interface CoverEditionPickerProps {
   seed?: string;
   selectedCoverUrl?: string | null;
   selectedCoverSource?: CoverProviderSource | null;
+  /** Quando true, indica que a capa foi escolhida manualmente e está travada contra jobs automáticos. */
+  isCoverLocked?: boolean;
+  /** Ação explícita "Restaurar automática" para destravar a capa. */
+  onRestoreAutomatic?: () => void;
   spineColor?: string | null;
   spineAccent?: string | null;
   /** Candidatas pré-carregadas (ex.: vindas da varredura do BackfillCoversModal). */
@@ -76,6 +80,8 @@ export function CoverEditionPicker({
   seed,
   selectedCoverUrl,
   selectedCoverSource,
+  isCoverLocked = false,
+  onRestoreAutomatic,
   spineColor,
   spineAccent,
   initialCandidates,
@@ -428,12 +434,26 @@ export function CoverEditionPicker({
             size="md"
           />
           {selectedCoverUrl ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#C8A46E]/55 bg-[#F4EFE6] px-2 py-0.5 text-[10px] font-semibold text-[#5C4321]">
-              <Check className="h-3 w-3 text-[#2D6A4F]" aria-hidden="true" />
-              {selectedCoverSource
-                ? SOURCE_LABELS[selectedCoverSource]
-                : "Capa ativa"}
-            </span>
+            <div className="flex flex-col items-center gap-1 sm:items-start">
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#C8A46E]/55 bg-[#F4EFE6] px-2 py-0.5 text-[10px] font-semibold text-[#5C4321]">
+                <Check className="h-3 w-3 text-[#2D6A4F]" aria-hidden="true" />
+                {selectedCoverSource
+                  ? SOURCE_LABELS[selectedCoverSource]
+                  : "Capa ativa"}
+                {isCoverLocked ? " · Fixada" : ""}
+              </span>
+              {isCoverLocked && onRestoreAutomatic ? (
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={onRestoreAutomatic}
+                  className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-[#722F3E] underline-offset-2 hover:underline disabled:opacity-50"
+                >
+                  <RefreshCw className="h-3 w-3" aria-hidden="true" />
+                  Restaurar automática
+                </button>
+              ) : null}
+            </div>
           ) : (
             <span className="text-[11px] font-medium text-[#5A5045]">
               Fallback editorial ativo

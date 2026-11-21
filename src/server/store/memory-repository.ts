@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isDemoSessionAllowed } from "@/lib/auth-demo";
@@ -9,15 +10,26 @@ import type {
   ReadingGoal,
   Review,
   Shelf,
+  UploadedCoverRecord,
   UserProfile,
+  UserSettings,
   WishlistItem,
   Work,
 } from "@/lib/domain";
 import { computeWorkFingerprint } from "@/features/catalog/rules";
+import { parseCoverDataUrl } from "@/features/catalog/cover-rules";
 import {
   clampPaperHsl,
   deriveSpineAccentHex,
 } from "@/features/catalog/spine-color-rules";
+import { DEFAULT_AMBIENT_PREFERENCES } from "@/features/reading/ambient-catalog";
+import { EMPTY_PERSISTED_SHELF_LAYOUT } from "@/features/shelves/arrange-shelves";
+import {
+  DEFAULT_DENSITY,
+  DEFAULT_FX,
+  DEFAULT_MOTION,
+  DEFAULT_THEME_ID,
+} from "@/lib/themes/themes.config";
 import { formatDateInTimezone, shiftYmdDays } from "@/lib/dates";
 import { createLiveCatalogPipeline } from "@/server/catalog/providers";
 import { ormSeedWorkspace } from "@/server/db/orm-repository";
@@ -39,6 +51,10 @@ export interface UserWorkspaceData {
   reviews: Review[];
   goals: ReadingGoal[];
   importJobs: ImportJob[];
+  /** Preferências persistidas por conta (`user_settings`: tema, arrumação 3D, sons ambiente, foco). */
+  settings?: UserSettings;
+  /** Armazenamento privado de uploads de capa restrito ao dono (`{userId}/{editionId}/{fileName}`). */
+  uploadedCovers?: Record<string, UploadedCoverRecord>;
   lastUndoAction?: {
     id: string;
     label: string;
@@ -903,30 +919,178 @@ function buildDemoWorkspace(): UserWorkspaceData {
   };
 }
 
+export function createDefaultUserSettings(profile: UserProfile): UserSettings {
+  return {
+    userId: profile.id,
+    theme: profile.theme ?? DEFAULT_THEME_ID,
+    density: profile.density ?? DEFAULT_DENSITY,
+    motion: profile.motion ?? DEFAULT_MOTION,
+    fx: profile.fx ?? DEFAULT_FX,
+    shelfLayout: structuredClone(EMPTY_PERSISTED_SHELF_LAYOUT),
+    ambientPreferences: structuredClone(
+      profile.focusAmbientPreferences ?? DEFAULT_AMBIENT_PREFERENCES
+    ),
+    focusDefaultMode: "free",
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function ensureWorkspaceSettings(ws: UserWorkspaceData): UserSettings {
+  if (!ws.settings) {
+    ws.settings = createDefaultUserSettings(ws.profile);
+  }
+  if (!ws.uploadedCovers) {
+    ws.uploadedCovers = {};
+  }
+  return ws.settings;
+}
+
+const MIME_TO_EXT: Record<UploadedCoverRecord["mimeType"], string> = {
+  "image/webp": "webp",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+};
+
+/**
+ * Persiste uma capa enviada pelo usuário (`data:image/...`) no armazenamento privado
+ * isolado por `{userId}/{editionId}/{fileName}` e retorna URL autenticada estável.
+ */
+export function saveUserUploadedCover(
+  ws: UserWorkspaceData,
+  editionId: string,
+  dataUrl: string
+): { routeUrl: string; record: UploadedCoverRecord } | null {
+  const parsed = parseCoverDataUrl(dataUrl);
+  if (!parsed) return null;
+
+  ensureWorkspaceSettings(ws);
+  const hash = crypto
+    .createHash("sha256")
+    .update(parsed.base64)
+    .digest("hex")
+    .slice(0, 16);
+  const ext = MIME_TO_EXT[parsed.mime];
+  const fileName = `cover-${hash}.${ext}`;
+  const storageKey = `${ws.profile.id}/${editionId}/${fileName}`;
+  const record: UploadedCoverRecord = {
+    ownerId: ws.profile.id,
+    editionId,
+    fileName,
+    mimeType: parsed.mime,
+    bytesBase64: parsed.base64,
+    etag: `"${hash}"`,
+    createdAt: new Date().toISOString(),
+  };
+
+  ws.uploadedCovers![storageKey] = record;
+  return {
+    routeUrl: `/api/covers/file/${encodeURIComponent(ws.profile.id)}/${encodeURIComponent(editionId)}/${encodeURIComponent(fileName)}`,
+    record,
+  };
+}
+
+/**
+ * Lê um arquivo de capa privado garantindo estritamente que o usuário autenticado é o dono.
+ */
+export function readUserUploadedCover(
+  ws: UserWorkspaceData,
+  ownerId: string,
+  editionId: string,
+  fileName: string
+): UploadedCoverRecord | null {
+  if (ws.profile.id !== ownerId) {
+    return null;
+  }
+  const key = `${ownerId}/${editionId}/${fileName}`;
+  return ws.uploadedCovers?.[key] ?? null;
+}
+
+/** Remove todos os arquivos privados de capa vinculados a uma edição (ao excluir livro/capa). */
+export function deleteEditionUploadedCovers(
+  ws: UserWorkspaceData,
+  editionId: string
+): number {
+  if (!ws.uploadedCovers) return 0;
+  const prefix = `${ws.profile.id}/${editionId}/`;
+  let removed = 0;
+  for (const key of Object.keys(ws.uploadedCovers)) {
+    if (key.startsWith(prefix)) {
+      delete ws.uploadedCovers[key];
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
+/**
+ * Guarda de integridade relacional (equivalente à FK composta `(id, user_id)`):
+ * impede vincular obra, edição ou prateleira pertencente a outro usuário.
+ */
+export function assertOwnedWorkspaceEntities(
+  ws: UserWorkspaceData,
+  refs: { workId?: string; editionId?: string; shelfId?: string }
+): { ok: true } | { ok: false; error: string } {
+  if (refs.workId) {
+    const work = ws.works.find(
+      (w) =>
+        w.id === refs.workId &&
+        (w.ownerId === null || w.ownerId === ws.profile.id)
+    );
+    if (!work) {
+      return { ok: false, error: "Obra não encontrada na sua conta." };
+    }
+  }
+  if (refs.editionId) {
+    const edition = ws.editions.find(
+      (e) =>
+        e.id === refs.editionId &&
+        (e.ownerId === null || e.ownerId === ws.profile.id)
+    );
+    if (!edition) {
+      return { ok: false, error: "Edição não encontrada na sua conta." };
+    }
+  }
+  if (refs.shelfId) {
+    const shelf = ws.shelves.find(
+      (s) => s.id === refs.shelfId && s.userId === ws.profile.id
+    );
+    if (!shelf) {
+      return { ok: false, error: "Prateleira não encontrada na sua conta." };
+    }
+  }
+  return { ok: true };
+}
+
 export function getMemoryStore(): GlobalStoreShape {
+  const allowDemoSeed = isDemoSessionAllowed();
   if (!globalThis.__readingFlowMemoryStore) {
-    const demo = buildDemoWorkspace();
-    const usersById = new Map<string, UserWorkspaceData>([
-      [DEMO_USER_ID, demo],
-    ]);
-    const userIdByEmail = new Map<string, string>([
-      [demo.profile.email.toLowerCase(), DEMO_USER_ID],
-    ]);
+    const usersById = new Map<string, UserWorkspaceData>();
+    const userIdByEmail = new Map<string, string>();
     const sessions = new Map<string, string>();
     const passwordResetTokens = new Map<string, PasswordResetTokenRecord>();
+    if (allowDemoSeed) {
+      const demo = buildDemoWorkspace();
+      ensureWorkspaceSettings(demo);
+      usersById.set(DEMO_USER_ID, demo);
+      userIdByEmail.set(demo.profile.email.toLowerCase(), DEMO_USER_ID);
+      void ormSeedWorkspace(demo).catch(() => {});
+    }
     globalThis.__readingFlowMemoryStore = {
       usersById,
       userIdByEmail,
       sessions,
       passwordResetTokens,
     };
-    void ormSeedWorkspace(demo).catch(() => {});
   } else {
     if (!globalThis.__readingFlowMemoryStore.passwordResetTokens) {
       globalThis.__readingFlowMemoryStore.passwordResetTokens = new Map();
     }
-    if (!globalThis.__readingFlowMemoryStore.usersById.has(DEMO_USER_ID)) {
+    if (
+      allowDemoSeed &&
+      !globalThis.__readingFlowMemoryStore.usersById.has(DEMO_USER_ID)
+    ) {
       const demo = buildDemoWorkspace();
+      ensureWorkspaceSettings(demo);
       globalThis.__readingFlowMemoryStore.usersById.set(DEMO_USER_ID, demo);
       globalThis.__readingFlowMemoryStore.userIdByEmail.set(
         demo.profile.email.toLowerCase(),
@@ -999,9 +1163,17 @@ function buildWorkspaceFingerprint(ws: UserWorkspaceData): string {
     ) || "0";
   const lastItemId = ws.items[ws.items.length - 1]?.id ?? "0";
   const lastShelfPos = ws.items[ws.items.length - 1]?.shelfPosition ?? 0;
+  const coversDigest = ws.editions
+    .map(
+      (e) =>
+        `${e.id}:${e.coverUrl ?? ""}:${e.coverLocked ? "1" : "0"}:${e.coverSelectedAt ?? ""}`
+    )
+    .join(",");
+  const settingsTs = ws.settings?.updatedAt ?? "0";
   return [
     ws.profile.id,
     ws.profile.timezone,
+    ws.profile.theme,
     ws.profile.goalsCountRereads ? "1" : "0",
     ws.works.length,
     ws.editions.length,
@@ -1015,7 +1187,19 @@ function buildWorkspaceFingerprint(ws: UserWorkspaceData): string {
     lastReviewTs,
     lastItemId,
     lastShelfPos,
+    settingsTs,
+    coversDigest,
   ].join("|");
+}
+
+/** Invalida explicitamente todas as entradas de cache pertencentes a um usuário específico. */
+export function invalidateUserWorkspaceCache(userId: string): void {
+  const prefix = `${userId}::`;
+  for (const key of workspaceQueryCache.keys()) {
+    if (key.startsWith(prefix)) {
+      workspaceQueryCache.delete(key);
+    }
+  }
 }
 
 /**

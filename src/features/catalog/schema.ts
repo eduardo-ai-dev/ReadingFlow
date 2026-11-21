@@ -120,4 +120,6 @@ export const updateEditionCoverSchema = z.object({
   coverSource: coverSourceEnum.nullable(),
   /** `page_count` do provedor preenche `pages` da edição quando estiver vazio. */
   pageCount: z.number().int().positive().max(20000).optional(),
+  /** Origem da atualização: "manual" trava a capa; "backfill" respeita capa travada; "unlock" restaura automática. */
+  sourceAction: z.enum(["manual", "backfill", "unlock"]).default("manual"),
 });

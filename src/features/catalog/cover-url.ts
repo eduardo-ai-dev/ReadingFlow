@@ -11,6 +11,28 @@ export function isCoverDebugEnabled(): boolean {
   );
 }
 
+const PRIVATE_COVER_ROUTE_PATTERN =
+  /^\/api\/covers\/file\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+
+/**
+ * Indica se a URL aponta para a rota privada autenticada de entrega de capas
+ * (`/api/covers/file/{userId}/{editionId}/{fileName}`).
+ */
+export function isPrivateCoverRouteUrl(url?: string | null): boolean {
+  if (!url) return false;
+  return PRIVATE_COVER_ROUTE_PATTERN.test(url.trim());
+}
+
+/**
+ * Regra canônica de proteção de capa escolhida pelo usuário:
+ * nenhum backfill ou job automático pode alterar uma edição com `coverLocked === true`.
+ */
+export function canAutoUpdateEditionCover(
+  edition?: Pick<Edition, "coverLocked"> | null
+): boolean {
+  return !edition?.coverLocked;
+}
+
 /**
  * Helper único para normalizar e ler exclusivamente a `cover_url` persistida
  * de uma edição (sem disparar buscas em rede durante a exibição).

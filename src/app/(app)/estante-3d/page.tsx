@@ -76,11 +76,15 @@ export default async function Estante3DPage({
 
   const totalVolumes = virtualBooks.length;
 
-  // Livros sem cover_url (deduplicados por edição) — nunca altera capas já escolhidas
+  // Livros sem cover_url e não travados manualmente (deduplicados por edição) — backfill nunca altera capas travadas
   const seenMissingEditions = new Set<string>();
   const booksWithoutCover: BackfillBookTarget[] = [];
   for (const entry of sortedItems) {
-    if (entry.edition.coverUrl || seenMissingEditions.has(entry.edition.id)) {
+    if (
+      entry.edition.coverLocked ||
+      entry.edition.coverUrl ||
+      seenMissingEditions.has(entry.edition.id)
+    ) {
       continue;
     }
     seenMissingEditions.add(entry.edition.id);

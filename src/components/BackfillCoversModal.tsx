@@ -213,6 +213,7 @@ export function BackfillCoversModal({
             coverUrl: unambiguous.coverUrl,
             coverSource: unambiguous.source,
             pageCount: unambiguous.pageCount ?? resolvedPageCount,
+            sourceAction: "backfill",
           });
           if (saved.ok) {
             applied.push(book.title);

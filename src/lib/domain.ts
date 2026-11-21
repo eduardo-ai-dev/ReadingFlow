@@ -41,6 +41,8 @@ import type {
   ThemePreference,
 } from "@/lib/themes/themes.types";
 import type { AmbientPreferences } from "@/features/reading/ambient-catalog";
+import type { FocusSessionMode } from "@/features/reading/focus-session-storage";
+import type { PersistedShelfLayout } from "@/features/shelves/arrange-shelves";
 
 export type ThreeDPreference = "auto" | "on" | "off";
 
@@ -87,6 +89,10 @@ export interface Edition {
   thicknessMm?: number;
   coverUrl?: string;
   coverSource?: BookCoverSource | null;
+  /** Quando true, nenhum job automático ou backfill pode sobrescrever a capa escolhida pelo usuário. */
+  coverLocked?: boolean;
+  /** Timestamp ISO de quando a capa foi escolhida explicitamente pelo usuário. */
+  coverSelectedAt?: string;
   coverColor?: string;
   coverAccentColor?: string;
   contributors: Contributor[];
@@ -236,4 +242,28 @@ export interface UserProfile {
   preferredFormats: ShelfKind[];
   acceptedTermsVersion: string;
   acceptedTermsAt: string;
+}
+
+/** Preferências persistidas por conta (1 linha por usuário em `user_settings`). */
+export interface UserSettings {
+  userId: string;
+  theme: ThemePreference;
+  density: DensityPreference;
+  motion: MotionPreference;
+  fx: FxPreference;
+  shelfLayout: PersistedShelfLayout;
+  ambientPreferences: AmbientPreferences;
+  focusDefaultMode: FocusSessionMode;
+  updatedAt: string;
+}
+
+/** Arquivo de capa enviado pelo usuário no armazenamento privado `{userId}/{editionId}/{fileName}`. */
+export interface UploadedCoverRecord {
+  ownerId: string;
+  editionId: string;
+  fileName: string;
+  mimeType: "image/jpeg" | "image/png" | "image/webp";
+  bytesBase64: string;
+  etag: string;
+  createdAt: string;
 }

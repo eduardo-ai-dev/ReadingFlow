@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  deleteEditionUploadedCovers,
+  invalidateUserWorkspaceCache,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
 } from "@/server/store/memory-repository";
@@ -62,6 +64,15 @@ export async function removeLibraryItemAction(
       reading.libraryItemId = undefined;
     }
   }
+  const stillReferenced =
+    ws.items.some((it) => it.editionId === item.editionId) ||
+    ws.wishlist.some(
+      (w) => w.editionId === item.editionId && w.status === "wanted"
+    );
+  if (!stillReferenced) {
+    deleteEditionUploadedCovers(ws, item.editionId);
+  }
+  invalidateUserWorkspaceCache(ws.profile.id);
   revalidatePath("/", "layout");
   return { ok: true };
 }

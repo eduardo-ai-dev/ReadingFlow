@@ -362,6 +362,30 @@ export function BookDetailActionsClient({
           seed={edition.isbn13 ?? work.id}
           selectedCoverUrl={edition.coverUrl ?? null}
           selectedCoverSource={edition.coverSource ?? null}
+          isCoverLocked={Boolean(edition.coverLocked)}
+          onRestoreAutomatic={() => {
+            setFeedback(null);
+            startTransition(async () => {
+              const res = await updateEditionCoverAction({
+                editionId: edition.id,
+                coverUrl: null,
+                coverSource: null,
+                sourceAction: "unlock",
+              });
+              if (!res.ok) {
+                setFeedback(res.error);
+                return;
+              }
+              setAutoCoverUrl("");
+              setUploadedCover("");
+              setCoverSource("none");
+              setChangingCover(false);
+              setFeedback(
+                "Capa destravada para busca automática. Você pode escolher outra capa quando quiser."
+              );
+              router.refresh();
+            });
+          }}
           spineColor={edition.coverColor}
           spineAccent={edition.coverAccentColor}
           isSaving={isPending}

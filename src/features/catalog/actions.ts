@@ -3,10 +3,14 @@
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import {
+  deleteEditionUploadedCovers,
   getCatalogPipelineForWorkspace,
+  invalidateUserWorkspaceCache,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
+  saveUserUploadedCover,
 } from "@/server/store/memory-repository";
+import { canAutoUpdateEditionCover } from "@/features/catalog/cover-url";
 import {
   addBookSchema,
   isbnLookupSchema,
@@ -44,7 +48,9 @@ function inferCoverSourceFromUrl(
   explicit?: BookCoverSource | null
 ): BookCoverSource {
   if (explicit) return explicit;
-  if (url.startsWith("data:")) return "upload";
+  if (url.startsWith("data:") || url.startsWith("/api/covers/file/")) {
+    return "upload";
+  }
   if (url.includes("openlibrary.org") || url.includes("archive.org")) {
     return "openlibrary";
   }
@@ -254,9 +260,17 @@ export async function addBookToLibraryAction(rawInput: unknown): Promise<
     editionId = dup.editionId;
   } else {
     editionId = `ed-${crypto.randomUUID()}`;
-    const inferredCoverSource: BookCoverSource | null = !safeCoverUrl
+    let persistedCoverUrl = safeCoverUrl;
+    if (safeCoverUrl?.startsWith("data:")) {
+      const stored = saveUserUploadedCover(ws, editionId, safeCoverUrl);
+      if (stored) {
+        persistedCoverUrl = stored.routeUrl;
+      }
+    }
+    const inferredCoverSource: BookCoverSource | null = !persistedCoverUrl
       ? null
-      : inferCoverSourceFromUrl(safeCoverUrl, data.coverSource);
+      : inferCoverSourceFromUrl(persistedCoverUrl, data.coverSource);
+    const hasExplicitCover = Boolean(persistedCoverUrl);
     const newEdition: Edition = {
       id: editionId,
       workId,
@@ -273,18 +287,24 @@ export async function addBookToLibraryAction(rawInput: unknown): Promise<
         : undefined,
       heightMm: dims.heightMm,
       thicknessMm: dims.thicknessMm,
-      coverUrl: safeCoverUrl,
+      coverUrl: persistedCoverUrl,
       coverSource: inferredCoverSource,
+      coverLocked: hasExplicitCover,
+      coverSelectedAt: hasExplicitCover ? nowIso : undefined,
       contributors,
       source: "manual",
       createdAt: nowIso,
     };
-    // Capa (se não dispensada pelo usuário), páginas e cores da lombada são resolvidas no cadastro.
+    // Capa (se não dispensada nem escolhida pelo usuário), páginas e cores da lombada são resolvidas no cadastro.
     await enrichEditionCoverMetadata(newEdition, cleanAuthor, {
-      skipCoverLookup: Boolean(data.skipAutoCover || data.coverSource === null),
+      skipCoverLookup: Boolean(
+        hasExplicitCover || data.skipAutoCover || data.coverSource === null
+      ),
     });
     ws.editions.push(newEdition);
   }
+
+  invalidateUserWorkspaceCache(ws.profile.id);
 
   if (data.addToWishlistOnly) {
     const wishId = `wish-${crypto.randomUUID()}`;
@@ -473,14 +493,31 @@ export async function updateBookMetadataAction(
   const coverChanged = nextCoverUrl !== edition.coverUrl;
   edition.heightMm = dims.heightMm;
   edition.thicknessMm = dims.thicknessMm;
-  edition.coverUrl = nextCoverUrl;
   if (coverChanged) {
-    edition.coverSource = !nextCoverUrl
+    const rawForPalette = nextCoverUrl;
+    let persistedCoverUrl = nextCoverUrl;
+    if (nextCoverUrl?.startsWith("data:")) {
+      deleteEditionUploadedCovers(ws, edition.id);
+      const stored = saveUserUploadedCover(ws, edition.id, nextCoverUrl);
+      if (stored) {
+        persistedCoverUrl = stored.routeUrl;
+      }
+    } else if (!nextCoverUrl) {
+      deleteEditionUploadedCovers(ws, edition.id);
+    }
+
+    edition.coverUrl = persistedCoverUrl;
+    edition.coverSource = !persistedCoverUrl
       ? null
-      : inferCoverSourceFromUrl(nextCoverUrl, data.coverSource);
-    if (nextCoverUrl) {
+      : inferCoverSourceFromUrl(persistedCoverUrl, data.coverSource);
+    edition.coverLocked = Boolean(persistedCoverUrl);
+    edition.coverSelectedAt = persistedCoverUrl
+      ? new Date().toISOString()
+      : undefined;
+
+    if (rawForPalette) {
       const palette = await extractSpinePaletteFromCover(
-        nextCoverUrl,
+        rawForPalette,
         AbortSignal.timeout(4000)
       );
       if (palette) {
@@ -527,19 +564,24 @@ export async function updateBookMetadataAction(
     }
   }
 
+  invalidateUserWorkspaceCache(ws.profile.id);
   revalidatePath("/", "layout");
   return { ok: true };
 }
 
 /**
- * Atualiza a capa escolhida pelo usuário ("Trocar capa" ou preenchimento em lote "Buscar capas").
- * Extrai `spine_color` e `spine_accent` no servidor (sem CORS) e persiste URL, fonte e cores.
+ * Atualiza a capa escolhida pelo usuário ("Trocar capa", "Restaurar automática" ou "Buscar capas").
+ * - `sourceAction === "backfill"`: NUNCA sobrescreve uma edição com `coverLocked === true`.
+ * - `sourceAction === "manual"`: trava a capa (`coverLocked = true`) e armazena uploads em pasta privada do dono.
+ * - `sourceAction === "unlock"`: destrava `coverLocked = false` para permitir nova busca automática.
  */
 export async function updateEditionCoverAction(rawInput: unknown): Promise<
   | {
       ok: true;
       coverUrl: string | null;
       coverSource: BookCoverSource | null;
+      coverLocked: boolean;
+      coverSelectedAt: string | null;
       spineColor: string;
       spineAccent: string;
     }
@@ -563,7 +605,42 @@ export async function updateEditionCoverAction(rawInput: unknown): Promise<
     return { ok: false, error: "Sem permissão para alterar esta edição." };
   }
 
-  let safeCoverUrl: string | undefined;
+  if (data.sourceAction === "backfill" && !canAutoUpdateEditionCover(edition)) {
+    return {
+      ok: false,
+      error:
+        "Esta capa está travada pela sua escolha manual. Use 'Restaurar automática' para destravar.",
+    };
+  }
+
+  if (data.sourceAction === "unlock") {
+    saveUndoSnapshot(ws, `Destravar capa automática de "${edition.title}"`);
+    edition.coverLocked = false;
+    edition.coverSelectedAt = undefined;
+    if (data.coverUrl === null) {
+      deleteEditionUploadedCovers(ws, edition.id);
+      edition.coverUrl = undefined;
+      edition.coverSource = null;
+    }
+    const seed = edition.isbn13 ?? edition.workId ?? edition.id;
+    const spineColor = edition.coverColor ?? clampPaperHsl(coverColor(seed));
+    const spineAccent =
+      edition.coverAccentColor ?? deriveSpineAccentHex(spineColor, seed);
+    invalidateUserWorkspaceCache(ws.profile.id);
+    revalidatePath("/", "layout");
+    return {
+      ok: true,
+      coverUrl: edition.coverUrl ?? null,
+      coverSource: edition.coverSource ?? null,
+      coverLocked: false,
+      coverSelectedAt: null,
+      spineColor,
+      spineAccent,
+    };
+  }
+
+  let validatedInput: string | undefined;
+  let persistedCoverUrl: string | undefined;
   let resolvedSource: BookCoverSource | null = null;
 
   if (data.coverUrl && data.coverUrl.trim().length > 0) {
@@ -575,23 +652,45 @@ export async function updateEditionCoverAction(rawInput: unknown): Promise<
           "A imagem de capa informada é inválida. Use uma edição válida ou envie JPEG, PNG ou WebP de até 300 KB.",
       };
     }
-    const sharpCheck = await validateChosenCoverWithSharp(validated);
-    if (!sharpCheck.ok) {
-      return {
-        ok: false,
-        error:
-          sharpCheck.error ??
-          "A capa escolhida possui dimensão inválida. Escolha outra candidata ou cole um link válido.",
-      };
+    if (!validated.startsWith("/api/covers/file/")) {
+      const sharpCheck = await validateChosenCoverWithSharp(validated);
+      if (!sharpCheck.ok) {
+        return {
+          ok: false,
+          error:
+            sharpCheck.error ??
+            "A capa escolhida possui dimensão inválida. Escolha outra candidata ou cole um link válido.",
+        };
+      }
     }
-    safeCoverUrl = validated;
-    resolvedSource = inferCoverSourceFromUrl(validated, data.coverSource);
+    validatedInput = validated;
+    persistedCoverUrl = validated;
+    if (validated.startsWith("data:")) {
+      deleteEditionUploadedCovers(ws, edition.id);
+      const stored = saveUserUploadedCover(ws, edition.id, validated);
+      if (stored) {
+        persistedCoverUrl = stored.routeUrl;
+      }
+    }
+    resolvedSource = inferCoverSourceFromUrl(
+      persistedCoverUrl,
+      data.coverSource
+    );
+  } else {
+    deleteEditionUploadedCovers(ws, edition.id);
   }
 
   saveUndoSnapshot(ws, `Troca de capa de "${edition.title}"`);
 
-  edition.coverUrl = safeCoverUrl;
+  const nowIso = new Date().toISOString();
+  const shouldLock =
+    data.sourceAction === "manual" && Boolean(persistedCoverUrl);
+
+  edition.coverUrl = persistedCoverUrl;
   edition.coverSource = resolvedSource;
+  edition.coverLocked = shouldLock;
+  edition.coverSelectedAt = shouldLock ? nowIso : undefined;
+
   if (
     data.pageCount &&
     data.pageCount > 0 &&
@@ -604,9 +703,9 @@ export async function updateEditionCoverAction(rawInput: unknown): Promise<
   let spineColor = edition.coverColor;
   let spineAccent = edition.coverAccentColor;
 
-  if (safeCoverUrl) {
+  if (validatedInput && !validatedInput.startsWith("/api/covers/file/")) {
     const palette = await extractSpinePaletteFromCover(
-      safeCoverUrl,
+      validatedInput,
       AbortSignal.timeout(4500)
     );
     if (palette) {
@@ -615,25 +714,26 @@ export async function updateEditionCoverAction(rawInput: unknown): Promise<
     }
   }
 
-  if (!spineColor || !safeCoverUrl) {
+  if (!spineColor || !persistedCoverUrl) {
     spineColor = clampPaperHsl(coverColor(seed));
   }
-  if (!spineAccent || !safeCoverUrl) {
+  if (!spineAccent || !persistedCoverUrl) {
     spineAccent = deriveSpineAccentHex(spineColor, seed);
   }
 
   edition.coverColor = spineColor;
   edition.coverAccentColor = spineAccent;
 
-  // Mantém consistência de capa persistida entre edições irmãs da mesma obra sem capa
-  if (safeCoverUrl) {
+  // Mantém consistência apenas em edições irmãs da mesma obra sem capa e não travadas
+  if (persistedCoverUrl) {
     for (const sibling of ws.editions) {
       if (
         sibling.id !== edition.id &&
         sibling.workId === edition.workId &&
+        !sibling.coverLocked &&
         !sibling.coverUrl?.trim()
       ) {
-        sibling.coverUrl = safeCoverUrl;
+        sibling.coverUrl = persistedCoverUrl;
         sibling.coverSource = resolvedSource;
         sibling.coverColor = spineColor;
         sibling.coverAccentColor = spineAccent;
@@ -641,11 +741,14 @@ export async function updateEditionCoverAction(rawInput: unknown): Promise<
     }
   }
 
+  invalidateUserWorkspaceCache(ws.profile.id);
   revalidatePath("/", "layout");
   return {
     ok: true,
-    coverUrl: safeCoverUrl ?? null,
+    coverUrl: persistedCoverUrl ?? null,
     coverSource: resolvedSource,
+    coverLocked: Boolean(edition.coverLocked),
+    coverSelectedAt: edition.coverSelectedAt ?? null,
     spineColor,
     spineAccent,
   };
