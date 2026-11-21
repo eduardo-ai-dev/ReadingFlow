@@ -374,8 +374,10 @@ export function FocusReadingSessionClient({
   // Restaura sessão em andamento após recarregamento sem erro de hidratação SSR (isolado por userId)
   useEffect(() => {
     const saved = readPersistedFocusSession(userId);
-    hydratedStorageRef.current = true;
-    if (!saved) return;
+    if (!saved) {
+      hydratedStorageRef.current = true;
+      return;
+    }
 
     const matchesExistingBook = activeBooks.some(
       (b) => b.readingId === saved.readingId
@@ -383,13 +385,17 @@ export function FocusReadingSessionClient({
     const shouldRestore =
       matchesExistingBook &&
       (!initialReadingId || initialReadingId === saved.readingId);
-    if (!shouldRestore) return;
+    if (!shouldRestore) {
+      hydratedStorageRef.current = true;
+      return;
+    }
 
     const restoredElapsed = computeElapsedFocusSeconds(saved, Date.now());
     const finishedPomodoro =
       saved.focusMode === "pomodoro" && restoredElapsed >= POMODORO_SECONDS;
 
     const frameId = window.requestAnimationFrame(() => {
+      hydratedStorageRef.current = true;
       setSelectedBookId(saved.readingId);
       setFocusMode(saved.focusMode);
       setAccumulatedSeconds(
