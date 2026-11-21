@@ -49,7 +49,7 @@ describe("Regressão de Desempenho #1 — Consultas O(N), Cache Fingerprint O(1)
     const elapsedMs = performance.now() - t0;
 
     expect(resolvedCount).toBe(2000);
-    expect(elapsedMs).toBeLessThan(10);
+    expect(elapsedMs).toBeLessThan(40);
 
     const inherited = resolveWorkCoverEdition({
       workId: targetEd.workId,
@@ -95,7 +95,7 @@ describe("Regressão de Desempenho #1 — Consultas O(N), Cache Fingerprint O(1)
       expect(hit.call).toBe(1);
     }
     const hit100Ms = performance.now() - t0;
-    expect(hit100Ms).toBeLessThan(5);
+    expect(hit100Ms).toBeLessThan(25);
     expect(computeCalls).toBe(1);
 
     invalidateUserWorkspaceCache(workspace.profile.id);

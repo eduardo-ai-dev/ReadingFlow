@@ -14,7 +14,8 @@ import * as schema from "./schema";
 
 declare global {
   var __readingFlowSqliteDb: DatabaseSync | undefined;
-  var __readingFlowDrizzle: ReturnType<typeof createDrizzleInstance> | undefined;
+  var __readingFlowDrizzle:
+    ReturnType<typeof createDrizzleInstance> | undefined;
 }
 
 function initTables(sqlite: DatabaseSync) {
@@ -165,10 +166,31 @@ function initTables(sqlite: DatabaseSync) {
       user_id TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+
+    -- Índices compostos cobrindo user_id + filtros/ordenação de Painel, Estantes, Busca e Métricas
+    CREATE INDEX IF NOT EXISTS idx_works_user_created ON works (user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_works_user_genre ON works (user_id, primary_genre);
+    CREATE INDEX IF NOT EXISTS idx_editions_user_created ON editions (user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_editions_work_id ON editions (work_id);
+    CREATE INDEX IF NOT EXISTS idx_editions_user_format ON editions (user_id, format);
+    CREATE INDEX IF NOT EXISTS idx_shelves_user_position ON shelves (user_id, position ASC);
+    CREATE INDEX IF NOT EXISTS idx_library_items_user_shelf_pos ON library_items (user_id, shelf_id ASC, shelf_position ASC);
+    CREATE INDEX IF NOT EXISTS idx_library_items_user_status ON library_items (user_id, status);
+    CREATE INDEX IF NOT EXISTS idx_readings_user_updated ON readings (user_id, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_readings_user_status_updated ON readings (user_id, status, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_readings_user_status_finished ON readings (user_id, status, finished_on DESC);
+    CREATE INDEX IF NOT EXISTS idx_readings_user_work ON readings (user_id, work_id);
+    CREATE INDEX IF NOT EXISTS idx_reviews_user_updated ON reviews (user_id, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_reviews_user_work ON reviews (user_id, work_id);
+    CREATE INDEX IF NOT EXISTS idx_goals_user_starts ON goals (user_id, starts_on ASC);
+    CREATE INDEX IF NOT EXISTS idx_wishlist_user_status_priority ON wishlist (user_id, status, priority ASC);
+    CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id);
   `);
 
   // Migração idempotente para bases SQLite locais já existentes
-  const editionCols = sqlite.prepare("PRAGMA table_info(editions)").all() as Array<{ name?: string }>;
+  const editionCols = sqlite
+    .prepare("PRAGMA table_info(editions)")
+    .all() as Array<{ name?: string }>;
   const colNames = new Set(editionCols.map((c) => c.name));
   if (!colNames.has("cover_source")) {
     sqlite.exec("ALTER TABLE editions ADD COLUMN cover_source TEXT");
@@ -177,9 +199,9 @@ function initTables(sqlite: DatabaseSync) {
     sqlite.exec("ALTER TABLE editions ADD COLUMN spine_accent TEXT");
   }
 
-  const userCols = sqlite
-    .prepare("PRAGMA table_info(users)")
-    .all() as Array<{ name?: string }>;
+  const userCols = sqlite.prepare("PRAGMA table_info(users)").all() as Array<{
+    name?: string;
+  }>;
   const userColNames = new Set(userCols.map((c) => c.name));
   if (!userColNames.has("density")) {
     sqlite.exec(
@@ -194,15 +216,25 @@ function initTables(sqlite: DatabaseSync) {
 }
 
 function createDrizzleInstance(sqlite: DatabaseSync) {
+  const stmtCache = new Map<string, ReturnType<DatabaseSync["prepare"]>>();
+
   return drizzle(
     async (sql, params, method) => {
-      // Execução estritamente parametrizada — ZERO concatenação de strings
-      const stmt = sqlite.prepare(sql);
+      // Execução estritamente parametrizada com cache de Prepared Statements — ZERO concatenação de strings
+      const cacheKey = `${method === "run" ? "r" : "a"}:${sql}`;
+      let stmt = stmtCache.get(cacheKey);
+      if (!stmt) {
+        stmt = sqlite.prepare(sql);
+        if (method !== "run") {
+          stmt.setReturnArrays(true);
+        }
+        stmtCache.set(cacheKey, stmt);
+      }
+
       if (method === "run") {
         stmt.run(...params);
         return { rows: [] };
       }
-      stmt.setReturnArrays(true);
       if (method === "get") {
         const row = stmt.get(...params) as unknown as unknown[] | undefined;
         return { rows: (row ?? undefined) as unknown[] };

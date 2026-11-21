@@ -1,6 +1,6 @@
 import "server-only";
 import { eq, and, desc, asc } from "drizzle-orm";
-import { getOrmDb } from "./connection";
+import { getDatabase, getOrmDb } from "./connection";
 import {
   usersTable,
   worksTable,
@@ -408,7 +408,7 @@ export async function ormInsertReading(reading: Reading): Promise<void> {
     progressTotal: reading.progressTotal,
     countsForGoals: reading.countsForGoals,
     abandonReason: reading.abandonReason,
-    createdAt: reading.createdAt,
+    createdAt: reading.createdAt ?? reading.updatedAt,
     updatedAt: reading.updatedAt,
   });
 }
@@ -638,45 +638,57 @@ export async function ormSeedWorkspace(ws: {
     return;
   }
 
-  await ormCreateUser({
-    id: ws.profile.id,
-    email: ws.profile.email,
-    displayName: ws.profile.displayName,
-    passwordHash: ws.passwordHashSim,
-    locale: ws.profile.locale,
-    timezone: ws.profile.timezone,
-    theme: ws.profile.theme,
-    defaultCurrency: ws.profile.defaultCurrency,
-    threeD: ws.profile.threeD,
-    goalsCountRereads: ws.profile.goalsCountRereads,
-    maxSimultaneousReadings: ws.profile.maxSimultaneousReadings,
-    telemetryOptOut: ws.profile.telemetryOptOut,
-    onboardingCompleted: ws.profile.onboardingCompleted,
-    acceptedTermsVersion: ws.profile.acceptedTermsVersion,
-    acceptedTermsAt: ws.profile.acceptedTermsAt,
-    createdAt: new Date().toISOString(),
-  });
+  const sqlite = getDatabase();
+  sqlite.exec("BEGIN IMMEDIATE;");
+  try {
+    await ormCreateUser({
+      id: ws.profile.id,
+      email: ws.profile.email,
+      displayName: ws.profile.displayName,
+      passwordHash: ws.passwordHashSim,
+      locale: ws.profile.locale,
+      timezone: ws.profile.timezone,
+      theme: ws.profile.theme,
+      defaultCurrency: ws.profile.defaultCurrency,
+      threeD: ws.profile.threeD,
+      goalsCountRereads: ws.profile.goalsCountRereads,
+      maxSimultaneousReadings: ws.profile.maxSimultaneousReadings,
+      telemetryOptOut: ws.profile.telemetryOptOut,
+      onboardingCompleted: ws.profile.onboardingCompleted,
+      acceptedTermsVersion: ws.profile.acceptedTermsVersion,
+      acceptedTermsAt: ws.profile.acceptedTermsAt,
+      createdAt: new Date().toISOString(),
+    });
 
-  for (const w of ws.works) {
-    await ormInsertWork(w);
-  }
-  for (const ed of ws.editions) {
-    await ormInsertEdition(ed);
-  }
-  await ormInsertShelves(ws.shelves);
-  for (const it of ws.items) {
-    await ormInsertLibraryItem(it);
-  }
-  for (const r of ws.readings) {
-    await ormInsertReading(r);
-  }
-  for (const rev of ws.reviews) {
-    await ormUpsertReview(rev);
-  }
-  for (const g of ws.goals) {
-    await ormInsertGoal(g);
-  }
-  for (const wish of ws.wishlist) {
-    await ormInsertWishlistItem(wish);
+    for (const w of ws.works) {
+      await ormInsertWork(w);
+    }
+    for (const ed of ws.editions) {
+      await ormInsertEdition(ed);
+    }
+    await ormInsertShelves(ws.shelves);
+    for (const it of ws.items) {
+      await ormInsertLibraryItem(it);
+    }
+    for (const r of ws.readings) {
+      await ormInsertReading(r);
+    }
+    for (const rev of ws.reviews) {
+      await ormUpsertReview(rev);
+    }
+    for (const g of ws.goals) {
+      await ormInsertGoal(g);
+    }
+    for (const wish of ws.wishlist) {
+      await ormInsertWishlistItem(wish);
+    }
+    sqlite.exec("COMMIT;");
+  } catch (err) {
+    try {
+      sqlite.exec("ROLLBACK;");
+    } catch {
+      // ignora se a transação já foi desfeita
+    }
+    throw err;
   }
 }
