@@ -188,8 +188,6 @@ a:hover .rf-book-cover-wishlist {
   margin: 0;
   padding: 12px 16px 0;
   list-style: none;
-  perspective: 1800px;
-  perspective-origin: 50% -140px;
 }
 
 /* ==========================================================================
@@ -214,8 +212,30 @@ a:hover .rf-book-cover-wishlist {
   flex: 0 0 var(--spine-width);
   z-index: 1;
   scroll-snap-align: start;
+  /* Câmera 3D individual centrada em cada livro (evita expor laterais nas bordas em repouso) */
   perspective: 1100px;
-  transform-style: preserve-3d;
+  perspective-origin: 50% 50%;
+}
+
+/* Em repouso (fora de hover/foco/seleção e fora do modo capas), faces laterais ficam ocultas */
+.rf-book-slot:not(:hover):not(.is-focused):not(.is-selected) .rf-face-top-pages,
+.rf-book-slot:not(:hover):not(.is-focused):not(.is-selected)
+  .rf-face-back-cover,
+.rf-book-slot:not(:hover):not(.is-focused):not(.is-selected)
+  .rf-face-fore-edge-pages,
+.rf-book-slot:not(:hover):not(.is-focused):not(.is-selected)
+  .rf-face-side-cover {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rf-covers-mode .rf-book-slot .rf-face-top-pages,
+.rf-covers-mode .rf-book-slot .rf-face-back-cover,
+.rf-covers-mode .rf-book-slot .rf-face-fore-edge-pages,
+.rf-covers-mode .rf-book-slot .rf-face-side-cover {
+  visibility: visible;
+  opacity: 1;
 }
 
 /* Sombra de contato removida por livro (movida para a tábua) para manter DOM enxuto em 150+ livros */
