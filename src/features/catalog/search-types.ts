@@ -34,7 +34,6 @@ export const BOOK_SEARCH_DEBOUNCE_MS = 350;
 /** Normaliza o termo digitado; `null` quando curto demais para consultar. */
 export function normalizeSearchQuery(raw: string): string | null {
   const cleaned = raw
-    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001F\u007F]/g, " ")
     .replace(/\s+/g, " ")
     .trim()

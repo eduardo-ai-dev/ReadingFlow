@@ -104,7 +104,6 @@ export function evaluatePasswordStrength(
   ];
 
   const metCount = criteria.filter((c) => c.met).length;
-  const isValid = metCount === 5;
 
   if (password.length === 0) {
     return {
