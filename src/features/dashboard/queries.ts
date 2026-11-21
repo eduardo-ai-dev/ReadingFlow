@@ -3,7 +3,10 @@ import {
   cachedWorkspaceQuery,
   requireAuthenticatedWorkspace,
 } from "@/server/store/memory-repository";
-import { resolveWorkCoverEdition } from "@/features/catalog/cover-url";
+import {
+  indexEditionsByWorkId,
+  resolveWorkCoverEdition,
+} from "@/features/catalog/cover-url";
 import { selectEligibleFinishedReadings } from "@/features/goals/rules";
 import {
   daysBetweenInclusive,
@@ -116,6 +119,13 @@ export async function getDashboardEditorialData(): Promise<DashboardEditorialDat
 
     const worksById = new Map(ws.works.map((w) => [w.id, w]));
     const editionsById = new Map(ws.editions.map((e) => [e.id, e]));
+    const editionsByWorkId = indexEditionsByWorkId(ws.editions);
+    const firstReadingByWorkId = new Map<string, (typeof ws.readings)[0]>();
+    for (const r of ws.readings) {
+      if (!firstReadingByWorkId.has(r.workId)) {
+        firstReadingByWorkId.set(r.workId, r);
+      }
+    }
     const itemEditionIdByWorkId = new Map<string, string>();
     for (const item of ws.items) {
       const ed = editionsById.get(item.editionId);
@@ -293,11 +303,12 @@ export async function getDashboardEditorialData(): Promise<DashboardEditorialDat
         preferredEditionId: itemEditionIdByWorkId.get(w.id),
         editions: ws.editions,
         editionsById,
+        editionsByWorkId,
       });
       const author =
         w.contributors.find((c) => c.role === "author")?.name ??
         "Autor desconhecido";
-      const reading = ws.readings.find((r) => r.workId === w.id);
+      const reading = firstReadingByWorkId.get(w.id);
       const statusLabel = reading
         ? reading.status === "reading"
           ? "Em andamento"
@@ -326,6 +337,7 @@ export async function getDashboardEditorialData(): Promise<DashboardEditorialDat
           preferredEditionId: wish.editionId,
           editions: ws.editions,
           editionsById,
+          editionsByWorkId,
         });
         const author =
           w.contributors.find((c) => c.role === "author")?.name ??

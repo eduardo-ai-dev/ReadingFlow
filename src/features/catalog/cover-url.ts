@@ -45,6 +45,25 @@ export function resolvePersistedCoverUrl(
 }
 
 /**
+ * Indexa edições por `workId` em O(N) para evitar varreduras lineares O(N²)
+ * ao resolver capas para centenas ou milhares de livros.
+ */
+export function indexEditionsByWorkId(
+  editions: readonly Edition[]
+): Map<string, Edition[]> {
+  const map = new Map<string, Edition[]>();
+  for (const ed of editions) {
+    const list = map.get(ed.workId);
+    if (list) {
+      list.push(ed);
+    } else {
+      map.set(ed.workId, [ed]);
+    }
+  }
+  return map;
+}
+
+/**
  * Resolve a edição canônica de uma obra para exibição consistente da capa persistida
  * entre Painel, Estante 3D, Ficha Rápida, Leitura e Lista de Desejos.
  *
@@ -56,8 +75,15 @@ export function resolveWorkCoverEdition(params: {
   preferredEditionId?: string | null;
   editions: readonly Edition[];
   editionsById?: ReadonlyMap<string, Edition>;
+  editionsByWorkId?: ReadonlyMap<string, readonly Edition[]>;
 }): Edition | undefined {
-  const { workId, preferredEditionId, editions, editionsById } = params;
+  const {
+    workId,
+    preferredEditionId,
+    editions,
+    editionsById,
+    editionsByWorkId,
+  } = params;
   const preferred = preferredEditionId
     ? (editionsById?.get(preferredEditionId) ??
       editions.find((e) => e.id === preferredEditionId))
@@ -67,9 +93,12 @@ export function resolveWorkCoverEdition(params: {
     return preferred;
   }
 
-  const siblingWithCover = editions.find(
-    (e) => e.workId === workId && Boolean(resolvePersistedCoverUrl(e))
-  );
+  const workEditions = editionsByWorkId ? editionsByWorkId.get(workId) : null;
+  const siblingWithCover = workEditions
+    ? workEditions.find((e) => Boolean(resolvePersistedCoverUrl(e)))
+    : editions.find(
+        (e) => e.workId === workId && Boolean(resolvePersistedCoverUrl(e))
+      );
 
   if (preferred) {
     if (!siblingWithCover) return preferred;
@@ -83,5 +112,8 @@ export function resolveWorkCoverEdition(params: {
     };
   }
 
-  return siblingWithCover ?? editions.find((e) => e.workId === workId);
+  return (
+    siblingWithCover ??
+    (workEditions ? workEditions[0] : editions.find((e) => e.workId === workId))
+  );
 }

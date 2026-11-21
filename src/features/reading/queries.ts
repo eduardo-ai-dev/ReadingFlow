@@ -1,7 +1,10 @@
 import "server-only";
 import { requireAuthenticatedWorkspace } from "@/server/store/memory-repository";
 import { computeReadingPercent } from "@/features/reading/rules";
-import { resolveWorkCoverEdition } from "@/features/catalog/cover-url";
+import {
+  indexEditionsByWorkId,
+  resolveWorkCoverEdition,
+} from "@/features/catalog/cover-url";
 import type { Edition, Reading, Review, Work } from "@/lib/domain";
 
 export interface EnrichedReadingEntry {
@@ -29,6 +32,7 @@ export async function getReadingsOverview(): Promise<{
   const ws = await requireAuthenticatedWorkspace();
   const worksById = new Map(ws.works.map((w) => [w.id, w]));
   const editionsById = new Map(ws.editions.map((e) => [e.id, e]));
+  const editionsByWorkId = indexEditionsByWorkId(ws.editions);
   const reviewsByWorkId = new Map(ws.reviews.map((r) => [r.workId, r]));
 
   // Count finished chronological order per work to flag rereads
@@ -54,6 +58,7 @@ export async function getReadingsOverview(): Promise<{
       preferredEditionId: reading.editionId,
       editions: ws.editions,
       editionsById,
+      editionsByWorkId,
     });
 
     const percent = computeReadingPercent({

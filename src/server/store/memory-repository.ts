@@ -1149,29 +1149,34 @@ interface WorkspaceQueryCacheEntry {
 }
 
 const workspaceQueryCache = new Map<string, WorkspaceQueryCacheEntry>();
+const workspaceRevisionCounter = new Map<string, number>();
 
+function bumpWorkspaceRevision(userId: string): number {
+  const next = (workspaceRevisionCounter.get(userId) ?? 0) + 1;
+  workspaceRevisionCounter.set(userId, next);
+  return next;
+}
+
+/**
+ * Fingerprint O(1): combina o contador monotônico de revisão por usuário
+ * (incrementado em toda mutação/invalidação) com comprimentos e ponteiros de
+ * borda das coleções (detectando inclusive mutações diretas em testes unitários)
+ * sem varrer nem concatenar 2.000 edições/leituras em cada hit de cache.
+ */
 function buildWorkspaceFingerprint(ws: UserWorkspaceData): string {
-  const lastReadingTs =
-    ws.readings.reduce(
-      (max, r) => (r.updatedAt > max ? r.updatedAt : max),
-      ""
-    ) || "0";
-  const lastReviewTs =
-    ws.reviews.reduce(
-      (max, r) => (r.updatedAt > max ? r.updatedAt : max),
-      ""
-    ) || "0";
-  const lastItemId = ws.items[ws.items.length - 1]?.id ?? "0";
-  const lastShelfPos = ws.items[ws.items.length - 1]?.shelfPosition ?? 0;
-  const coversDigest = ws.editions
-    .map(
-      (e) =>
-        `${e.id}:${e.coverUrl ?? ""}:${e.coverLocked ? "1" : "0"}:${e.coverSelectedAt ?? ""}`
-    )
-    .join(",");
+  const rev = workspaceRevisionCounter.get(ws.profile.id) ?? 0;
+  const firstEd = ws.editions[0];
+  const lastEd = ws.editions[ws.editions.length - 1];
+  const firstReading = ws.readings[0];
+  const lastReading = ws.readings[ws.readings.length - 1];
+  const lastReview = ws.reviews[ws.reviews.length - 1];
+  const firstItem = ws.items[0];
+  const lastItem = ws.items[ws.items.length - 1];
   const settingsTs = ws.settings?.updatedAt ?? "0";
+
   return [
     ws.profile.id,
+    rev,
     ws.profile.timezone,
     ws.profile.theme,
     ws.profile.goalsCountRereads ? "1" : "0",
@@ -1183,17 +1188,24 @@ function buildWorkspaceFingerprint(ws: UserWorkspaceData): string {
     ws.wishlist.length,
     ws.goals.length,
     ws.lastUndoAction?.id ?? "0",
-    lastReadingTs,
-    lastReviewTs,
-    lastItemId,
-    lastShelfPos,
+    firstReading?.updatedAt ?? "0",
+    lastReading?.updatedAt ?? "0",
+    lastReview?.updatedAt ?? "0",
+    firstItem?.id ?? "0",
+    firstItem?.shelfPosition ?? 0,
+    lastItem?.id ?? "0",
+    lastItem?.shelfPosition ?? 0,
+    firstEd?.coverUrl ?? "",
+    firstEd?.coverLocked ? "1" : "0",
+    lastEd?.coverUrl ?? "",
+    lastEd?.coverLocked ? "1" : "0",
     settingsTs,
-    coversDigest,
   ].join("|");
 }
 
 /** Invalida explicitamente todas as entradas de cache pertencentes a um usuário específico. */
 export function invalidateUserWorkspaceCache(userId: string): void {
+  bumpWorkspaceRevision(userId);
   const prefix = `${userId}::`;
   for (const key of workspaceQueryCache.keys()) {
     if (key.startsWith(prefix)) {
@@ -1234,13 +1246,33 @@ export function cachedWorkspaceQuery<T>(
 }
 
 export function saveUndoSnapshot(ws: UserWorkspaceData, label: string): void {
-  const { lastUndoAction: _ignored, ...rest } = ws;
-  void _ignored;
+  bumpWorkspaceRevision(ws.profile.id);
   ws.lastUndoAction = {
     id: `undo-${Date.now()}`,
     label,
     createdAtMs: Date.now(),
-    restoreSnapshot: structuredClone(rest),
+    restoreSnapshot: {
+      profile: { ...ws.profile },
+      passwordHashSim: ws.passwordHashSim,
+      works: ws.works.map((w) => ({
+        ...w,
+        contributors: w.contributors.map((c) => ({ ...c })),
+      })),
+      editions: ws.editions.map((e) => ({
+        ...e,
+        contributors: e.contributors.map((c) => ({ ...c })),
+      })),
+      shelves: ws.shelves.map((s) => ({ ...s })),
+      items: ws.items.map((i) => ({ ...i })),
+      wishlist: ws.wishlist.map((w) => ({ ...w })),
+      readings: ws.readings.map((r) => ({
+        ...r,
+        dailyLogs: r.dailyLogs ? r.dailyLogs.map((d) => ({ ...d })) : undefined,
+      })),
+      reviews: ws.reviews.map((r) => ({ ...r })),
+      goals: ws.goals.map((g) => ({ ...g })),
+      importJobs: ws.importJobs.map((j) => ({ ...j })),
+    },
   };
 }
 
