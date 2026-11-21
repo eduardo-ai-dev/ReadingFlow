@@ -1241,7 +1241,7 @@ export function FocusReadingSessionClient({
             <div
               aria-hidden="true"
               onClick={() => setAmbientSheetOpen(false)}
-              className="fixed inset-0 z-40 bg-black/45 lg:hidden"
+              className="!m-0 fixed inset-0 z-40 bg-black/45 lg:hidden"
             />
           ) : null}
 
@@ -1252,7 +1252,7 @@ export function FocusReadingSessionClient({
             aria-label={ambientSheetOpen ? "Mixer de sons ambiente" : undefined}
             className={
               ambientSheetOpen
-                ? "fixed inset-x-0 bottom-0 z-50 max-h-[82dvh] overflow-y-auto overscroll-contain rounded-t-2xl border-t border-[var(--rf-border-default)] bg-[#FAF7F1] p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl lg:static lg:z-auto lg:block lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none"
+                ? "!m-0 fixed inset-x-0 bottom-0 z-50 max-h-[82dvh] overflow-y-auto overscroll-contain rounded-t-2xl border-t border-[var(--rf-border-default)] bg-[#FAF7F1] p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl lg:static lg:z-auto lg:block lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none"
                 : "hidden lg:block"
             }
           >

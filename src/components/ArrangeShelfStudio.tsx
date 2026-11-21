@@ -1550,7 +1550,7 @@ export function ArrangeShelfStudio({
           aria-label="Controles de personalização da estante"
           className={
             mobileSheetOpen
-              ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[82dvh] flex-col overflow-y-auto overscroll-contain rounded-t-2xl border-t border-[var(--rf-border-default)] bg-[var(--rf-surface-card)] p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl xl:static xl:z-auto xl:block xl:max-h-none xl:overflow-visible xl:rounded-2xl xl:border xl:p-4 xl:shadow-sm xl:sticky xl:top-6"
+              ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[82dvh] flex-col overflow-y-auto overscroll-contain rounded-t-2xl border-t border-[var(--rf-border-default)] bg-[var(--rf-surface-card-solid)] p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl xl:static xl:z-auto xl:block xl:max-h-none xl:overflow-visible xl:rounded-2xl xl:border xl:bg-[var(--rf-surface-card)] xl:p-4 xl:shadow-sm xl:sticky xl:top-6"
               : "hidden rounded-2xl border border-[var(--rf-border-default)] bg-[var(--rf-surface-card)] p-4 shadow-sm xl:sticky xl:top-6 xl:block"
           }
         >

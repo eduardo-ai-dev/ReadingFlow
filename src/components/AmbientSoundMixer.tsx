@@ -590,12 +590,12 @@ export function AmbientSoundMixer({
       ) : null}
 
       {/* Opção desligada por padrão: continuar em outras telas */}
-      <label className="flex min-h-[44px] lg:min-h-0 cursor-pointer items-center gap-2 font-sans text-xs lg:text-[11px] text-[var(--rf-text-secondary)]">
+      <label className="flex min-h-[44px] lg:min-h-0 cursor-pointer items-center gap-2.5 font-sans text-xs lg:text-[11px] text-[var(--rf-text-secondary)]">
         <input
           type="checkbox"
           checked={prefs.continueAcrossPages}
           onChange={(e) => handleToggleContinueAcross(e.target.checked)}
-          className="h-4 w-4 lg:h-3.5 lg:w-3.5 shrink-0 accent-[var(--rf-accent-secondary)]"
+          className="h-6 w-6 lg:h-4 lg:w-4 shrink-0 accent-[var(--rf-accent-secondary)]"
         />
         <span>Continuar som em outras telas</span>
       </label>

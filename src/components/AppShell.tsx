@@ -322,15 +322,15 @@ export function AppShell({
           ÁREA PRINCIPAL DE CONTEÚDO — FOLHA EDITORIAL CENTRAL (max-w-[1360px])
           Iluminação ambiente quente abaixo da navbar + folha sobre mesa
           ==================================================================== */}
-      <div className="relative z-10 min-h-[calc(100dvh-4rem)]">
+      <div className="relative min-h-[calc(100dvh-4rem)]">
         <div
           aria-hidden="true"
-          className="rf-top-ambient-glow pointer-events-none absolute inset-x-0 top-0 z-10 h-44"
+          className="rf-top-ambient-glow pointer-events-none absolute inset-x-0 top-0 z-0 h-44"
         />
         <main
           id="conteudo-principal"
           tabIndex={-1}
-          className="rf-editorial-sheet relative z-10 min-h-[calc(100dvh-4rem)] min-w-0 px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-10 lg:py-9 lg:pb-16"
+          className="rf-editorial-sheet relative min-h-[calc(100dvh-4rem)] min-w-0 px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-10 lg:py-9 lg:pb-16"
         >
           <UndoBanner undoInfo={undoInfo} />
           {children}

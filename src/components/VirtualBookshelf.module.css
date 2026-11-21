@@ -1366,7 +1366,9 @@
   .cancelDeleteBtn,
   .colorPresetBtn,
   .shelfSuggestionChip {
+    min-width: 44px;
     min-height: 44px;
+    justify-content: center;
     padding-inline: 12px;
   }
 }
