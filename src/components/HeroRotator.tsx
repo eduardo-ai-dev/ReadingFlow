@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
@@ -14,12 +14,25 @@ interface HeroRotatorProps {
   isAuthenticated?: boolean;
 }
 
+function resolveLayoutSrc(
+  layout: LandingHeroLayout,
+  isMobileViewport: boolean
+): string {
+  if (isMobileViewport && layout.mobileSrc) {
+    return layout.mobileSrc;
+  }
+  return layout.src;
+}
+
 /**
  * HeroRotator — Exibe um cenário aleatório da landing page (descoberto em `public/landing-layouts/`)
  * a cada recarregamento da página (F5), sem repetir a imagem anterior e sem controles de carrossel:
  * - Render inicial / SSR: `activeIndex = null` mantendo o fundo Onyx (#141514) sem erro de hidratação.
  * - Ao montar no cliente: sorteia um índice diferente do último salvo em `sessionStorage` e revela
  *   a imagem com fade suave (`opacity-0` -> `opacity-100`, `duration-500`).
+ * - Mantém no máximo 2 camadas de imagem no DOM (ativa com `preload` + próxima pré-estagiada após o load da ativa).
+ * - Direção de arte mobile: em viewports `< 768px`, entrega recorte retrato dedicado (`1080×1920`, `mobileSrc`)
+ *   ou `mobileObjectPosition` ajustado, evitando ampliação excessiva de foto 16:9 em tela vertical.
  */
 export function HeroRotator({
   layouts,
@@ -28,19 +41,57 @@ export function HeroRotator({
   const count = layouts.length;
   const [openHotspotId, setOpenHotspotId] = useState<string | null>(null);
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(max-width: 767px)").matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mql = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobileViewport(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
 
   const { activeIndex, prefersReducedMotion } = useHeroRotator(count);
 
   const activeLayout =
     activeIndex !== null ? (layouts[activeIndex] ?? null) : null;
+  const nextIndex =
+    activeIndex !== null && count > 1 ? (activeIndex + 1) % count : null;
+  const nextLayout =
+    nextIndex !== null && nextIndex !== activeIndex
+      ? (layouts[nextIndex] ?? null)
+      : null;
+
+  const activeResolvedSrc = activeLayout
+    ? resolveLayoutSrc(activeLayout, isMobileViewport)
+    : null;
+  const nextResolvedSrc = nextLayout
+    ? resolveLayoutSrc(nextLayout, isMobileViewport)
+    : null;
+
   const isImageLoaded = Boolean(
-    activeLayout && loadedSrc === activeLayout.src
+    activeResolvedSrc && loadedSrc === activeResolvedSrc
   );
 
   const imagePositionVars = activeLayout
     ? ({
         "--hero-pos-desktop": activeLayout.objectPosition,
-        "--hero-pos-mobile": activeLayout.mobileObjectPosition,
+        "--hero-pos-mobile": activeLayout.mobileSrc
+          ? "50% 50%"
+          : activeLayout.mobileObjectPosition,
+      } as CSSProperties)
+    : undefined;
+
+  const nextImagePositionVars = nextLayout
+    ? ({
+        "--hero-pos-desktop": nextLayout.objectPosition,
+        "--hero-pos-mobile": nextLayout.mobileSrc
+          ? "50% 50%"
+          : nextLayout.mobileObjectPosition,
       } as CSSProperties)
     : undefined;
 
@@ -52,30 +103,53 @@ export function HeroRotator({
       data-hero-active-index={activeIndex !== null ? activeIndex : undefined}
       className={styles.heroSection}
     >
-      {/* 1. Imagem de fundo sorteada no cliente (inicia em opacity-0 sobre #141514 e faz fade-in suave duration-500) */}
-      {activeLayout ? (
+      {/* 1. No máximo 2 camadas no DOM: imagem ativa (com preload e quality=85) + próxima (sem preload, após a ativa carregar) */}
+      {activeLayout && activeResolvedSrc ? (
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 overflow-hidden"
         >
           <div
             data-hero-layout={activeLayout.filename}
+            data-hero-layer="active"
+            data-hero-variant={
+              isMobileViewport && activeLayout.mobileSrc
+                ? "mobile-portrait"
+                : "desktop-landscape"
+            }
             className={`${styles.imageLayer} transition-opacity duration-500 ease-out motion-reduce:transition-none ${
               isImageLoaded ? "opacity-100" : "opacity-0"
             }`}
             style={imagePositionVars}
           >
             <Image
-              src={activeLayout.src}
+              src={activeResolvedSrc}
               alt={activeLayout.alt}
               fill
-              priority
-              fetchPriority="high"
-              quality={90}
+              preload
+              quality={85}
               sizes="100vw"
-              onLoad={() => setLoadedSrc(activeLayout.src)}
+              onLoad={() => setLoadedSrc(activeResolvedSrc)}
             />
           </div>
+
+          {isImageLoaded && nextLayout && nextResolvedSrc ? (
+            <div
+              data-hero-next-layout={nextLayout.filename}
+              data-hero-layer="next"
+              aria-hidden="true"
+              className={`${styles.imageLayer} pointer-events-none opacity-0`}
+              style={nextImagePositionVars}
+            >
+              <Image
+                src={nextResolvedSrc}
+                alt={nextLayout.alt}
+                fill
+                quality={85}
+                sizes="100vw"
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -193,11 +267,9 @@ export function HeroRotator({
         type="button"
         aria-label="Rolar para a próxima seção"
         onClick={() => {
-          document
-            .getElementById("sobre")
-            ?.scrollIntoView({
-              behavior: prefersReducedMotion ? "auto" : "smooth",
-            });
+          document.getElementById("sobre")?.scrollIntoView({
+            behavior: prefersReducedMotion ? "auto" : "smooth",
+          });
         }}
         className="rf-icon-btn absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 cursor-pointer flex-col items-center gap-1 rounded-full border border-[#C8A46E]/30 bg-[#141514]/70 px-3 py-2 font-sans text-[#DFBE88] backdrop-blur-sm transition-colors hover:bg-[#141514]/90 hover:text-[#F4EFE6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E] lg:bottom-5"
       >

@@ -5,10 +5,11 @@
   "description": "Biblioteca pessoal digital para livros físicos, e-books e audiobooks (Release R0 — 2D)",
   "scripts": {
     "dev": "next dev",
-    "build": "npm run check:contrast && next build",
+    "build": "npm run check:contrast && npm run check:images && next build",
     "start": "next start",
     "check:contrast": "node scripts/verify-theme-contrast.mjs",
     "check:contrast:rendered": "node scripts/verify-theme-contrast.mjs --rendered",
+    "check:images": "node scripts/check-images.mjs",
     "lint": "eslint .",
     "format": "prettier --write --ignore-unknown .",
     "format:check": "prettier --check --ignore-unknown .",

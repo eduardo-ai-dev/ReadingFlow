@@ -24,16 +24,14 @@ export function LandingHeroClient({
       aria-label="Apresentação do ReadingFlow"
       className="relative h-[100dvh] min-h-[100dvh] w-full overflow-hidden border-b border-[#C8A46E]/30 bg-[#141514]"
     >
-      {/* 1. Imagem 4K otimizada via next/image (WebP/AVIF, priority, fetchPriority="high", dimensões 3840x2160 anti-CLS) */}
-      <div className="rf-ken-burns motion-reduce:animate-none absolute inset-0 h-full w-full">
+      {/* 1. Imagem 4K otimizada via next/image (WebP/AVIF, preload, fill, quality=85, sem zoom que reamostre) */}
+      <div className="absolute inset-0 h-full w-full">
         <Image
           src="/hero-library-4k.webp"
           alt="Cenário clássico de biblioteca noturna com janela em arco iluminada pela lua à esquerda, estante de madeira escura ao centro e poltrona de couro com abajur à direita"
-          width={3840}
-          height={2160}
-          priority
-          fetchPriority="high"
-          quality={90}
+          fill
+          preload
+          quality={85}
           sizes="100vw"
           className="h-full w-full object-cover object-center select-none"
         />

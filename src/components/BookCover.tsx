@@ -306,7 +306,7 @@ function BookCoverBase({
               height={imageHeight}
               sizes={resolvedSizes}
               quality={75}
-              priority={priority}
+              preload={priority}
               loading={priority ? undefined : "lazy"}
               unoptimized={isInlineOrPrivateUrl}
               referrerPolicy="no-referrer"
@@ -336,7 +336,7 @@ function BookCoverBase({
               fill
               sizes={resolvedSizes}
               quality={75}
-              priority={priority}
+              preload={priority}
               loading={priority ? undefined : "lazy"}
               unoptimized={isInlineOrPrivateUrl}
               referrerPolicy="no-referrer"
@@ -390,7 +390,7 @@ function BookCoverBase({
         className="pointer-events-none absolute inset-[0_3px_3px_0] z-[3]"
         style={{
           background:
-            "linear-gradient(126deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.05) 28%, transparent 48%, rgba(20, 21, 20, 0.08) 100%)",
+            "linear-gradient(126deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 26%, transparent 46%, rgba(20, 21, 20, 0.06) 100%)",
         }}
       />
 

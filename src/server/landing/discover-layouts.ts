@@ -2,6 +2,7 @@ import "server-only";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
+  LANDING_LAYOUTS_MOBILE_PUBLIC_PREFIX,
   LANDING_LAYOUTS_PUBLIC_PREFIX,
   compareLandingLayoutFilenames,
   deriveDefaultAltFromFilename,
@@ -53,10 +54,9 @@ export async function discoverLandingLayouts(
 ): Promise<LandingHeroLayout[]> {
   let entries: string[];
   try {
-    const dirents = await fs.readdir(
-      /*turbopackIgnore: true*/ dirPath,
-      { withFileTypes: true }
-    );
+    const dirents = await fs.readdir(/*turbopackIgnore: true*/ dirPath, {
+      withFileTypes: true,
+    });
     entries = dirents
       .filter((d) => d.isFile() && isSupportedLandingImageFilename(d.name))
       .map((d) => d.name)
@@ -70,6 +70,24 @@ export async function discoverLandingLayouts(
   }
 
   const manifest = await readOptionalManifest(dirPath);
+  const mobilePrefix =
+    publicPrefix === LANDING_LAYOUTS_PUBLIC_PREFIX
+      ? LANDING_LAYOUTS_MOBILE_PUBLIC_PREFIX
+      : `${publicPrefix}/mobile`;
+  let mobileFiles = new Set<string>();
+  try {
+    const mobileDirents = await fs.readdir(
+      /*turbopackIgnore: true*/ path.join(dirPath, "mobile"),
+      { withFileTypes: true }
+    );
+    mobileFiles = new Set(
+      mobileDirents
+        .filter((d) => d.isFile() && isSupportedLandingImageFilename(d.name))
+        .map((d) => d.name)
+    );
+  } catch {
+    // Subpasta mobile/ opcional
+  }
 
   return entries.map((filename, index) => {
     const meta = manifest[filename];
@@ -82,6 +100,14 @@ export async function discoverLandingLayouts(
       meta?.mobileObjectPosition,
       objectPosition
     );
+
+    const baseName = filename.replace(/\.[^.]+$/, "");
+    const mobileCandidate = `${baseName}.webp`;
+    const mobileSrc = mobileFiles.has(mobileCandidate)
+      ? `${mobilePrefix}/${encodeURIComponent(mobileCandidate)}`
+      : mobileFiles.has(filename)
+        ? `${mobilePrefix}/${encodeURIComponent(filename)}`
+        : undefined;
 
     const hotspots: LandingLayoutHotspot[] = (meta?.hotspots ?? []).map(
       (hs, hsIdx) => ({
@@ -98,6 +124,7 @@ export async function discoverLandingLayouts(
       id: `layout-${index + 1}-${filename.replace(/[^a-zA-Z0-9_-]/g, "")}`,
       filename,
       src: `${publicPrefix}/${encodeURIComponent(filename)}`,
+      ...(mobileSrc ? { mobileSrc } : {}),
       label: meta?.label ?? defaultLabel,
       alt: meta?.alt ?? deriveDefaultAltFromFilename(filename),
       objectPosition,

@@ -1,12 +1,14 @@
 import { z } from "zod";
 
 export const LANDING_LAYOUTS_PUBLIC_PREFIX = "/landing-layouts";
+export const LANDING_LAYOUTS_MOBILE_PUBLIC_PREFIX = "/landing-layouts/mobile";
 
 export const SUPPORTED_LANDING_IMAGE_EXTENSIONS = new Set([
   ".avif",
   ".webp",
   ".jpg",
   ".jpeg",
+  ".jfif",
   ".png",
 ]);
 
@@ -25,6 +27,8 @@ export interface LandingHeroLayout {
   id: string;
   filename: string;
   src: string;
+  /** Recorte retrato próprio para mobile (ex.: 1080×1920 em public/landing-layouts/mobile/). */
+  mobileSrc?: string;
   label: string;
   alt: string;
   objectPosition: string;

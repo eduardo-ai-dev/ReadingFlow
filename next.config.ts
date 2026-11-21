@@ -43,9 +43,10 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   images: {
     formats: ["image/avif", "image/webp"],
-    qualities: [75, 90, 100],
-    minimumCacheTTL: 2592000,
-    imageSizes: [48, 64, 96, 128, 160, 200, 256, 384],
+    qualities: [75, 85],
+    minimumCacheTTL: 31536000,
+    deviceSizes: [640, 828, 1080, 1280, 1920, 2560, 3840],
+    imageSizes: [48, 64, 96, 128, 256, 384],
     remotePatterns: [
       { protocol: "https", hostname: "books.google.com" },
       { protocol: "https", hostname: "books.googleusercontent.com" },

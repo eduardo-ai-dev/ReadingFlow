@@ -16,23 +16,31 @@ import { HeroRotator } from "@/components/HeroRotator";
 
 vi.mock("next/image", () => ({
   default: ({
-    fill: _fill,
+    fill,
+    preload,
     priority: _priority,
     fetchPriority: _fp,
-    quality: _q,
+    quality,
     ...props
   }: ImgHTMLAttributes<HTMLImageElement> & {
     fill?: boolean;
+    preload?: boolean;
     priority?: boolean;
     fetchPriority?: string;
     quality?: number;
   }) => {
-    void _fill;
     void _priority;
     void _fp;
-    void _q;
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img {...props} alt={props.alt ?? ""} />;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        {...props}
+        alt={props.alt ?? ""}
+        data-fill={fill ? "true" : undefined}
+        data-preload={preload ? "true" : undefined}
+        data-quality={quality !== undefined ? String(quality) : undefined}
+      />
+    );
   },
 }));
 
@@ -118,7 +126,9 @@ describe("HeroRotator component behavior", () => {
     });
 
     expect(screen.getByRole("heading", { name: "ReadingFlow" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Abrir Minha Estante" })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Abrir Minha Estante" })
+    ).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Rolar para a próxima seção" })
     ).toBeTruthy();
@@ -145,10 +155,18 @@ describe("HeroRotator component behavior", () => {
     expect(layer?.className).toContain("opacity-0");
     expect(layer?.className).toContain("duration-500");
 
-    // Once the image finishes loading, fades to opacity-100
+    // Once the image finishes loading, fades to opacity-100 and mounts at most the 2nd layer (next)
     fireEvent.load(imgs[0]!);
     expect(layer?.className).toContain("opacity-100");
     expect(layer?.className).not.toContain("opacity-0");
+
+    const afterLoadImgs = container.querySelectorAll("img");
+    expect(afterLoadImgs).toHaveLength(2);
+    expect(afterLoadImgs[0]?.getAttribute("data-preload")).toBe("true");
+    expect(afterLoadImgs[0]?.getAttribute("data-quality")).toBe("85");
+    expect(afterLoadImgs[0]?.getAttribute("sizes")).toBe("100vw");
+    expect(afterLoadImgs[1]?.getAttribute("data-preload")).toBeNull();
+    expect(afterLoadImgs[1]?.getAttribute("data-quality")).toBe("85");
 
     // No carousel arrows or pagination dots exist; scroll-down button stays intact
     expect(container.querySelector('[data-hero-controls="true"]')).toBeNull();
@@ -177,7 +195,9 @@ describe("HeroRotator component behavior", () => {
         .querySelector('[data-hero-rotator="true"]')
         ?.getAttribute("data-hero-active-index")
     ).toBe("1");
-    expect(window.sessionStorage.getItem(HERO_LAST_INDEX_STORAGE_KEY)).toBe("1");
+    expect(window.sessionStorage.getItem(HERO_LAST_INDEX_STORAGE_KEY)).toBe(
+      "1"
+    );
     first.unmount();
 
     // Simulated reload (F5): must pick index 0 (different from 1)
@@ -190,7 +210,9 @@ describe("HeroRotator component behavior", () => {
         .querySelector('[data-hero-rotator="true"]')
         ?.getAttribute("data-hero-active-index")
     ).toBe("0");
-    expect(window.sessionStorage.getItem(HERO_LAST_INDEX_STORAGE_KEY)).toBe("0");
+    expect(window.sessionStorage.getItem(HERO_LAST_INDEX_STORAGE_KEY)).toBe(
+      "0"
+    );
   });
 
   it("does not auto-rotate over time (no carousel timer)", () => {
@@ -234,6 +256,47 @@ describe("HeroRotator component behavior", () => {
 
     const h1 = screen.getByRole("heading", { name: "ReadingFlow" });
     expect(h1.className).toContain("sr-only");
-    expect(screen.getByRole("button", { name: "Nicho Clássicos" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Nicho Clássicos" })
+    ).toBeTruthy();
+  });
+
+  it("uses dedicated mobile portrait crop (mobileSrc) on viewports <= 767px", () => {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes("max-width: 767px"),
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
+    const layouts = [
+      makeLayout(1, {
+        src: "/landing-layouts/01-cenario.webp",
+        mobileSrc: "/landing-layouts/mobile/01-cenario.webp",
+      }),
+    ];
+
+    const { container } = render(<HeroRotator layouts={layouts} />);
+    act(() => {
+      vi.advanceTimersByTime(32);
+    });
+
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("src")).toBe(
+      "/landing-layouts/mobile/01-cenario.webp"
+    );
+    expect(
+      container
+        .querySelector('[data-hero-layer="active"]')
+        ?.getAttribute("data-hero-variant")
+    ).toBe("mobile-portrait");
   });
 });
