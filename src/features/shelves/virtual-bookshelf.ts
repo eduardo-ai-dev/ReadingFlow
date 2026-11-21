@@ -21,11 +21,7 @@ import {
 } from "@/features/catalog/spine-color-rules";
 
 export type RealisticBookFormat =
-  | "capa_dura"
-  | "brochura"
-  | "bolso"
-  | "ebook"
-  | "audio";
+  "capa_dura" | "brochura" | "bolso" | "ebook" | "audio";
 
 export interface VirtualBookItem {
   id: string | number;
@@ -173,12 +169,7 @@ export function mapWishlistEntryToVirtualBook(
 }
 
 export type ShelfQuickFilter =
-  | "all"
-  | "physical"
-  | "digital"
-  | "reading"
-  | "finished"
-  | "wishlist";
+  "all" | "physical" | "digital" | "reading" | "finished" | "wishlist";
 
 /** Filtra volumes por categoria rápida da Estante 3D. */
 export function filterVirtualBooksByQuickFilter(
@@ -197,7 +188,8 @@ export function filterVirtualBooksByQuickFilter(
       });
     case "digital":
       return books.filter((b) => {
-        if (b.shelfKind) return b.shelfKind === "digital" || b.shelfKind === "audio";
+        if (b.shelfKind)
+          return b.shelfKind === "digital" || b.shelfKind === "audio";
         const fmt = normalizeRealisticBookFormat(b.format);
         return fmt === "ebook" || fmt === "audio";
       });
@@ -299,15 +291,12 @@ export function computeRealisticBookSpecs(params: {
   } else {
     const safePages =
       typeof params.pages === "number" &&
-        Number.isFinite(params.pages) &&
-        params.pages > 0
+      Number.isFinite(params.pages) &&
+      params.pages > 0
         ? params.pages
         : 220;
-    const rawThickness =
-      safePages * 0.06 + (format === "capa_dura" ? 5 : 1.5);
-    thicknessMm = Number(
-      Math.min(55, Math.max(6, rawThickness)).toFixed(2)
-    );
+    const rawThickness = safePages * 0.06 + (format === "capa_dura" ? 5 : 1.5);
+    thicknessMm = Number(Math.min(55, Math.max(6, rawThickness)).toFixed(2));
   }
 
   return {
@@ -379,7 +368,8 @@ function pickVariedFallbackHex(
   seed: string,
   avoidNeighborHex?: string | null
 ): string {
-  const idx = hashCoverSeed(`${seed}:varied-spine`) % VARIED_SPINE_FALLBACK_HEXES.length;
+  const idx =
+    hashCoverSeed(`${seed}:varied-spine`) % VARIED_SPINE_FALLBACK_HEXES.length;
   const candidate = VARIED_SPINE_FALLBACK_HEXES[idx]!;
   if (
     avoidNeighborHex &&
@@ -485,8 +475,8 @@ export function resolveBookDimensions(book: {
 }): { spineWidthPx: number; bookHeightPx: number } {
   const safePages =
     typeof book.pages === "number" &&
-      Number.isFinite(book.pages) &&
-      book.pages > 0
+    Number.isFinite(book.pages) &&
+    book.pages > 0
       ? book.pages
       : 220;
   const spineWidthPx = Math.max(
@@ -601,8 +591,8 @@ export function computeShelfBookGeometry(params: {
 
   const safePages =
     typeof params.pages === "number" &&
-      Number.isFinite(params.pages) &&
-      params.pages > 0
+    Number.isFinite(params.pages) &&
+    params.pages > 0
       ? params.pages
       : 240;
 
@@ -621,7 +611,7 @@ export function computeShelfBookGeometry(params: {
   const depthPx = Math.round(heightPx * 0.67);
   const typoStyle =
     SPINE_TYPO_STYLES[
-    hashCoverSeed(`${params.seed}:typo-style`) % SPINE_TYPO_STYLES.length
+      hashCoverSeed(`${params.seed}:typo-style`) % SPINE_TYPO_STYLES.length
     ]!;
 
   return {
@@ -796,18 +786,164 @@ export const MIN_SHELF_WIDTH_PX = 480;
 export const MAX_SHELF_WIDTH_PX = 960;
 export const PLANK_OVERHANG_PX = 12;
 export const MAX_PACKED_ROW_BOOKS_WIDTH_PX = 880; // Capacidade útil na tábua de até 960px antes de quebrar para continuação
+export const SHELF_BOOKEND_WIDTH_PX = 38;
+export const SHELF_COVERS_MODE_EXTRA_PX = 54;
+export const SHELF_TILTED_EXTRA_PX = 26;
+export const SHELF_FRONT_COVER_MARGIN_INLINE_PX = 6;
+export const DEFAULT_GROUP_GAP_PX = 12;
+
+export type ShelfBookLayoutDisplayMode =
+  "lombada" | "capa_frente" | "inclinado";
+
+export interface BookRenderLayoutMetrics {
+  /** Largura total ocupada pelo slot do livro na fileira (base + inclinação + modo capas 3D). */
+  widthPx: number;
+  /** Altura renderizada do livro na fileira. */
+  heightPx: number;
+  /** Largura da capa frontal quando displayMode === "capa_frente". */
+  coverShowcaseWidthPx: number;
+  /** Altura da capa frontal quando displayMode === "capa_frente". */
+  coverShowcaseHeightPx: number;
+}
+
+/**
+ * Função ÚNICA de cálculo de dimensões renderizadas de um livro na estante.
+ * Usada tanto pelo empacotador de fileiras (`packShelfBooksByWidth`) quanto pela
+ * renderização (`ShelfView`), garantindo paridade exata entre quebra e layout final.
+ */
+export function measureBookRenderLayout(
+  book: {
+    id: string | number;
+    pages?: number | null;
+    format?: string | null;
+    realisticFormat?: string | null;
+    seed?: string | null;
+    resolvedSeed?: string | null;
+  },
+  options: {
+    displayMode?: ShelfBookLayoutDisplayMode;
+    view3dMode?: "spines" | "covers";
+    shelfScale?: number;
+  } = {}
+): BookRenderLayoutMetrics {
+  const displayMode = options.displayMode ?? "lombada";
+  const view3dMode = options.view3dMode ?? "spines";
+  const shelfScale = options.shelfScale ?? 1;
+
+  const geom = computeShelfBookGeometry({
+    pages: book.pages,
+    format: book.realisticFormat ?? book.format,
+    seed: book.resolvedSeed ?? book.seed ?? String(book.id),
+  });
+
+  const coverShowcaseHeightPx = Math.max(
+    132,
+    Math.min(168, Math.round(geom.heightPx * 0.9))
+  );
+  const coverShowcaseWidthPx = Math.round(coverShowcaseHeightPx * 0.66);
+
+  if (displayMode === "capa_frente") {
+    return {
+      widthPx: Number(
+        (coverShowcaseWidthPx + SHELF_FRONT_COVER_MARGIN_INLINE_PX).toFixed(2)
+      ),
+      heightPx: coverShowcaseHeightPx,
+      coverShowcaseWidthPx,
+      coverShowcaseHeightPx,
+    };
+  }
+
+  const baseSpine = geom.spineWidthPx * shelfScale;
+  const tiltExtra = displayMode === "inclinado" ? SHELF_TILTED_EXTRA_PX : 0;
+  const coversExtra = view3dMode === "covers" ? SHELF_COVERS_MODE_EXTRA_PX : 0;
+
+  return {
+    widthPx: Number((baseSpine + tiltExtra + coversExtra).toFixed(2)),
+    heightPx: Number((geom.heightPx * shelfScale).toFixed(2)),
+    coverShowcaseWidthPx,
+    coverShowcaseHeightPx,
+  };
+}
+
+/**
+ * Converte a configuração de densidade da estante no vão horizontal aplicado
+ * SOMENTE entre grupos de 3–7 livros (nunca entre cada livro individualmente).
+ */
+export function resolveShelfGroupGapPx(
+  density:
+    | "compact"
+    | "normal"
+    | "spacious"
+    | "compacta"
+    | "padrao"
+    | "vitrine" = "padrao"
+): number {
+  switch (density) {
+    case "compact":
+    case "compacta":
+      return 8;
+    case "spacious":
+    case "vitrine":
+      return 16;
+    case "normal":
+    case "padrao":
+    default:
+      return DEFAULT_GROUP_GAP_PX;
+  }
+}
+
+/**
+ * Calcula os índices 0-based dentro de uma fileira onde inicia um novo grupo.
+ * Regra determinística e SSR-safe:
+ * - Fileiras com <= 7 livros formam 1 único grupo coeso (0 vãos internos).
+ * - Fileiras com >= 8 livros são particionadas em grupos de 3 a 7 livros cada,
+ *   garantindo vãos APENAS entre grupos e nunca entre livros individuais.
+ */
+export function computeRowGroupBreakIndices(
+  bookCount: number,
+  rowSeed: string
+): number[] {
+  if (bookCount <= 7) return [];
+
+  const breaks: number[] = [];
+  let cursor = 0;
+  let groupIndex = 0;
+
+  while (bookCount - cursor > 7) {
+    const remaining = bookCount - cursor;
+    const maxAllowed = Math.min(7, remaining - 3);
+    const minAllowed = 3;
+    // Prefere grupos naturais de 4–6 quando há folga; respeita rigorosamente [3, 7]
+    const preferredMin = remaining >= 11 ? 4 : minAllowed;
+    const preferredMax = remaining >= 11 ? Math.min(6, maxAllowed) : maxAllowed;
+    const span = Math.max(1, preferredMax - preferredMin + 1);
+    const pick =
+      preferredMin + (hashCoverSeed(`${rowSeed}:grp:${groupIndex}`) % span);
+    const size = Math.max(minAllowed, Math.min(maxAllowed, pick));
+    cursor += size;
+    breaks.push(cursor);
+    groupIndex += 1;
+  }
+
+  return breaks;
+}
 
 export interface PackedShelfRowChunk<T = NormalizedVirtualBook> {
   books: T[];
   rowBooksWidthPx: number;
   maxBookHeightPx: number;
   startIndex: number;
+  /** Índices 0-based (dentro da fileira) que iniciam um novo grupo de 3–7 livros. */
+  groupBreakIndices: number[];
+  /** Vão horizontal aplicado apenas nos índices em `groupBreakIndices`. */
+  groupGapPx: number;
 }
 
 /**
- * Empacotamento determinístico e SSR-safe por soma das larguras (calculadas pelos dados):
- * quando a soma das larguras + espaçamento ultrapassa `maxRowWidthPx`, o excedente
- * vai para a próxima prateleira de continuação, sem scroll horizontal.
+ * Empacotamento determinístico e SSR-safe pela função única `measureBookRenderLayout`:
+ * considera modo de exibição (`lombada`, `capa_frente`, `inclinado`), modo `"covers"`
+ * (+54px) e vãos apenas entre grupos de 3–7 livros. Jamais ultrapassa `maxRowWidthPx`
+ * em fileiras com mais de 1 livro.
  */
 export function packShelfBooksByWidth<
   T extends {
@@ -822,11 +958,26 @@ export function packShelfBooksByWidth<
   books: readonly T[],
   options: {
     maxRowWidthPx?: number;
+    /** Vão entre grupos de 3–7 livros. */
+    groupGapPx?: number;
+    /** @deprecated Mantido apenas por compatibilidade; mapeado quando `groupGapPx` não é passado. */
     gapPx?: number;
+    rowSeedPrefix?: string;
+    bookDisplayModes?: Record<string, ShelfBookLayoutDisplayMode>;
+    view3dMode?: "spines" | "covers";
+    shelfScale?: number;
   } = {}
 ): PackedShelfRowChunk<T>[] {
   const maxRowWidthPx = options.maxRowWidthPx ?? MAX_PACKED_ROW_BOOKS_WIDTH_PX;
-  const gapPx = options.gapPx ?? 3;
+  const groupGapPx =
+    options.groupGapPx ??
+    (options.gapPx !== undefined
+      ? Math.max(0, options.gapPx)
+      : DEFAULT_GROUP_GAP_PX);
+  const rowSeedPrefix = options.rowSeedPrefix ?? "shelf";
+  const bookDisplayModes = options.bookDisplayModes;
+  const view3dMode = options.view3dMode ?? "spines";
+  const shelfScale = options.shelfScale ?? 1;
 
   if (books.length === 0) {
     return [
@@ -835,54 +986,71 @@ export function packShelfBooksByWidth<
         rowBooksWidthPx: 0,
         maxBookHeightPx: 178,
         startIndex: 0,
+        groupBreakIndices: [],
+        groupGapPx,
       },
     ];
   }
 
   const rows: PackedShelfRowChunk<T>[] = [];
   let currentBooks: T[] = [];
-  let currentWidth = 0;
+  let currentBooksSumWidth = 0;
   let currentMaxHeight = 150;
   let currentStartIdx = 0;
 
-  books.forEach((book, idx) => {
-    const geom = computeShelfBookGeometry({
-      pages: book.pages,
-      format: book.realisticFormat ?? book.format,
-      seed: book.resolvedSeed ?? book.seed ?? String(book.id),
+  const finalizeCurrentRow = () => {
+    const rowSeed = `${rowSeedPrefix}:row:${rows.length}`;
+    const breaks =
+      groupGapPx > 0
+        ? computeRowGroupBreakIndices(currentBooks.length, rowSeed)
+        : [];
+    const totalWidth = Number(
+      (currentBooksSumWidth + breaks.length * groupGapPx).toFixed(2)
+    );
+    rows.push({
+      books: currentBooks,
+      rowBooksWidthPx: totalWidth,
+      maxBookHeightPx: currentMaxHeight,
+      startIndex: currentStartIdx,
+      groupBreakIndices: breaks,
+      groupGapPx,
     });
-    const w = geom.spineWidthPx;
-    const h = geom.heightPx;
-    const addedGap = currentBooks.length > 0 ? gapPx : 0;
+  };
 
-    if (
-      currentBooks.length > 0 &&
-      currentWidth + addedGap + w > maxRowWidthPx
-    ) {
-      rows.push({
-        books: currentBooks,
-        rowBooksWidthPx: Number(currentWidth.toFixed(2)),
-        maxBookHeightPx: currentMaxHeight,
-        startIndex: currentStartIdx,
-      });
+  books.forEach((book, idx) => {
+    const displayMode = bookDisplayModes?.[String(book.id)] ?? "lombada";
+    const metrics = measureBookRenderLayout(book, {
+      displayMode,
+      view3dMode,
+      shelfScale,
+    });
+    const w = metrics.widthPx;
+    const h = metrics.heightPx;
+
+    const candidateCount = currentBooks.length + 1;
+    const candidateSeed = `${rowSeedPrefix}:row:${rows.length}`;
+    const candidateBreaks =
+      groupGapPx > 0
+        ? computeRowGroupBreakIndices(candidateCount, candidateSeed)
+        : [];
+    const candidateTotalWidth =
+      currentBooksSumWidth + w + candidateBreaks.length * groupGapPx;
+
+    if (currentBooks.length > 0 && candidateTotalWidth > maxRowWidthPx) {
+      finalizeCurrentRow();
       currentBooks = [book];
-      currentWidth = w;
+      currentBooksSumWidth = w;
       currentMaxHeight = h;
       currentStartIdx = idx;
     } else {
       currentBooks.push(book);
-      currentWidth += addedGap + w;
+      currentBooksSumWidth += w;
       if (h > currentMaxHeight) currentMaxHeight = h;
     }
   });
 
   if (currentBooks.length > 0) {
-    rows.push({
-      books: currentBooks,
-      rowBooksWidthPx: Number(currentWidth.toFixed(2)),
-      maxBookHeightPx: currentMaxHeight,
-      startIndex: currentStartIdx,
-    });
+    finalizeCurrentRow();
   }
 
   return rows;

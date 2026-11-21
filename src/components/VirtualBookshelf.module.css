@@ -104,7 +104,7 @@
 @media (min-width: 1024px) {
   .shelfLayoutWithPanel {
     display: grid;
-    grid-template-columns: 640px minmax(280px, 1fr);
+    grid-template-columns: minmax(0, 640px) minmax(280px, 1fr);
     gap: 24px;
     align-items: start;
     padding-bottom: 0;
@@ -126,6 +126,7 @@
   position: relative;
   width: 100%;
   max-width: 640px;
+  min-width: 0;
   margin-inline: 0;
   padding: 20px 14px 24px;
   border-radius: var(--rf-card-radius);
@@ -164,8 +165,9 @@
 
 @media (min-width: 1024px) {
   .bookcase {
-    width: 640px;
+    width: 100%;
     max-width: 640px;
+    min-width: 0;
   }
 }
 
@@ -208,6 +210,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
+  min-width: 0;
   padding-bottom: 12px;
   overflow: visible;
   content-visibility: auto;
@@ -218,6 +221,7 @@
 .shelfTier {
   position: relative;
   width: 100%;
+  min-width: 0;
   display: flex;
   align-items: flex-end;
   background: transparent;
@@ -228,6 +232,7 @@
   position: relative;
   z-index: 1;
   width: 100%;
+  min-width: 0;
   display: flex;
   align-items: flex-end;
   overflow: visible;
@@ -244,7 +249,7 @@
   }
 
   .shelfTrack {
-    min-width: max-content;
+    min-width: 0;
   }
 }
 
@@ -257,20 +262,23 @@
   display: flex;
   flex-direction: column;
   width: 100%;
+  min-width: 0;
 }
 
 /* Altura da fileira = livro mais alto + 14px; padding-inline de 12px faz a tábua avançar ~12px além dos livros */
+/* Vãos horizontais existem APENAS entre grupos de 3–7 livros via --rf-group-gap (nunca entre cada livro) */
 .booksRow {
   --mm: clamp(1.04px, 0.038vw + 0.94px, 1.35px);
   display: flex;
   align-items: flex-end;
   justify-content: flex-start;
-  gap: var(--books-gap, 3px);
+  gap: 0;
   height: calc(var(--row-h, 196px) * var(--rf-shelf-scale, 1));
   list-style: none;
   margin: 0;
   padding: 0 12px;
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   /* Sem perspective compartilhada na fileira: cada .rf-book-slot aplica sua própria perspective centrada (50% 50%) */
 }
@@ -1419,6 +1427,7 @@
   right: 10px;
   bottom: 60px;
   z-index: 40;
+  min-width: 0;
   border-radius: var(--rf-card-radius);
   border: 1px solid var(--rf-border-default);
   background-color: var(--rf-surface-card-solid);
@@ -2028,18 +2037,7 @@
   box-shadow: 0 2px 10px rgba(255, 204, 128, 0.85);
 }
 
-/* --- 6. Densidade (espaçamento entre volumes) --- */
-.bookcase[data-shelf-density="compacta"] .booksRow {
-  --books-gap: 1px;
-}
-
-.bookcase[data-shelf-density="padrao"] .booksRow {
-  --books-gap: 3px;
-}
-
-.bookcase[data-shelf-density="vitrine"] .booksRow {
-  --books-gap: 8px;
-}
+/* --- 6. Densidade (controla apenas o vão entre grupos via resolveShelfGroupGapPx) --- */
 
 /* --- 7. Modos individuais de exibição do livro --- */
 .bookFrontSlot {
@@ -2048,7 +2046,8 @@
   align-items: flex-end;
   justify-content: center;
   flex-shrink: 0;
-  margin-inline: 3px;
+  margin-left: calc(3px + var(--rf-group-gap, 0px));
+  margin-right: 3px;
   padding-bottom: 1px;
 }
 
@@ -2114,7 +2113,8 @@
 }
 
 .bookTiltedWrap {
-  margin-inline: 11px;
+  margin-left: calc(11px + var(--rf-group-gap, 0px));
+  margin-right: 11px;
   transform-origin: bottom center;
   transition: transform 200ms ease;
 }

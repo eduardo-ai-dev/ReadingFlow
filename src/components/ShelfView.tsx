@@ -6,6 +6,7 @@ import {
   Fragment,
   memo,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -27,9 +28,12 @@ import {
 } from "lucide-react";
 import type { BookFormat, ReadingStatus } from "@/lib/domain";
 import {
+  measureBookRenderLayout,
   packShelfBooksByWidth,
   pickSpineTemplate,
+  resolveShelfGroupGapPx,
   resolveSpinePalette,
+  SHELF_BOOKEND_WIDTH_PX,
   type GenreShelfGroup,
   type NormalizedVirtualBook,
   type RealisticBookFormat,
@@ -38,7 +42,6 @@ import {
 import {
   DEFAULT_SHELF_THEME_CONFIG,
   extractPredominantDotColors,
-  getShelfDensityGapPx,
   migrateLegacyShelfThemeConfig,
   SHELF_DECOR_OPTIONS,
   type BookDisplayMode,
@@ -133,7 +136,10 @@ interface PackedDisplayRow {
   books: NormalizedVirtualBook[];
   visuals: ResolvedSpineVisual[];
   rowBooksWidthPx: number;
+  effectiveMaxRowW: number;
   maxBookHeightPx: number;
+  groupBreakIndices: number[];
+  groupGapPx: number;
   colors: readonly string[];
 }
 
@@ -680,7 +686,12 @@ export function ShelfView({
     (shelfMaterial !== "classic-wood"
       ? migrateLegacyShelfThemeConfig({ shelfMaterial })
       : DEFAULT_SHELF_THEME_CONFIG);
-  const densityGapPx = getShelfDensityGapPx(resolvedThemeConfig.density);
+  const groupGapPx = resolveShelfGroupGapPx(resolvedThemeConfig.density);
+
+  // Largura útil real da tábua medida via ResizeObserver com debounce (SSR-safe default = FIXED_ROW_PACK_WIDTH_PX)
+  const [measuredRowWidthPx, setMeasuredRowWidthPx] = useState<number>(
+    FIXED_ROW_PACK_WIDTH_PX
+  );
 
   const [draggingBook, setDraggingBook] = useState<{
     shelfKey: string;
@@ -727,10 +738,43 @@ export function ShelfView({
     disabled: totalBooksCount > 40,
   });
 
-  // Empacota cada grupo de prateleira para largura fixa ~640px (excedente vai para a prateleira seguinte)
+  useEffect(() => {
+    const el = bookcaseRef.current;
+    if (!el || typeof window === "undefined") return;
+
+    const computeUsableRowWidth = () => {
+      const cs = window.getComputedStyle(el);
+      const padLeft = Number.parseFloat(cs.paddingLeft) || 0;
+      const padRight = Number.parseFloat(cs.paddingRight) || 0;
+      const innerWidth = el.clientWidth - padLeft - padRight;
+      // 24px = padding-inline (12px × 2) da .booksRow; 4px = margem de segurança subpixel
+      const nextUsable = Math.max(240, Math.floor(innerWidth - 28));
+      setMeasuredRowWidthPx((prev) =>
+        Math.abs(prev - nextUsable) >= 2 ? nextUsable : prev
+      );
+    };
+
+    computeUsableRowWidth();
+
+    if (typeof ResizeObserver === "undefined") return;
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const observer = new ResizeObserver(() => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(computeUsableRowWidth, 100);
+    });
+    observer.observe(el);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [bookcaseRef]);
+
+  // Empacota cada grupo de prateleira usando a mesma função única de medida da renderização
   const packedRows = useMemo<PackedDisplayRow[]>(() => {
     const out: PackedDisplayRow[] = [];
-    const maxRowW = FIXED_ROW_PACK_WIDTH_PX;
+    const maxRowW = measuredRowWidthPx;
 
     shelves.forEach((shelf, shelfIdx) => {
       if (shelf.books.length === 0 && !isEdit && !shelf.isCustom) {
@@ -742,47 +786,30 @@ export function ShelfView({
         const w =
           SHELF_DECOR_OPTIONS.find((opt) => opt.id === d.decorType)?.widthPx ??
           38;
-        return acc + w + 6 + densityGapPx;
+        return acc + w + 6;
       }, 0);
       const editPlusReservedPx = isEdit && onAddBook ? 46 : 0;
       const effectiveMaxRowW = Math.max(
-        260,
+        220,
         maxRowW - decorReservedPx - editPlusReservedPx
       );
 
-      // Ajusta largura estimada para capas frontais e livros inclinados para jamais vazar da tábua
-      const originalById = new Map(shelf.books.map((b) => [String(b.id), b]));
-      const booksForPacking = shelf.books.map((b) => {
-        const modeForBook = bookDisplayModes[String(b.id)] ?? "lombada";
-        if (modeForBook === "capa_frente") {
-          const showcaseH = Math.max(
-            132,
-            Math.min(168, Math.round(b.bookHeightPx * 0.9))
-          );
-          const showcaseW = Math.round(showcaseH * 0.66) + 10;
-          return { ...b, spineWidthPx: showcaseW };
-        }
-        if (modeForBook === "inclinado") {
-          return { ...b, spineWidthPx: b.spineWidthPx + 24 };
-        }
-        return b;
-      });
-
-      const chunks = packShelfBooksByWidth(booksForPacking, {
+      const chunks = packShelfBooksByWidth(shelf.books, {
         maxRowWidthPx: effectiveMaxRowW,
-        gapPx: densityGapPx,
+        groupGapPx,
+        rowSeedPrefix: shelf.genreKey,
+        bookDisplayModes,
+        view3dMode,
       });
 
       let offset = 0;
       chunks.forEach((chunk, chunkIdx) => {
-        const restoredBooks = chunk.books.map(
-          (b) => originalById.get(String(b.id)) ?? b
-        );
-        const visuals = resolveRowSpineVisuals(restoredBooks);
+        const rowBooks = chunk.books;
+        const visuals = resolveRowSpineVisuals(rowBooks);
         const rowColors =
           shelf.hasCustomColors && shelf.colors.length > 0
             ? shelf.colors
-            : restoredBooks.length > 0
+            : rowBooks.length > 0
               ? extractPredominantDotColors(visuals, (v) => v.spineBg, 4)
               : shelf.colors;
 
@@ -797,13 +824,16 @@ export function ShelfView({
           isFirstChunk: chunkIdx === 0,
           isLastChunk: chunkIdx === chunks.length - 1,
           startBookIndex: offset,
-          books: restoredBooks,
+          books: rowBooks,
           visuals,
           rowBooksWidthPx: chunk.rowBooksWidthPx,
+          effectiveMaxRowW,
           maxBookHeightPx: chunk.maxBookHeightPx,
+          groupBreakIndices: chunk.groupBreakIndices,
+          groupGapPx: chunk.groupGapPx,
           colors: rowColors,
         });
-        offset += restoredBooks.length;
+        offset += rowBooks.length;
       });
     });
 
@@ -811,8 +841,10 @@ export function ShelfView({
   }, [
     shelves,
     isEdit,
-    densityGapPx,
+    measuredRowWidthPx,
+    groupGapPx,
     bookDisplayModes,
+    view3dMode,
     shelfDecorByRow,
     onAddBook,
   ]);
@@ -1258,19 +1290,35 @@ export function ShelfView({
                           focusButtonAt(buttons, nextIdx);
                         };
 
-                        const coverShowcaseHeight = Math.max(
-                          132,
-                          Math.min(168, Math.round(book.bookHeightPx * 0.9))
-                        );
-                        const coverShowcaseWidth = Math.round(
-                          coverShowcaseHeight * 0.66
-                        );
+                        const bookLayout = measureBookRenderLayout(book, {
+                          displayMode,
+                          view3dMode,
+                        });
+                        const coverShowcaseHeight =
+                          bookLayout.coverShowcaseHeightPx;
+                        const coverShowcaseWidth =
+                          bookLayout.coverShowcaseWidthPx;
+                        const bookGroupGapPx = row.groupBreakIndices.includes(
+                          idx
+                        )
+                          ? row.groupGapPx
+                          : 0;
 
                         return (
                           <Fragment key={book.id}>
                             {displayMode === "capa_frente" ? (
                               <li
                                 data-book-display="capa_frente"
+                                data-group-start={
+                                  bookGroupGapPx > 0 ? "true" : undefined
+                                }
+                                style={
+                                  bookGroupGapPx > 0
+                                    ? ({
+                                        "--rf-group-gap": `${bookGroupGapPx}px`,
+                                      } as CSSProperties)
+                                    : undefined
+                                }
                                 draggable={canDrag}
                                 onDragStart={(e) =>
                                   handleBookDragStart(
@@ -1342,6 +1390,7 @@ export function ShelfView({
                               </li>
                             ) : (
                               <Book3D
+                                groupGapPx={bookGroupGapPx}
                                 className={
                                   displayMode === "inclinado"
                                     ? `${styles.bookTiltedWrap} ${
@@ -1441,7 +1490,8 @@ export function ShelfView({
                       {!isEdit &&
                       row.books.length > 0 &&
                       (shelfDecorByRow[shelf.genreKey]?.length ?? 0) === 0 &&
-                      row.rowBooksWidthPx < FIXED_ROW_PACK_WIDTH_PX * 0.84 ? (
+                      row.rowBooksWidthPx + SHELF_BOOKEND_WIDTH_PX + 6 <=
+                        row.effectiveMaxRowW ? (
                         <li
                           className={styles.bookendSlot}
                           data-bookend="true"

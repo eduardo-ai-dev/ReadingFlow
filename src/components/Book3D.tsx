@@ -103,6 +103,8 @@ export interface Book3DProps {
   onDrop?: DragEventHandler<HTMLElement>;
   onDragEnd?: DragEventHandler<HTMLElement>;
   as?: "li" | "div";
+  /** Vão horizontal aplicado apenas no primeiro livro de um novo grupo (3–7 livros). */
+  groupGapPx?: number;
   className?: string;
 }
 
@@ -121,6 +123,7 @@ type BookSlotStyle = CSSProperties & {
   "--depth": string;
   "--title-fs": string;
   "--author-fs": string;
+  "--rf-group-gap"?: string;
 };
 
 /**
@@ -596,6 +599,7 @@ function Book3DBase({
   onDrop,
   onDragEnd,
   as = "li",
+  groupGapPx = 0,
   className = "",
 }: Book3DProps) {
   const itemTitle = book?.title ?? title ?? "Título";
@@ -989,6 +993,7 @@ function Book3DBase({
     "--depth": `calc(${geometry.depthPx}px * var(--rf-shelf-scale, 1))`,
     "--title-fs": `${typography.titleFontPx}px`,
     "--author-fs": `${typography.authorFontPx}px`,
+    ...(groupGapPx > 0 ? { "--rf-group-gap": `${groupGapPx}px` } : {}),
   };
 
   const SlotTag = as;
@@ -1000,6 +1005,7 @@ function Book3DBase({
       }}
       data-spine-template={resolvedTemplate}
       data-spine-color={spinePalette.spineBg}
+      data-group-start={groupGapPx > 0 ? "true" : undefined}
       draggable={draggable}
       onDragStart={stableDragStart}
       onDragOver={stableDragOver}
