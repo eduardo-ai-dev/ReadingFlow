@@ -140,10 +140,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   });
 
   try {
-    const response = await searchBooksOnline(queryUsed, {
+    let activeQuery = queryUsed;
+    let response = await searchBooksOnline(activeQuery, {
       signal: request.signal,
     });
-    const items = filterNewBookSuggestions(response.results, {
+    let items = filterNewBookSuggestions(response.results, {
       ownedIsbn13s,
       ownedFingerprints,
       wishlistIsbn13s,
@@ -151,12 +152,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       limit: 8,
     });
 
+    // Se a consulta específica veio vazia após excluir livros já no acervo, tenta uma consulta editorial ampla
+    if (items.length === 0 && activeQuery !== "romance brasileiro") {
+      activeQuery = "romance brasileiro";
+      response = await searchBooksOnline(activeQuery, {
+        signal: request.signal,
+      });
+      items = filterNewBookSuggestions(response.results, {
+        ownedIsbn13s,
+        ownedFingerprints,
+        wishlistIsbn13s,
+        wishlistFingerprints,
+        limit: 8,
+      });
+    }
+
     return NextResponse.json(
       {
         ok: true,
         items,
         source: response.fonte,
-        queryUsed,
+        queryUsed: activeQuery,
         batch: parsed.data.batch,
       },
       {

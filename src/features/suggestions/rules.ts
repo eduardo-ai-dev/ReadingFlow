@@ -26,74 +26,53 @@ export const SUGGESTION_GENRE_OPTIONS: readonly SuggestionGenreOption[] = [
     key: "todos",
     label: "Para você",
     queries: [
-      "literatura brasileira contemporanea romance",
-      "ficcao literaria premio jabuti",
-      "classicos literatura universal portugues",
-      "ficcao cientifica distopia portugues",
+      "romance brasileiro",
+      "clarice lispector",
+      "jorge amado",
+      "ficcao cientifica",
+      "fantasia",
+      "filosofia",
     ],
   },
   {
     key: "literatura-brasileira",
     label: "Literatura Brasileira",
     queries: [
-      "literatura brasileira romance contemporaneo",
-      "autores brasileiros premio jabuti",
-      "romance brasileiro companhia das letras",
+      "romance brasileiro",
+      "literatura brasileira",
+      "jorge amado",
+      "graciliano ramos",
     ],
   },
   {
     key: "ficcao",
     label: "Ficção",
-    queries: [
-      "ficcao literaria romance premiado",
-      "romance contemporaneo best seller literatura",
-      "contos e romances ficcao moderna",
-    ],
+    queries: ["romance", "contos", "ficcao cientifica", "distopia"],
   },
   {
     key: "fantasia",
     label: "Fantasia",
-    queries: [
-      "fantasia epica romance portugues",
-      "fantasia literatura ficcao fantastica",
-      "alta fantasia livro romance",
-    ],
+    queries: ["fantasia", "tolkien", "ursula le guin"],
   },
   {
     key: "classicos",
     label: "Clássicos",
-    queries: [
-      "classicos literatura mundial portugues",
-      "romance classico literatura seculo xix",
-      "grandes classicos da literatura",
-    ],
+    queries: ["dostoievski", "jane austen", "franz kafka", "machado de assis"],
   },
   {
     key: "filosofia",
     label: "Filosofia",
-    queries: [
-      "filosofia contemporanea ensaios portugues",
-      "estoicismo filosofia classica livro",
-      "ensaios filosofia literatura pensamento",
-    ],
+    queries: ["filosofia", "estoicismo", "albert camus"],
   },
   {
     key: "nao-ficcao",
     label: "Não-ficção",
-    queries: [
-      "historia ciencia nao ficcao portugues",
-      "biografia jornalismo literario livro",
-      "psicologia sociedade ensaio livro",
-    ],
+    queries: ["historia brasil", "biografia", "ciencia"],
   },
   {
     key: "suspense",
     label: "Suspense",
-    queries: [
-      "romance policial suspense misterio portugues",
-      "thriller investigacao misterio livro",
-      "suspense psicologico ficcao",
-    ],
+    queries: ["suspense", "agatha christie", "misterio"],
   },
 ] as const;
 
@@ -319,14 +298,22 @@ export function buildNewBookDiscoveryQuery(params: {
 
   if (genreKey === "todos") {
     const cleanOwnedGenres = (params.ownedGenres ?? [])
-      .map((g) => g.trim())
-      .filter((g) => g.length >= 3 && g.toLowerCase() !== "acervo geral");
+      .map((g) =>
+        g
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .trim()
+          .split(/\s+/)
+          .slice(0, 2)
+          .join(" ")
+      )
+      .filter(
+        (g) =>
+          g.length >= 4 && !/acervo geral|miscelanea|auditoria|teste/i.test(g)
+      );
 
     const basePool = SUGGESTION_GENRE_OPTIONS[0]!.queries;
-    const combinedPool = [
-      ...cleanOwnedGenres.slice(0, 3).map((g) => `${g} livro literatura`),
-      ...basePool,
-    ];
+    const combinedPool = [...basePool, ...cleanOwnedGenres.slice(0, 3)];
     return combinedPool[batch % combinedPool.length]!;
   }
 
