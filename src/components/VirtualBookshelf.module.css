@@ -131,16 +131,29 @@
   border-radius: var(--rf-card-radius);
   border: 1px solid var(--rf-line);
   background-color: var(--rf-back);
-  background-image:
-    radial-gradient(ellipse 68% 24% at 50% 0%, var(--rf-accent-primary-subtle), transparent 72%);
+  background-image: radial-gradient(
+    ellipse 68% 24% at 50% 0%,
+    var(--rf-accent-primary-subtle),
+    transparent 72%
+  );
   box-shadow:
     inset 0 0 0 1px var(--rf-border-subtle),
     var(--rf-shadow-card);
   overflow: visible;
-  transform: perspective(1200px) rotateX(var(--shelf-rx, 0deg)) rotateY(var(--shelf-ry, 0deg));
   transform-style: flat;
   transition: transform 240ms ease-out;
   box-sizing: border-box;
+}
+
+:global([data-fx="min"]) .bookcase {
+  background-image: none;
+  box-shadow: none;
+  transition: none;
+}
+
+:global([data-fx="min"]) .topSpotlightsLayer,
+:global([data-fx="min"]) .shelfLedStrip {
+  display: none;
 }
 
 @media (min-width: 640px) {
@@ -197,6 +210,8 @@
   width: 100%;
   padding-bottom: 12px;
   overflow: visible;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 252px;
 }
 
 /* Fileira aberta sobre o fundo creme (sem nicho escuro) */
@@ -274,26 +289,32 @@
   background-color: var(--wood-front-mid);
   background-image:
     var(--rf-paper-tile),
-    repeating-linear-gradient(180deg,
+    repeating-linear-gradient(
+      180deg,
       rgba(246, 228, 200, 0.06) 0px,
       rgba(246, 228, 200, 0.06) 1.5px,
       transparent 1.5px,
       transparent 3.5px,
       rgba(42, 22, 10, 0.09) 3.5px,
-      rgba(42, 22, 10, 0.09) 5px),
-    linear-gradient(90deg,
+      rgba(42, 22, 10, 0.09) 5px
+    ),
+    linear-gradient(
+      90deg,
       rgba(52, 29, 14, 0.14) 0%,
       rgba(246, 228, 200, 0.08) 24%,
       rgba(52, 29, 14, 0.06) 52%,
       rgba(246, 228, 200, 0.07) 78%,
-      rgba(52, 29, 14, 0.15) 100%),
-    linear-gradient(180deg,
+      rgba(52, 29, 14, 0.15) 100%
+    ),
+    linear-gradient(
+      180deg,
       var(--wood-top-light) 0px,
       var(--wood-top-mid) 5px,
       var(--wood-bevel) 5.5px,
       var(--wood-front-light) 7px,
       var(--wood-front-mid) 13px,
-      var(--wood-front-deep) 100%);
+      var(--wood-front-deep) 100%
+    );
   background-blend-mode: soft-light, normal, normal, normal;
   border-radius: 3px;
   box-shadow:
@@ -309,7 +330,11 @@
   top: 100%;
   width: 18px;
   height: 13px;
-  background: linear-gradient(180deg, var(--wood-front-mid) 0%, var(--wood-front-deep) 100%);
+  background: linear-gradient(
+    180deg,
+    var(--wood-front-mid) 0%,
+    var(--wood-front-deep) 100%
+  );
   filter: drop-shadow(0 3px 4px rgba(56, 33, 18, 0.22));
   pointer-events: none;
 }
@@ -346,10 +371,12 @@
   width: 11px;
   height: 100%;
   border-radius: 2px 3px 0 0;
-  background: linear-gradient(90deg,
-      #3A2D27 0%,
-      var(--rf-coffee, #2C221E) 52%,
-      #1B1411 100%);
+  background: linear-gradient(
+    90deg,
+    #3a2d27 0%,
+    var(--rf-coffee, #2c221e) 52%,
+    #1b1411 100%
+  );
   box-shadow:
     inset 1px 0 0 rgba(223, 190, 136, 0.32),
     inset 0 1px 0 rgba(223, 190, 136, 0.28),
@@ -363,10 +390,12 @@
   left: 4px;
   width: 2.5px;
   border-radius: 999px;
-  background: linear-gradient(180deg,
-      var(--rf-fawn, #DFBE88) 0%,
-      var(--rf-camel, #C8A46E) 55%,
-      #9C7A47 100%);
+  background: linear-gradient(
+    180deg,
+    var(--rf-fawn, #dfbe88) 0%,
+    var(--rf-camel, #c8a46e) 55%,
+    #9c7a47 100%
+  );
   box-shadow: 0 0 3px rgba(200, 164, 110, 0.45);
 }
 
@@ -379,11 +408,13 @@
   width: 36px;
   height: 7px;
   border-radius: 1px 3px 1px 1px;
-  background: linear-gradient(180deg,
-      var(--rf-camel, #C8A46E) 0%,
-      #9B7B49 32%,
-      var(--rf-coffee, #2C221E) 36%,
-      #1B1411 100%);
+  background: linear-gradient(
+    180deg,
+    var(--rf-camel, #c8a46e) 0%,
+    #9b7b49 32%,
+    var(--rf-coffee, #2c221e) 36%,
+    #1b1411 100%
+  );
   box-shadow:
     inset 0 1px 0 rgba(244, 239, 230, 0.35),
     2px 2px 5px rgba(20, 21, 20, 0.28);
@@ -397,10 +428,12 @@
   width: 40px;
   height: 4px;
   border-radius: 50%;
-  background: radial-gradient(ellipse at 38% 50%,
-      rgba(20, 21, 20, 0.32) 0%,
-      rgba(20, 21, 20, 0.12) 55%,
-      transparent 80%);
+  background: radial-gradient(
+    ellipse at 38% 50%,
+    rgba(20, 21, 20, 0.32) 0%,
+    rgba(20, 21, 20, 0.12) 55%,
+    transparent 80%
+  );
 }
 
 /* ==========================================================================
@@ -414,10 +447,12 @@
 .bookcase[data-shelf-material="minimal-modern"] .shelfPlank {
   height: 10px;
   background-color: #141514;
-  background-image: linear-gradient(180deg,
-      #2E302E 0px,
-      #1E1F1E 2.5px,
-      #141514 100%);
+  background-image: linear-gradient(
+    180deg,
+    #2e302e 0px,
+    #1e1f1e 2.5px,
+    #141514 100%
+  );
   border-radius: 1px;
   box-shadow:
     inset 0 1px 0 rgba(244, 239, 230, 0.14),
@@ -427,7 +462,7 @@
 .bookcase[data-shelf-material="minimal-modern"] .shelfBracket {
   width: 10px;
   height: 8px;
-  background: #1E1F1E;
+  background: #1e1f1e;
   clip-path: none;
   border-radius: 0 0 2px 2px;
   box-shadow: 0 2px 4px rgba(20, 21, 20, 0.22);
@@ -436,7 +471,7 @@
 .bookcase[data-shelf-material="minimal-modern"] .bookendUpright {
   width: 9px;
   border-radius: 1px 1px 0 0;
-  background: linear-gradient(90deg, #272927 0%, #141514 60%, #0E0F0E 100%);
+  background: linear-gradient(90deg, #272927 0%, #141514 60%, #0e0f0e 100%);
   box-shadow:
     inset 1px 0 0 rgba(244, 239, 230, 0.16),
     2px 0 5px rgba(20, 21, 20, 0.2);
@@ -445,29 +480,31 @@
 .bookcase[data-shelf-material="minimal-modern"] .bookendBrassTrim {
   width: 1.5px;
   left: 3.5px;
-  background: linear-gradient(180deg, #8E918E 0%, #4E514E 100%);
+  background: linear-gradient(180deg, #8e918e 0%, #4e514e 100%);
   box-shadow: none;
 }
 
 .bookcase[data-shelf-material="minimal-modern"] .bookendFoot {
   height: 5px;
   border-radius: 1px;
-  background: linear-gradient(180deg, #2E302E 0%, #141514 100%);
+  background: linear-gradient(180deg, #2e302e 0%, #141514 100%);
 }
 
 /* 2. Editorial Bordô (#722F3E + detalhes dourados #C4A77D / #D4AF37) */
 .bookcase[data-shelf-material="editorial-bordeaux"] .shelfPlank {
   height: 16px;
-  background-color: #722F3E;
+  background-color: #722f3e;
   background-image:
     var(--rf-paper-tile),
-    linear-gradient(180deg,
-      #8D4052 0px,
-      #722F3E 5px,
-      #59212E 5.5px,
-      #3E151F 100%);
+    linear-gradient(
+      180deg,
+      #8d4052 0px,
+      #722f3e 5px,
+      #59212e 5.5px,
+      #3e151f 100%
+    );
   background-blend-mode: soft-light, normal;
-  border-top: 1.5px solid #C4A77D;
+  border-top: 1.5px solid #c4a77d;
   border-radius: 3px;
   box-shadow:
     inset 0 -1px 0 rgba(212, 175, 55, 0.32),
@@ -475,12 +512,12 @@
 }
 
 .bookcase[data-shelf-material="editorial-bordeaux"] .shelfBracket {
-  background: linear-gradient(180deg, #722F3E 0%, #3E151F 100%);
+  background: linear-gradient(180deg, #722f3e 0%, #3e151f 100%);
   border-top: 1px solid rgba(196, 167, 125, 0.55);
 }
 
 .bookcase[data-shelf-material="editorial-bordeaux"] .bookendUpright {
-  background: linear-gradient(90deg, #8A3C4E 0%, #722F3E 52%, #471A25 100%);
+  background: linear-gradient(90deg, #8a3c4e 0%, #722f3e 52%, #471a25 100%);
   box-shadow:
     inset 1px 0 0 rgba(212, 175, 55, 0.48),
     inset 0 1px 0 rgba(212, 175, 55, 0.4),
@@ -488,16 +525,18 @@
 }
 
 .bookcase[data-shelf-material="editorial-bordeaux"] .bookendBrassTrim {
-  background: linear-gradient(180deg, #E7C983 0%, #D4AF37 52%, #B59249 100%);
+  background: linear-gradient(180deg, #e7c983 0%, #d4af37 52%, #b59249 100%);
   box-shadow: 0 0 4px rgba(212, 175, 55, 0.55);
 }
 
 .bookcase[data-shelf-material="editorial-bordeaux"] .bookendFoot {
-  background: linear-gradient(180deg,
-      #D4AF37 0%,
-      #C4A77D 34%,
-      #722F3E 38%,
-      #3E151F 100%);
+  background: linear-gradient(
+    180deg,
+    #d4af37 0%,
+    #c4a77d 34%,
+    #722f3e 38%,
+    #3e151f 100%
+  );
 }
 
 .bookcase[data-shelf-material="editorial-bordeaux"] .colorDotsPill,
@@ -610,9 +649,11 @@
   border-radius: 10px;
   border: 1px solid rgb(200 164 110 / 0.32);
   background:
-    radial-gradient(ellipse 70% 100% at 50% 0%,
+    radial-gradient(
+      ellipse 70% 100% at 50% 0%,
       rgb(255 176 100 / 0.08) 0%,
-      transparent 72%),
+      transparent 72%
+    ),
     linear-gradient(180deg, var(--rf-coffee) 0%, var(--rf-carbon) 100%);
   box-shadow: 0 10px 22px rgb(20 21 20 / 0.55);
 }
@@ -808,7 +849,9 @@
   font-size: 11px;
   font-weight: 600;
   box-shadow: 0 8px 18px rgb(20 21 20 / 0.78);
-  transition: opacity 160ms ease-out, transform 160ms ease-out;
+  transition:
+    opacity 160ms ease-out,
+    transform 160ms ease-out;
 }
 
 .ghostSlot:last-child .ghostLabel,
@@ -1239,7 +1282,6 @@
   outline: 2px solid var(--rf-camel);
   outline-offset: 2px;
 }
-
 
 /* ==========================================================================
    MODO EDIÇÃO ("Arrumar estante") — mesma cena, controles extras
@@ -1796,35 +1838,60 @@
 .bookcase[data-shelf-backdrop="madeira"] {
   background-color: #462f22;
   background-image:
-    repeating-linear-gradient(90deg,
+    repeating-linear-gradient(
+      90deg,
       rgba(255, 232, 200, 0.035) 0px,
       rgba(255, 232, 200, 0.035) 2px,
       transparent 2px,
-      transparent 26px),
-    radial-gradient(ellipse 74% 32% at 50% 0%, rgba(212, 165, 108, 0.16), transparent 72%);
+      transparent 26px
+    ),
+    radial-gradient(
+      ellipse 74% 32% at 50% 0%,
+      rgba(212, 165, 108, 0.16),
+      transparent 72%
+    );
   border-color: rgba(212, 175, 122, 0.24);
 }
 
 .bookcase[data-shelf-backdrop="verde_biblioteca"] {
   background-color: #192d24;
   background-image:
-    radial-gradient(ellipse 75% 36% at 50% 0%, rgba(200, 164, 110, 0.16), transparent 74%),
-    linear-gradient(180deg, rgba(16, 30, 23, 0.2) 0%, rgba(10, 20, 15, 0.45) 100%);
+    radial-gradient(
+      ellipse 75% 36% at 50% 0%,
+      rgba(200, 164, 110, 0.16),
+      transparent 74%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(16, 30, 23, 0.2) 0%,
+      rgba(10, 20, 15, 0.45) 100%
+    );
   border-color: rgba(200, 164, 110, 0.26);
 }
 
 .bookcase[data-shelf-backdrop="bordo_profundo"] {
   background-color: #2b1319;
   background-image:
-    radial-gradient(ellipse 75% 34% at 50% 0%, rgba(224, 168, 120, 0.15), transparent 72%),
-    linear-gradient(180deg, rgba(43, 19, 25, 0.15) 0%, rgba(20, 8, 11, 0.45) 100%);
+    radial-gradient(
+      ellipse 75% 34% at 50% 0%,
+      rgba(224, 168, 120, 0.15),
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(43, 19, 25, 0.15) 0%,
+      rgba(20, 8, 11, 0.45) 100%
+    );
   border-color: rgba(212, 175, 122, 0.26);
 }
 
 .bookcase[data-shelf-backdrop="preto_fosco"] {
   background-color: #151516;
-  background-image:
-    radial-gradient(ellipse 70% 30% at 50% 0%, rgba(244, 239, 230, 0.08), transparent 70%);
+  background-image: radial-gradient(
+    ellipse 70% 30% at 50% 0%,
+    rgba(244, 239, 230, 0.08),
+    transparent 70%
+  );
   border-color: rgba(244, 239, 230, 0.14);
 }
 
@@ -1870,12 +1937,14 @@
   top: 100%;
   height: 2.5px;
   border-radius: 999px;
-  background: linear-gradient(90deg,
-      rgba(255, 224, 170, 0.25) 0%,
-      rgba(255, 228, 176, 0.96) 18%,
-      rgba(255, 236, 198, 1) 50%,
-      rgba(255, 228, 176, 0.96) 82%,
-      rgba(255, 224, 170, 0.25) 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 224, 170, 0.25) 0%,
+    rgba(255, 228, 176, 0.96) 18%,
+    rgba(255, 236, 198, 1) 50%,
+    rgba(255, 228, 176, 0.96) 82%,
+    rgba(255, 224, 170, 0.25) 100%
+  );
   box-shadow:
     0 3px 10px rgba(255, 196, 112, 0.62),
     0 12px 24px rgba(255, 182, 92, 0.34);
@@ -1894,10 +1963,12 @@
   right: 8px;
   top: -8px;
   height: 54px;
-  background: radial-gradient(ellipse 86% 78% at 50% 0%,
-      rgba(255, 206, 132, 0.22),
-      rgba(255, 194, 108, 0.06) 58%,
-      transparent 88%);
+  background: radial-gradient(
+    ellipse 86% 78% at 50% 0%,
+    rgba(255, 206, 132, 0.22),
+    rgba(255, 194, 108, 0.06) 58%,
+    transparent 88%
+  );
   pointer-events: none;
   z-index: 0;
 }
@@ -1916,14 +1987,18 @@
   pointer-events: none;
   z-index: 1;
   background-image:
-    radial-gradient(ellipse 34% 72% at 28% 0%,
+    radial-gradient(
+      ellipse 34% 72% at 28% 0%,
       rgba(255, 220, 158, 0.24),
       rgba(255, 204, 130, 0.06) 54%,
-      transparent 78%),
-    radial-gradient(ellipse 34% 72% at 72% 0%,
+      transparent 78%
+    ),
+    radial-gradient(
+      ellipse 34% 72% at 72% 0%,
       rgba(255, 220, 158, 0.24),
       rgba(255, 204, 130, 0.06) 54%,
-      transparent 78%);
+      transparent 78%
+    );
 }
 
 .topSpotFixtures {
@@ -1945,7 +2020,12 @@
   width: 22px;
   height: 4px;
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255, 214, 150, 0.4), #ffedc9, rgba(255, 214, 150, 0.4));
+  background: linear-gradient(
+    90deg,
+    rgba(255, 214, 150, 0.4),
+    #ffedc9,
+    rgba(255, 214, 150, 0.4)
+  );
   box-shadow: 0 2px 10px rgba(255, 204, 128, 0.85);
 }
 
@@ -1982,7 +2062,9 @@
   cursor: pointer;
   transform-origin: bottom center;
   transform: perspective(640px) rotateX(4deg) translateZ(4px);
-  transition: transform 200ms ease, filter 200ms ease;
+  transition:
+    transform 200ms ease,
+    filter 200ms ease;
   filter: drop-shadow(0 6px 8px rgba(18, 12, 8, 0.34));
   border-radius: 3px;
 }
@@ -2081,7 +2163,11 @@
   right: 12%;
   height: 4px;
   border-radius: 999px;
-  background: radial-gradient(ellipse at center, rgba(16, 10, 6, 0.42), transparent 72%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(16, 10, 6, 0.42),
+    transparent 72%
+  );
   pointer-events: none;
 }
 
@@ -2126,7 +2212,9 @@
   box-shadow: var(--rf-shadow-sm);
   cursor: pointer;
   opacity: 0.92;
-  transition: transform 140ms ease, background-color 140ms ease;
+  transition:
+    transform 140ms ease,
+    background-color 140ms ease;
 }
 
 .decorRemoveBtn:hover,

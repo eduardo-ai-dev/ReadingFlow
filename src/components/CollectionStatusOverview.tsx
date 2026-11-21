@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import Link from "next/link";
 import { BookCover } from "@/components/BookCover";
 import { coverColor, extractAuthorSurname } from "@/lib/cover-color";
@@ -9,15 +9,16 @@ import { DashboardBlockEmpty } from "@/components/DashboardBlockState";
 import { FilterChip, rfButtonClassName } from "@/components/ui/ActionControls";
 
 type CollectionFilterId =
-  | "all"
-  | "reading"
-  | "finished"
-  | "wishlist"
-  | "abandoned";
+  "all" | "reading" | "finished" | "wishlist" | "abandoned";
 
 const EMPTY_TAB_COPY: Record<
   CollectionFilterId,
-  { title: string; description: string; actionLabel: string; actionHref: string }
+  {
+    title: string;
+    description: string;
+    actionLabel: string;
+    actionHref: string;
+  }
 > = {
   all: {
     title: "Seu acervo ainda está vazio",
@@ -56,7 +57,7 @@ const EMPTY_TAB_COPY: Record<
   },
 };
 
-export function CollectionStatusOverview({
+export const CollectionStatusOverview = memo(function CollectionStatusOverview({
   counts,
   books,
   wishlistBooks = [],
@@ -197,4 +198,4 @@ export function CollectionStatusOverview({
       )}
     </section>
   );
-}
+});

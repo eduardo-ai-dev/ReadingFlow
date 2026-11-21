@@ -15,10 +15,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { BookFormat, ReadingStatus } from "@/lib/domain";
-import {
-  extractAuthorSurname,
-  hashCoverSeed,
-} from "@/lib/cover-color";
+import { extractAuthorSurname, hashCoverSeed } from "@/lib/cover-color";
 import { rgbToHsl } from "@/features/catalog/spine-color-rules";
 import {
   computeShelfBookGeometry,
@@ -61,14 +58,14 @@ export interface Book3DProps {
   seed?: string;
   status?: string;
   readingStatus?:
-  | ReadingStatus
-  | "lendo"
-  | "em_andamento"
-  | "concluido"
-  | "lido"
-  | "desejo"
-  | "quero_ler"
-  | "wishlist";
+    | ReadingStatus
+    | "lendo"
+    | "em_andamento"
+    | "concluido"
+    | "lido"
+    | "desejo"
+    | "quero_ler"
+    | "wishlist";
   isWishlist?: boolean;
   progressPercent?: number;
   progressValue?: number | null;
@@ -93,6 +90,8 @@ export interface Book3DProps {
   coverUrl?: string | null;
   sampleWorks?: string;
   variant?: "spine" | "showcase" | "desk";
+  /** Quando true (ex.: modo "Ver capas em 3D"), mantém faces laterais/capa montadas em repouso. */
+  showCoverFace?: boolean;
   isSelected?: boolean;
   suppressSelectedTooltip?: boolean;
   onSelect?: (book: Book3DItem) => void;
@@ -399,11 +398,7 @@ export function computeFittedSpineTypography(params: {
 
   // Desconta faixa superior (templates B/D), vincos, marca de editora e filete ornamental
   const topBandPx =
-    template === "D"
-      ? heightPx * 0.27
-      : template === "B"
-        ? heightPx * 0.23
-        : 0;
+    template === "D" ? heightPx * 0.27 : template === "B" ? heightPx * 0.23 : 0;
   const verticalPaddingPx = template === "B" || template === "D" ? 26 : 34;
   const imprintPx = hasPublisherMark ? 13 : 0;
   const ornamentPx = template === "C" ? 8 : 0;
@@ -428,9 +423,9 @@ export function computeFittedSpineTypography(params: {
   );
   const maxFs2Lines = canUseTwoLines
     ? Math.min(
-      MAX_SPINE_FONT_PX,
-      Math.max(MIN_SPINE_FONT_PX, (spineWidthPx - 6) / 2.22)
-    )
+        MAX_SPINE_FONT_PX,
+        Math.max(MIN_SPINE_FONT_PX, (spineWidthPx - 6) / 2.22)
+      )
     : 0;
 
   const tryFit = (
@@ -589,6 +584,7 @@ function Book3DBase({
   coverUrl,
   sampleWorks,
   variant = "spine",
+  showCoverFace = false,
   isSelected = false,
   suppressSelectedTooltip = false,
   onSelect,
@@ -739,7 +735,10 @@ function Book3DBase({
 
     const bookCenterX = rect.left + rect.width / 2;
     const minCenterX = tipW / 2 + marginX;
-    const maxCenterX = Math.max(minCenterX, window.innerWidth - tipW / 2 - marginX);
+    const maxCenterX = Math.max(
+      minCenterX,
+      window.innerWidth - tipW / 2 - marginX
+    );
     const x = Math.min(Math.max(bookCenterX, minCenterX), maxCenterX);
     const maxArrowShift = Math.max(0, tipW / 2 - 18);
     const arrowOffset = Math.max(
@@ -784,10 +783,10 @@ function Book3DBase({
 
     setTipCoords((prev) =>
       prev &&
-        prev.placement === placement &&
-        Math.abs(prev.x - x) < 0.5 &&
-        Math.abs(prev.y - y) < 0.5 &&
-        Math.abs(prev.arrowOffset - arrowOffset) < 0.5
+      prev.placement === placement &&
+      Math.abs(prev.x - x) < 0.5 &&
+      Math.abs(prev.y - y) < 0.5 &&
+      Math.abs(prev.arrowOffset - arrowOffset) < 0.5
         ? prev
         : { x, y, arrowOffset, placement }
     );
@@ -900,21 +899,41 @@ function Book3DBase({
   }
 
   // 3. MODO SPINE REALISTA (CSS 3D com alturas orgânicas e auto-fit 15px..8px sem reticências)
-  const geometry = computeShelfBookGeometry({
-    pages: resolvedPages,
-    format: resolvedFormat,
-    seed: resolvedSeed,
-  });
+  const geometry = useMemo(
+    () =>
+      computeShelfBookGeometry({
+        pages: resolvedPages,
+        format: resolvedFormat,
+        seed: resolvedSeed,
+      }),
+    [resolvedPages, resolvedFormat, resolvedSeed]
+  );
 
-  const typography = computeFittedSpineTypography({
-    title: itemTitle,
-    authorSurname: resolvedSurname,
-    heightPx: geometry.heightPx,
-    spineWidthPx: geometry.spineWidthPx,
-    template: resolvedTemplate,
-    hasPublisherMark: Boolean(resolvedPublisherMark),
-    typoStyle: geometry.typoStyle,
-  });
+  const typography = useMemo(
+    () =>
+      computeFittedSpineTypography({
+        title: itemTitle,
+        authorSurname: resolvedSurname,
+        heightPx: geometry.heightPx,
+        spineWidthPx: geometry.spineWidthPx,
+        template: resolvedTemplate,
+        hasPublisherMark: Boolean(resolvedPublisherMark),
+        typoStyle: geometry.typoStyle,
+      }),
+    [
+      itemTitle,
+      resolvedSurname,
+      geometry.heightPx,
+      geometry.spineWidthPx,
+      resolvedTemplate,
+      resolvedPublisherMark,
+      geometry.typoStyle,
+    ]
+  );
+
+  // Faces 3D auxiliares + <BookCover> lateral são montadas sob demanda (hover/foco/seleção/modo capas),
+  // reduzindo drasticamente o número de nós DOM em estantes grandes (150+ livros).
+  const mount3DFaces = hovered || focused || isSelected || showCoverFace;
 
   const authorPt = resolvedAuthorFull || resolvedSurname || "Autor do acervo";
   const normalizedStatus = String(readingStatus ?? "").toLowerCase();
@@ -946,8 +965,8 @@ function Book3DBase({
   const inkIsDark = spinePalette.spineInk !== "#F4EFE6";
   const effectivePages =
     typeof resolvedPages === "number" &&
-      Number.isFinite(resolvedPages) &&
-      resolvedPages > 0
+    Number.isFinite(resolvedPages) &&
+    resolvedPages > 0
       ? resolvedPages
       : 240;
 
@@ -995,54 +1014,56 @@ function Book3DBase({
         if (e.pointerType !== "mouse") return;
         setHovered(false);
       }}
-      className={`rf-book-slot rf-format-${geometry.format} rf-typo-${geometry.typoStyle} rf-tpl-${resolvedTemplate} ${typography.isThinSpine ? "rf-thin-spine" : ""
-        } ${typography.isWideSpine ? "rf-wide-spine" : ""} ${typography.lines.length >= 2 ? "rf-two-line-spine" : ""
-        } ${inkIsDark ? "is-ink-dark" : ""} ${isReading ? "is-reading" : ""} ${isFinished ? "is-finished" : ""
-        } ${effectiveWishlist ? "is-wishlist" : ""} ${isSelected ? "is-selected" : ""
-        } ${isDragging ? "is-dragging" : ""} ${dropPosition === "before"
+      className={`rf-book-slot rf-format-${geometry.format} rf-typo-${geometry.typoStyle} rf-tpl-${resolvedTemplate} ${
+        typography.isThinSpine ? "rf-thin-spine" : ""
+      } ${typography.isWideSpine ? "rf-wide-spine" : ""} ${
+        typography.lines.length >= 2 ? "rf-two-line-spine" : ""
+      } ${inkIsDark ? "is-ink-dark" : ""} ${isReading ? "is-reading" : ""} ${
+        isFinished ? "is-finished" : ""
+      } ${effectiveWishlist ? "is-wishlist" : ""} ${
+        isSelected ? "is-selected" : ""
+      } ${focused ? "is-focused" : ""} ${isDragging ? "is-dragging" : ""} ${
+        dropPosition === "before"
           ? "is-drop-before"
           : dropPosition === "after"
             ? "is-drop-after"
             : ""
-        } ${className}`}
+      } ${className}`}
       style={slotStyle}
     >
-      {/* Sombra projetada e de contato sob a base do livro */}
-      <span className="rf-book-contact-shadow" aria-hidden="true" />
-
       {/* Tooltip em portal: centralizada acima do livro, com seta, clamp na viewport e barra dourada */}
       {tipVisible && tipCoords && typeof document !== "undefined"
         ? createPortal(
-          <div
-            ref={tipRef}
-            className="rf-book-tooltip"
-            data-placement={tipCoords.placement}
-            aria-hidden="true"
-            style={
-              {
-                "--tip-x": `${tipCoords.x}px`,
-                "--tip-y": `${tipCoords.y}px`,
-                "--tip-arrow-offset": `${tipCoords.arrowOffset}px`,
-              } as CSSProperties
-            }
-          >
-            <span className="rf-book-tooltip-title">{itemTitle}</span>
-            <span className="rf-book-tooltip-author">{authorPt}</span>
-            <span className="rf-book-tooltip-meta">
-              <span className="rf-book-tooltip-pct">{progressLabel}</span>
-            </span>
-            <span className="rf-book-tooltip-bar">
-              <span
-                className="rf-book-tooltip-bar-fill"
-                style={{
-                  width: `${effectiveBarPercent > 0 ? Math.max(4, effectiveBarPercent) : 0}%`,
-                }}
-              />
-            </span>
-            <span className="rf-book-tooltip-arrow" />
-          </div>,
-          document.body
-        )
+            <div
+              ref={tipRef}
+              className="rf-book-tooltip"
+              data-placement={tipCoords.placement}
+              aria-hidden="true"
+              style={
+                {
+                  "--tip-x": `${tipCoords.x}px`,
+                  "--tip-y": `${tipCoords.y}px`,
+                  "--tip-arrow-offset": `${tipCoords.arrowOffset}px`,
+                } as CSSProperties
+              }
+            >
+              <span className="rf-book-tooltip-title">{itemTitle}</span>
+              <span className="rf-book-tooltip-author">{authorPt}</span>
+              <span className="rf-book-tooltip-meta">
+                <span className="rf-book-tooltip-pct">{progressLabel}</span>
+              </span>
+              <span className="rf-book-tooltip-bar">
+                <span
+                  className="rf-book-tooltip-bar-fill"
+                  style={{
+                    width: `${effectiveBarPercent > 0 ? Math.max(4, effectiveBarPercent) : 0}%`,
+                  }}
+                />
+              </span>
+              <span className="rf-book-tooltip-arrow" />
+            </div>,
+            document.body
+          )
         : null}
 
       <button
@@ -1072,11 +1093,9 @@ function Book3DBase({
       >
         {/* 1. LOMBADA FRONTAL: 4 templates gráficos (A/B/C/D) + acabamento de papel + auto-fit sem reticências */}
         <span className="rf-face-spine" aria-hidden="true">
-          <span className="rf-spine-noise" />
           {resolvedTemplate === "B" || resolvedTemplate === "D" ? (
             <span className="rf-spine-top-band" />
           ) : null}
-          <span className="rf-spine-crease-top" />
 
           <span className="rf-spine-titles">
             <span
@@ -1103,37 +1122,35 @@ function Book3DBase({
           {resolvedPublisherMark ? (
             <span className="rf-spine-imprint">{resolvedPublisherMark}</span>
           ) : null}
-
-          <span className="rf-spine-crease-bottom" />
         </span>
 
-        {/* 2. TOPO E BASE DE PÁGINAS CREME (#EFE6D2) + CONTRACAPA */}
-        <span className="rf-face-top-pages" aria-hidden="true" />
-        <span className="rf-face-back-cover" aria-hidden="true" />
-
-        {/* 3. LADO OPOSTO (CORTE FRONTAL DE PÁGINAS CREME #EFE6D2) */}
-        <span className="rf-face-fore-edge-pages" aria-hidden="true" />
-
-        {/* 4. CAPA FRONTAL UNIFICADA (`BookCover`) COM CROSSFADE, FALLBACK E ACABAMENTO FÍSICO */}
-        <span className="rf-face-side-cover" aria-hidden="true">
-          <BookCover
-            fillContainer
-            title={itemTitle}
-            author={authorPt}
-            coverUrl={itemCoverUrl}
-            spineColor={spinePalette.spineBg}
-            spineAccent={spinePalette.spineAccentHex}
-            seed={resolvedSeed}
-            sizes="(max-width: 480px) 130px, 176px"
-            readingStatus={readingStatus}
-            isWishlist={effectiveWishlist}
-            progressPercent={effectiveBarPercent}
-            className="rounded-none border-0 shadow-none"
-          />
-          <span className="rf-side-cover-progress-badge">
-            {progressLabel}
-          </span>
-        </span>
+        {/* Faces 3D auxiliares + capa lateral montadas apenas quando visíveis (hover/foco/seleção/modo capas) */}
+        {mount3DFaces ? (
+          <>
+            <span className="rf-face-top-pages" aria-hidden="true" />
+            <span className="rf-face-back-cover" aria-hidden="true" />
+            <span className="rf-face-fore-edge-pages" aria-hidden="true" />
+            <span className="rf-face-side-cover" aria-hidden="true">
+              <BookCover
+                fillContainer
+                title={itemTitle}
+                author={authorPt}
+                coverUrl={itemCoverUrl}
+                spineColor={spinePalette.spineBg}
+                spineAccent={spinePalette.spineAccentHex}
+                seed={resolvedSeed}
+                sizes="(max-width: 480px) 130px, 176px"
+                readingStatus={readingStatus}
+                isWishlist={effectiveWishlist}
+                progressPercent={effectiveBarPercent}
+                className="rounded-none border-0 shadow-none"
+              />
+              <span className="rf-side-cover-progress-badge">
+                {progressLabel}
+              </span>
+            </span>
+          </>
+        ) : null}
       </button>
     </SlotTag>
   );
@@ -1144,10 +1161,9 @@ function Book3DBase({
  * componente, então mudar uma closure inline no pai não re-renderiza 100 livros.
  */
 function areBook3DPropsEqual(prev: Book3DProps, next: Book3DProps): boolean {
-  const keys = new Set([
-    ...Object.keys(prev),
-    ...Object.keys(next),
-  ]) as Set<keyof Book3DProps>;
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]) as Set<
+    keyof Book3DProps
+  >;
   for (const key of keys) {
     const a = prev[key];
     const b = next[key];

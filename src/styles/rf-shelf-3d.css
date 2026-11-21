@@ -130,29 +130,35 @@ a:hover .rf-book-cover-wishlist {
   height: 16px;
   margin: 0 auto;
   border-radius: 3px;
-  background-color: #6B4226;
+  background-color: #6b4226;
   background-image:
     var(--rf-paper-tile),
-    repeating-linear-gradient(180deg,
+    repeating-linear-gradient(
+      180deg,
       rgba(246, 228, 200, 0.06) 0px,
       rgba(246, 228, 200, 0.06) 1.5px,
       transparent 1.5px,
       transparent 3.5px,
       rgba(42, 22, 10, 0.09) 3.5px,
-      rgba(42, 22, 10, 0.09) 5px),
-    linear-gradient(90deg,
+      rgba(42, 22, 10, 0.09) 5px
+    ),
+    linear-gradient(
+      90deg,
       rgba(52, 29, 14, 0.14) 0%,
       rgba(246, 228, 200, 0.08) 24%,
       rgba(52, 29, 14, 0.06) 52%,
       rgba(246, 228, 200, 0.07) 78%,
-      rgba(52, 29, 14, 0.15) 100%),
-    linear-gradient(180deg,
-      #B5895D 0px,
-      #9E7046 5px,
-      #5E381E 5.5px,
-      #774B2C 7px,
-      #5F391F 13px,
-      #4A2B16 100%);
+      rgba(52, 29, 14, 0.15) 100%
+    ),
+    linear-gradient(
+      180deg,
+      #b5895d 0px,
+      #9e7046 5px,
+      #5e381e 5.5px,
+      #774b2c 7px,
+      #5f391f 13px,
+      #4a2b16 100%
+    );
   background-blend-mode: soft-light, normal, normal, normal;
   box-shadow:
     inset 0 1px 0 rgba(246, 228, 200, 0.44),
@@ -181,13 +187,19 @@ a:hover .rf-book-cover-wishlist {
 .rf-book-slot {
   /* Espessura: clamp(12px, calc(var(--pages, 240) * 0.07px), 56px) + variação ±2px por hash */
   --spine-raw: clamp(12px, calc(var(--pages, 240) * 0.07px), 56px);
-  --spine-base: clamp(12px, calc(var(--spine-raw) + var(--spine-jitter, 0px)), 56px);
+  --spine-base: clamp(
+    12px,
+    calc(var(--spine-raw) + var(--spine-jitter, 0px)),
+    56px
+  );
   --spine-width: calc(var(--spine-base) * var(--rf-shelf-scale, 1));
   --half-spine: calc(var(--spine-width) / 2);
   position: relative;
   width: var(--spine-width);
   /* Altura determinística (150px–215px), alinhada pela base */
-  height: calc(clamp(150px, var(--book-h, 178px), 215px) * var(--rf-shelf-scale, 1));
+  height: calc(
+    clamp(150px, var(--book-h, 178px), 215px) * var(--rf-shelf-scale, 1)
+  );
   flex: 0 0 var(--spine-width);
   z-index: 1;
   scroll-snap-align: start;
@@ -195,28 +207,9 @@ a:hover .rf-book-cover-wishlist {
   transform-style: preserve-3d;
 }
 
-/* Sombra curta de contato sob a base de cada lombada */
+/* Sombra de contato removida por livro (movida para a tábua) para manter DOM enxuto em 150+ livros */
 .rf-book-contact-shadow {
-  position: absolute;
-  bottom: -3px;
-  left: -6%;
-  width: 112%;
-  height: 5px;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 45%,
-      rgba(0, 0, 0, 0.28) 0%,
-      rgba(0, 0, 0, 0.12) 52%,
-      transparent 76%);
-  pointer-events: none;
-  z-index: 0;
-  transition: transform 280ms ease-out, opacity 280ms ease-out;
-}
-
-.rf-book-slot:hover .rf-book-contact-shadow,
-.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-book-contact-shadow,
-.rf-book-slot.is-selected .rf-book-contact-shadow {
-  transform: translate(3px, 2px) scaleX(1.08);
-  opacity: 0.95;
+  display: none;
 }
 
 /* ==========================================================================
@@ -237,7 +230,7 @@ a:hover .rf-book-cover-wishlist {
   padding: 8px 12px 9px;
   border-radius: 9px;
   border: 1px solid rgb(200 164 110 / 0.55);
-  background: #1B1815;
+  background: #1b1815;
   box-shadow:
     0 12px 26px rgb(20 18 15 / 0.45),
     0 2px 6px rgb(20 18 15 / 0.25);
@@ -258,7 +251,7 @@ a:hover .rf-book-cover-wishlist {
   bottom: -6px;
   width: 10px;
   height: 10px;
-  background: #1B1815;
+  background: #1b1815;
   border-right: 1px solid rgb(200 164 110 / 0.55);
   border-bottom: 1px solid rgb(200 164 110 / 0.55);
   transform: translateX(-50%) rotate(45deg);
@@ -338,7 +331,7 @@ a:hover .rf-book-cover-wishlist {
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #C4A77D 0%, #D4AF37 55%, #F3E5AB 100%);
+  background: linear-gradient(90deg, #c4a77d 0%, #d4af37 55%, #f3e5ab 100%);
   box-shadow: 0 0 6px rgba(212, 175, 55, 0.55);
   transition: width 220ms ease-out;
 }
@@ -354,7 +347,7 @@ a:hover .rf-book-cover-wishlist {
 }
 
 .rf-book-slot:hover,
-.rf-book-slot:has(.rf-book-prism:focus-visible),
+.rf-book-slot.is-focused,
 .rf-book-slot.is-selected {
   z-index: 40;
 }
@@ -403,19 +396,20 @@ a:hover .rf-book-cover-wishlist {
   outline: none;
   transform-style: preserve-3d;
   transform-origin: left bottom 0px;
-  transition:
-    transform 0.4s cubic-bezier(0.25, 1, 0.5, 1),
-    filter 0.35s ease;
+  transition: transform 0.36s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 /* Lista de Desejos em 3D: dessaturação editorial com retorno completo da cor ao hover */
 .rf-book-slot.is-wishlist .rf-book-prism {
   filter: grayscale(45%) saturate(65%);
   opacity: 0.9;
+  transition:
+    transform 0.36s cubic-bezier(0.25, 1, 0.5, 1),
+    opacity 0.25s ease,
+    filter 0.25s ease;
 }
 
 @media (hover: hover) {
-
   .rf-book-slot.is-wishlist:hover .rf-book-prism,
   .rf-book-slot.is-wishlist:focus-within .rf-book-prism {
     filter: grayscale(0%) saturate(100%);
@@ -441,7 +435,6 @@ a:hover .rf-book-cover-wishlist {
 
 /* Hover apenas em dispositivos com ponteiro fino: eleva -10px, puxa +45px, gira -72deg e escala 1.1 para capa maior e legível */
 @media (hover: hover) {
-
   .rf-book-slot:hover,
   .rf-covers-mode .rf-book-slot:hover {
     z-index: 40;
@@ -454,21 +447,21 @@ a:hover .rf-book-cover-wishlist {
   }
 }
 
-.rf-book-slot:has(.rf-book-prism:focus-visible),
+.rf-book-slot.is-focused,
 .rf-book-slot.is-selected {
   z-index: 40;
 }
 
-.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-book-prism,
+.rf-book-slot.is-focused .rf-book-prism,
 .rf-book-slot.is-selected .rf-book-prism,
-.rf-covers-mode .rf-book-slot:has(.rf-book-prism:focus-visible) .rf-book-prism,
+.rf-covers-mode .rf-book-slot.is-focused .rf-book-prism,
 .rf-covers-mode .rf-book-slot.is-selected .rf-book-prism {
   transform: translateY(-10px) translateZ(45px) rotateY(-72deg) scale(1.1);
 }
 
 /* @media (hover:none): apenas o toque/seleção ativa */
 @media (hover: none) {
-  .rf-book-slot:hover:not(.is-selected):not(:has(.rf-book-prism:focus-visible)) .rf-book-prism {
+  .rf-book-slot:hover:not(.is-selected):not(.is-focused) .rf-book-prism {
     transform: none;
   }
 }
@@ -481,25 +474,31 @@ a:hover .rf-book-cover-wishlist {
   inset: 0;
   border-radius: 2px 1px 1px 2px;
   /* 8% de Soft Linen misturado para tirar aspecto plástico */
-  background-color: color-mix(in srgb, var(--c, #51262F) 92%, var(--rf-linen) 8%);
+  background-color: color-mix(
+    in srgb,
+    var(--c, #51262f) 92%,
+    var(--rf-linen) 8%
+  );
   /* Luz: escurecimento vertical de ~10% nas pontas + gradiente cilíndrico horizontal (realce à esquerda, sombra à direita) */
   background-image:
-    linear-gradient(180deg,
+    linear-gradient(
+      180deg,
       rgba(20, 21, 20, 0.11) 0%,
       rgba(20, 21, 20, 0) 13%,
       rgba(20, 21, 20, 0) 87%,
-      rgba(20, 21, 20, 0.13) 100%),
-    linear-gradient(90deg,
+      rgba(20, 21, 20, 0.13) 100%
+    ),
+    linear-gradient(
+      90deg,
       rgba(255, 255, 255, 0.22) 0%,
       rgba(255, 255, 255, 0.06) 24%,
       rgba(20, 21, 20, 0.03) 68%,
-      rgba(20, 21, 20, 0.24) 100%);
+      rgba(20, 21, 20, 0.24) 100%
+    );
   color: var(--txt, var(--rf-linen));
-  /* Aresta clara de 1px + contorno sutil + sombra curta entre livros */
-  box-shadow:
-    inset 1px 0 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 1px rgba(20, 21, 20, 0.18),
-    -2px 0 4px rgba(20, 21, 20, 0.16);
+  /* Aresta clara de 1px + contorno nítido (sem blur de sombra externa por livro para 60 FPS com 150+ livros) */
+  border: 1px solid rgba(20, 21, 20, 0.2);
+  border-left-color: rgba(255, 255, 255, 0.24);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -511,11 +510,25 @@ a:hover .rf-book-cover-wishlist {
   user-select: none;
 }
 
-.rf-book-slot.is-finished .rf-face-spine {
-  box-shadow:
-    inset 1px 0 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 1px rgba(20, 21, 20, 0.18),
-    -2px 0 4px rgba(20, 21, 20, 0.16);
+/* Dois vincos finos horizontais via pseudo-elementos (elimina 2 nós DOM por livro) */
+.rf-face-spine::before,
+.rf-face-spine::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(20, 21, 20, 0.16);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.rf-face-spine::before {
+  top: 8px;
+}
+
+.rf-face-spine::after {
+  bottom: 8px;
 }
 
 /* Nos temas escuros, aresta clara de 1px garante leitura até de lombadas pretas sem alterar a cor da capa */
@@ -523,10 +536,8 @@ a:hover .rf-book-cover-wishlist {
 [data-theme="gotico"] .rf-face-spine,
 [data-theme="dark"] .rf-face-spine,
 [data-theme="editorial-dark"] .rf-face-spine {
-  box-shadow:
-    inset 1px 0 0 rgba(255, 255, 255, 0.34),
-    inset 0 0 0 1px var(--rf-spine-edge-highlight, rgba(244, 239, 230, 0.26)),
-    -2px 0 5px rgba(0, 0, 0, 0.45);
+  border-color: var(--rf-spine-edge-highlight, rgba(244, 239, 230, 0.26));
+  border-left-color: rgba(255, 255, 255, 0.34);
 }
 
 /* Dois vincos finos horizontais perto das pontas superior e inferior */
@@ -554,15 +565,19 @@ a:hover .rf-book-cover-wishlist {
 .rf-format-ebook .rf-face-spine,
 .rf-format-audio .rf-face-spine {
   background-image:
-    linear-gradient(180deg,
+    linear-gradient(
+      180deg,
       rgba(20, 21, 20, 0.1) 0%,
       rgba(20, 21, 20, 0) 13%,
       rgba(20, 21, 20, 0) 87%,
-      rgba(20, 21, 20, 0.12) 100%),
-    linear-gradient(90deg,
+      rgba(20, 21, 20, 0.12) 100%
+    ),
+    linear-gradient(
+      90deg,
       rgba(244, 239, 230, 0.18) 0%,
       rgba(20, 21, 20, 0.04) 55%,
-      rgba(20, 21, 20, 0.22) 100%);
+      rgba(20, 21, 20, 0.22) 100%
+    );
 }
 
 /* Ruído de papel a ~6% com o único tile SVG compartilhado em :root */
@@ -594,16 +609,20 @@ a:hover .rf-book-cover-wishlist {
 
 .rf-tpl-B .rf-spine-top-band {
   height: 23%;
-  background-color: color-mix(in srgb, var(--accent, #C8A46E) 92%, var(--rf-linen) 8%);
+  background-color: color-mix(
+    in srgb,
+    var(--accent, #c8a46e) 92%,
+    var(--rf-linen) 8%
+  );
   background-image:
-    linear-gradient(180deg,
-      rgba(20, 21, 20, 0.14) 0%,
-      rgba(20, 21, 20, 0) 42%),
-    linear-gradient(90deg,
+    linear-gradient(180deg, rgba(20, 21, 20, 0.14) 0%, rgba(20, 21, 20, 0) 42%),
+    linear-gradient(
+      90deg,
       rgba(255, 255, 255, 0.22) 0%,
       rgba(255, 255, 255, 0.06) 24%,
       rgba(20, 21, 20, 0.03) 68%,
-      rgba(20, 21, 20, 0.24) 100%);
+      rgba(20, 21, 20, 0.24) 100%
+    );
   border-bottom: 1px solid rgba(20, 21, 20, 0.22);
 }
 
@@ -621,30 +640,39 @@ a:hover .rf-book-cover-wishlist {
   width: 58%;
   height: 1.5px;
   border-radius: 999px;
-  background-color: color-mix(in srgb, var(--accent, var(--txt)) 65%, var(--txt) 35%);
+  background-color: color-mix(
+    in srgb,
+    var(--accent, var(--txt)) 65%,
+    var(--txt) 35%
+  );
   opacity: 0.8;
 }
 
 /* Template D: bloco colorido no topo + restante claro (papel marfim), sans minimalista */
 .rf-tpl-D .rf-face-spine {
-  background-color: color-mix(in srgb, #EAE3D5 92%, var(--rf-linen) 8%);
+  background-color: color-mix(in srgb, #eae3d5 92%, var(--rf-linen) 8%);
   color: var(--rf-onyx);
   padding-top: 0;
 }
 
 .rf-tpl-D .rf-spine-top-band {
   height: 27%;
-  background-color: color-mix(in srgb, var(--c, #51262F) 92%, var(--rf-linen) 8%);
+  background-color: color-mix(
+    in srgb,
+    var(--c, #51262f) 92%,
+    var(--rf-linen) 8%
+  );
   background-image:
-    linear-gradient(180deg,
-      rgba(20, 21, 20, 0.14) 0%,
-      rgba(20, 21, 20, 0) 40%),
-    linear-gradient(90deg,
+    linear-gradient(180deg, rgba(20, 21, 20, 0.14) 0%, rgba(20, 21, 20, 0) 40%),
+    linear-gradient(
+      90deg,
       rgba(255, 255, 255, 0.22) 0%,
       rgba(255, 255, 255, 0.06) 24%,
       rgba(20, 21, 20, 0.03) 68%,
-      rgba(20, 21, 20, 0.24) 100%);
-  border-bottom: 1.5px solid color-mix(in srgb, var(--accent, var(--c)) 80%, rgba(20, 21, 20, 0.2) 20%);
+      rgba(20, 21, 20, 0.24) 100%
+    );
+  border-bottom: 1.5px solid
+    color-mix(in srgb, var(--accent, var(--c)) 80%, rgba(20, 21, 20, 0.2) 20%);
 }
 
 .rf-tpl-D .rf-spine-title {
@@ -656,7 +684,7 @@ a:hover .rf-book-cover-wishlist {
 }
 
 .rf-tpl-D .rf-spine-author {
-  color: #4A433C !important;
+  color: #4a433c !important;
   opacity: 0.88 !important;
 }
 
@@ -690,10 +718,12 @@ a:hover .rf-book-cover-wishlist {
   top: 0;
   bottom: 0;
   width: 1px;
-  background: linear-gradient(180deg,
-      rgba(20, 21, 20, 0.55) 0%,
-      rgba(200, 164, 110, 0.16) 50%,
-      rgba(20, 21, 20, 0.58) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(20, 21, 20, 0.55) 0%,
+    rgba(200, 164, 110, 0.16) 50%,
+    rgba(20, 21, 20, 0.58) 100%
+  );
   pointer-events: none;
 }
 
@@ -749,7 +779,12 @@ a:hover .rf-book-cover-wishlist {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--rf-fawn) 0%, var(--rf-camel) 50%, var(--rf-fawn) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--rf-fawn) 0%,
+    var(--rf-camel) 50%,
+    var(--rf-fawn) 100%
+  );
   box-shadow: 0 1px 8px rgb(200 164 110 / 0.85);
   pointer-events: none;
   z-index: 3;
@@ -772,7 +807,7 @@ a:hover .rf-book-cover-wishlist {
   height: 100%;
   min-width: 2px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #D4AF37 0%, #F3E5AB 100%);
+  background: linear-gradient(90deg, #d4af37 0%, #f3e5ab 100%);
   box-shadow: 0 0 6px rgba(212, 175, 55, 0.85);
 }
 
@@ -931,7 +966,6 @@ a:hover .rf-book-cover-wishlist {
 }
 
 @media (hover: hover) {
-
   .rf-book-slot:hover .rf-face-top-pages,
   .rf-book-slot:hover .rf-face-fore-edge-pages,
   .rf-book-slot:hover .rf-face-back-cover,
@@ -940,10 +974,10 @@ a:hover .rf-book-cover-wishlist {
   }
 }
 
-.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-top-pages,
-.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-fore-edge-pages,
-.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-back-cover,
-.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-side-cover,
+.rf-book-slot.is-focused .rf-face-top-pages,
+.rf-book-slot.is-focused .rf-face-fore-edge-pages,
+.rf-book-slot.is-focused .rf-face-back-cover,
+.rf-book-slot.is-focused .rf-face-side-cover,
 .rf-book-slot.is-selected .rf-face-top-pages,
 .rf-book-slot.is-selected .rf-face-fore-edge-pages,
 .rf-book-slot.is-selected .rf-face-back-cover,
@@ -961,11 +995,13 @@ a:hover .rf-book-cover-wishlist {
   left: 1px;
   width: calc(100% - 2px);
   height: var(--depth, 124px);
-  background: repeating-linear-gradient(90deg,
-      #EFE6D2 0px,
-      #EFE6D2 1.5px,
-      #DDD1BA 1.5px,
-      #DDD1BA 2.5px);
+  background: repeating-linear-gradient(
+    90deg,
+    #efe6d2 0px,
+    #efe6d2 1.5px,
+    #ddd1ba 1.5px,
+    #ddd1ba 2.5px
+  );
   transform-origin: top center;
   transform: rotateX(90deg);
   box-shadow: inset 0 0 6px rgba(20, 21, 20, 0.38);
@@ -974,43 +1010,7 @@ a:hover .rf-book-cover-wishlist {
 }
 
 /* Capa dura: beirada saliente de ~2.5px no topo e na frente */
-.rf-format-capa_dura
-
-/* Em repouso só as lombadas ficam visíveis; as faces laterais/capa aparecem ao girar */
-.rf-face-top-pages,
-.rf-face-fore-edge-pages,
-.rf-face-back-cover,
-.rf-face-side-cover {
-  opacity: 0;
-  transition: opacity 0.22s ease;
-}
-
-@media (hover: hover) {
-
-  .rf-book-slot:hover .rf-face-top-pages,
-  .rf-book-slot:hover .rf-face-fore-edge-pages,
-  .rf-book-slot:hover .rf-face-back-cover,
-  .rf-book-slot:hover .rf-face-side-cover {
-    opacity: 1;
-  }
-}
-
-.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-top-pages,
-.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-fore-edge-pages,
-.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-back-cover,
-.rf-book-slot:has(.rf-book-prism:focus-visible) .rf-face-side-cover,
-.rf-book-slot.is-selected .rf-face-top-pages,
-.rf-book-slot.is-selected .rf-face-fore-edge-pages,
-.rf-book-slot.is-selected .rf-face-back-cover,
-.rf-book-slot.is-selected .rf-face-side-cover,
-.rf-covers-mode .rf-book-slot .rf-face-top-pages,
-.rf-covers-mode .rf-book-slot .rf-face-fore-edge-pages,
-.rf-covers-mode .rf-book-slot .rf-face-back-cover,
-.rf-covers-mode .rf-book-slot .rf-face-side-cover {
-  opacity: 1;
-}
-
-.rf-face-top-pages {
+.rf-format-capa_dura .rf-face-top-pages {
   top: 2.5px;
   height: calc(var(--depth, 124px) - 2.5px);
 }
@@ -1022,11 +1022,13 @@ a:hover .rf-book-cover-wishlist {
   left: 0;
   width: 100%;
   height: calc(100% - 4px);
-  background: repeating-linear-gradient(180deg,
-      #EFE6D2 0px,
-      #EFE6D2 1.5px,
-      #DDD1BA 1.5px,
-      #DDD1BA 2.5px);
+  background: repeating-linear-gradient(
+    180deg,
+    #efe6d2 0px,
+    #efe6d2 1.5px,
+    #ddd1ba 1.5px,
+    #ddd1ba 2.5px
+  );
   transform: translateZ(calc(-1 * var(--depth, 124px)));
   box-shadow: inset 0 0 6px rgba(20, 21, 20, 0.42);
   backface-visibility: hidden;
@@ -1045,10 +1047,12 @@ a:hover .rf-book-cover-wishlist {
   left: 0;
   width: var(--depth, 124px);
   height: 100%;
-  background-color: var(--c, #51262F);
-  background-image: linear-gradient(90deg,
-      rgba(20, 21, 20, 0.52) 0%,
-      rgba(20, 21, 20, 0.28) 100%);
+  background-color: var(--c, #51262f);
+  background-image: linear-gradient(
+    90deg,
+    rgba(20, 21, 20, 0.52) 0%,
+    rgba(20, 21, 20, 0.28) 100%
+  );
   transform-origin: left center;
   transform: rotateY(90deg);
   backface-visibility: hidden;
@@ -1064,7 +1068,11 @@ a:hover .rf-book-cover-wishlist {
   left: 100%;
   width: var(--depth, 124px);
   height: 100%;
-  background-color: color-mix(in srgb, var(--c, #51262F) 92%, var(--rf-linen) 8%);
+  background-color: color-mix(
+    in srgb,
+    var(--c, #51262f) 92%,
+    var(--rf-linen) 8%
+  );
   transform-origin: left center;
   transform: rotateY(90deg);
   border-radius: 0 3px 3px 0;
@@ -1085,10 +1093,12 @@ a:hover .rf-book-cover-wishlist {
   bottom: 0;
   left: 7px;
   width: 2px;
-  background: linear-gradient(90deg,
-      rgba(20, 21, 20, 0.48) 0%,
-      rgba(255, 255, 255, 0.24) 55%,
-      rgba(20, 21, 20, 0.14) 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(20, 21, 20, 0.48) 0%,
+    rgba(255, 255, 255, 0.24) 55%,
+    rgba(20, 21, 20, 0.14) 100%
+  );
   z-index: 4;
   pointer-events: none;
 }
@@ -1097,10 +1107,12 @@ a:hover .rf-book-cover-wishlist {
   position: absolute;
   inset: 0 auto 0 0;
   width: 14px;
-  background: linear-gradient(90deg,
-      rgba(244, 239, 230, 0.22) 0%,
-      rgba(20, 21, 20, 0.26) 45%,
-      transparent 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(244, 239, 230, 0.22) 0%,
+    rgba(20, 21, 20, 0.26) 45%,
+    transparent 100%
+  );
   pointer-events: none;
   z-index: 4;
 }
@@ -1109,11 +1121,13 @@ a:hover .rf-book-cover-wishlist {
 .rf-side-cover-diagonal-sheen {
   position: absolute;
   inset: 0;
-  background: linear-gradient(126deg,
-      rgba(255, 255, 255, 0.2) 0%,
-      rgba(255, 255, 255, 0.06) 28%,
-      transparent 48%,
-      rgba(20, 21, 20, 0.08) 100%);
+  background: linear-gradient(
+    126deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.06) 28%,
+    transparent 48%,
+    rgba(20, 21, 20, 0.08) 100%
+  );
   pointer-events: none;
   z-index: 4;
 }
@@ -1125,11 +1139,13 @@ a:hover .rf-book-cover-wishlist {
   right: 0;
   bottom: 2px;
   width: 3px;
-  background: repeating-linear-gradient(90deg,
-      #F3ECDD 0px,
-      #F3ECDD 1px,
-      #D8CCB6 1px,
-      #D8CCB6 2px);
+  background: repeating-linear-gradient(
+    90deg,
+    #f3ecdd 0px,
+    #f3ecdd 1px,
+    #d8ccb6 1px,
+    #d8ccb6 2px
+  );
   box-shadow: inset 1px 0 1px rgba(20, 21, 20, 0.24);
   z-index: 4;
   pointer-events: none;
@@ -1141,11 +1157,13 @@ a:hover .rf-book-cover-wishlist {
   right: 0;
   bottom: 0;
   height: 3px;
-  background: repeating-linear-gradient(180deg,
-      #F3ECDD 0px,
-      #F3ECDD 1px,
-      #D8CCB6 1px,
-      #D8CCB6 2px);
+  background: repeating-linear-gradient(
+    180deg,
+    #f3ecdd 0px,
+    #f3ecdd 1px,
+    #d8ccb6 1px,
+    #d8ccb6 2px
+  );
   box-shadow: inset 0 1px 1px rgba(20, 21, 20, 0.22);
   z-index: 4;
   pointer-events: none;
@@ -1181,10 +1199,16 @@ a:hover .rf-book-cover-wishlist {
   padding: 20px 14px 16px 16px;
   box-sizing: border-box;
   color: var(--txt, var(--rf-linen));
-  background-color: color-mix(in srgb, var(--c, #51262F) 92%, var(--rf-linen) 8%);
-  background-image: linear-gradient(155deg,
-      rgba(255, 255, 255, 0.1) 0%,
-      rgba(20, 21, 20, 0.18) 100%);
+  background-color: color-mix(
+    in srgb,
+    var(--c, #51262f) 92%,
+    var(--rf-linen) 8%
+  );
+  background-image: linear-gradient(
+    155deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(20, 21, 20, 0.18) 100%
+  );
   z-index: 1;
 }
 
@@ -1204,7 +1228,11 @@ a:hover .rf-book-cover-wishlist {
   left: 0;
   right: 3px;
   height: 10px;
-  background-color: color-mix(in srgb, var(--accent, #C8A46E) 92%, var(--rf-linen) 8%);
+  background-color: color-mix(
+    in srgb,
+    var(--accent, #c8a46e) 92%,
+    var(--rf-linen) 8%
+  );
   border-bottom: 1px solid rgba(20, 21, 20, 0.18);
   pointer-events: none;
 }
@@ -1213,7 +1241,8 @@ a:hover .rf-book-cover-wishlist {
   position: absolute;
   inset: 14px 10px 10px 12px;
   border-radius: 2px;
-  border: 1px solid color-mix(in srgb, var(--accent, var(--txt)) 65%, var(--txt) 35%);
+  border: 1px solid
+    color-mix(in srgb, var(--accent, var(--txt)) 65%, var(--txt) 35%);
   opacity: 0.65;
   pointer-events: none;
 }
@@ -1241,7 +1270,8 @@ a:hover .rf-book-cover-wishlist {
   position: relative;
   z-index: 1;
   padding-top: 6px;
-  border-top: 1px solid color-mix(in srgb, var(--accent, var(--txt)) 55%, transparent 45%);
+  border-top: 1px solid
+    color-mix(in srgb, var(--accent, var(--txt)) 55%, transparent 45%);
   font-family: var(--font-sans, system-ui, sans-serif);
   font-size: 8.5px;
   font-weight: 600;
@@ -1361,7 +1391,7 @@ a:hover .rf-book-cover-wishlist {
   position: absolute;
   inset: 0;
   transform: translateZ(calc(var(--depth) / 2));
-  background: var(--c, #51262F);
+  background: var(--c, #51262f);
   border-radius: 2px 5px 5px 2px;
   overflow: hidden;
   box-shadow: inset 4px 0 8px rgba(20, 21, 20, 0.45);
@@ -1415,7 +1445,7 @@ a:hover .rf-book-cover-wishlist {
   position: absolute;
   inset: 0;
   transform: rotateY(180deg) translateZ(calc(var(--depth) / 2));
-  background: var(--c, #51262F);
+  background: var(--c, #51262f);
   border-radius: 5px 2px 2px 5px;
   backface-visibility: hidden;
 }
@@ -1427,7 +1457,7 @@ a:hover .rf-book-cover-wishlist {
   width: var(--depth);
   height: var(--bh);
   transform: rotateY(-90deg) translateZ(calc(var(--bw) / 2));
-  background: var(--c, #51262F);
+  background: var(--c, #51262f);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1450,9 +1480,11 @@ a:hover .rf-book-cover-wishlist {
   width: var(--depth);
   height: var(--bh);
   transform: rotateY(90deg) translateZ(calc(var(--bw) / 2));
-  background: repeating-linear-gradient(180deg,
-      #EFE6D2 0 1.5px,
-      #DDD1BA 1.5px 2.5px);
+  background: repeating-linear-gradient(
+    180deg,
+    #efe6d2 0 1.5px,
+    #ddd1ba 1.5px 2.5px
+  );
   backface-visibility: hidden;
 }
 
@@ -1463,9 +1495,11 @@ a:hover .rf-book-cover-wishlist {
   width: var(--bw);
   height: var(--depth);
   transform: rotateX(90deg) translateZ(calc(var(--bh) / 2));
-  background: repeating-linear-gradient(90deg,
-      #EFE6D2 0 1.5px,
-      #DDD1BA 1.5px 2.5px);
+  background: repeating-linear-gradient(
+    90deg,
+    #efe6d2 0 1.5px,
+    #ddd1ba 1.5px 2.5px
+  );
   backface-visibility: hidden;
 }
 
@@ -1476,9 +1510,11 @@ a:hover .rf-book-cover-wishlist {
   width: var(--bw);
   height: var(--depth);
   transform: rotateX(-90deg) translateZ(calc(var(--bh) / 2));
-  background: repeating-linear-gradient(90deg,
-      #EFE6D2 0 1.5px,
-      #DDD1BA 1.5px 2.5px);
+  background: repeating-linear-gradient(
+    90deg,
+    #efe6d2 0 1.5px,
+    #ddd1ba 1.5px 2.5px
+  );
   backface-visibility: hidden;
 }
 
@@ -1490,9 +1526,11 @@ a:hover .rf-book-cover-wishlist {
   width: 190px;
   height: 22px;
   border-radius: 50%;
-  background: radial-gradient(ellipse at center,
-      rgba(20, 21, 20, 0.65) 0%,
-      transparent 70%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(20, 21, 20, 0.65) 0%,
+    transparent 70%
+  );
   pointer-events: none;
 }
 

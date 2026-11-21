@@ -4,9 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Fragment,
+  memo,
+  useCallback,
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   useTransition,
   type CSSProperties,
   type DragEvent,
@@ -128,6 +131,7 @@ interface PackedDisplayRow {
   isLastChunk: boolean;
   startBookIndex: number;
   books: NormalizedVirtualBook[];
+  visuals: ResolvedSpineVisual[];
   rowBooksWidthPx: number;
   maxBookHeightPx: number;
   colors: readonly string[];
@@ -184,9 +188,9 @@ export function resolveRowSpineVisuals(
       );
       const safeAlt =
         altHex.toLowerCase() === prevColor.toLowerCase()
-          ? EDITORIAL_SPINE_PALETTE.find(
-            (hex) => hex.toLowerCase() !== prevColor!.toLowerCase()
-          ) ?? altHex
+          ? (EDITORIAL_SPINE_PALETTE.find(
+              (hex) => hex.toLowerCase() !== prevColor!.toLowerCase()
+            ) ?? altHex)
           : altHex;
       palette = resolveSpinePalette(safeAlt, book.resolvedSeed, prevColor);
     }
@@ -328,14 +332,16 @@ export function BookQuickPanel({
         setFocusError(res.error);
         return;
       }
-      router.push(`/leitura/foco?readingId=${encodeURIComponent(res.readingId)}`);
+      router.push(
+        `/leitura/foco?readingId=${encodeURIComponent(res.readingId)}`
+      );
     });
   };
 
   const pageDetail =
     book.progressUnit === "pages" &&
-      book.progressTotal &&
-      book.progressTotal > 0
+    book.progressTotal &&
+    book.progressTotal > 0
       ? `Pág. ${Math.min(book.progressValue ?? 0, book.progressTotal)} de ${book.progressTotal}`
       : book.pages
         ? `${book.pages} páginas`
@@ -353,12 +359,13 @@ export function BookQuickPanel({
         <div className={styles.quickPanelTopMeta}>
           <span className={styles.quickPanelKicker}>Ficha rápida</span>
           <span
-            className={`${styles.quickPanelStatusBadge} ${isReading
-              ? styles.quickPanelStatusReading
-              : isFinished
-                ? styles.quickPanelStatusFinished
-                : ""
-              }`}
+            className={`${styles.quickPanelStatusBadge} ${
+              isReading
+                ? styles.quickPanelStatusReading
+                : isFinished
+                  ? styles.quickPanelStatusFinished
+                  : ""
+            }`}
           >
             {statusLabel}
           </span>
@@ -541,6 +548,78 @@ export function BookQuickPanel({
   );
 }
 
+const MemoBookQuickPanel = memo(BookQuickPanel);
+
+interface PreviewStore {
+  getId: () => string | null;
+  setId: (id: string | null) => void;
+  subscribe: (listener: () => void) => () => void;
+}
+
+function createPreviewStore(): PreviewStore {
+  let currentId: string | null = null;
+  const listeners = new Set<() => void>();
+  return {
+    getId: () => currentId,
+    setId: (id: string | null) => {
+      if (currentId === id) return;
+      currentId = id;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
+/**
+ * Isola as atualizações de hover/foco do painel lateral para que passar o mouse
+ * sobre os livros na estante jamais re-renderize `ShelfView` ou as 150 lombadas.
+ */
+const ConnectedBookQuickPanel = memo(function ConnectedBookQuickPanel({
+  store,
+  shelves,
+  activeBookId,
+}: {
+  store: PreviewStore;
+  shelves: readonly ShelfRenderGroup[];
+  activeBookId: string | number | null;
+}) {
+  const previewBookId = useSyncExternalStore(
+    store.subscribe,
+    store.getId,
+    () => null
+  );
+
+  const quickPanelBook = useMemo<NormalizedVirtualBook | null>(() => {
+    const allBooks: NormalizedVirtualBook[] = [];
+    for (const shelf of shelves) {
+      for (const b of shelf.books) allBooks.push(b);
+    }
+    if (allBooks.length === 0) return null;
+
+    if (previewBookId) {
+      const matched = allBooks.find((b) => String(b.id) === previewBookId);
+      if (matched) return matched;
+    }
+    if (activeBookId !== null && activeBookId !== undefined) {
+      const matched = allBooks.find(
+        (b) => String(b.id) === String(activeBookId)
+      );
+      if (matched) return matched;
+    }
+    const readingBook = allBooks.find((b) => b.readingStatus === "reading");
+    return readingBook ?? allBooks[0] ?? null;
+  }, [shelves, previewBookId, activeBookId]);
+
+  return <MemoBookQuickPanel book={quickPanelBook} />;
+});
+
 function reorderBookListByMove(
   items: readonly NormalizedVirtualBook[],
   dragBookId: string,
@@ -555,10 +634,13 @@ function reorderBookListByMove(
   const [moved] = copy.splice(fromIdx, 1);
   if (!moved) return [...items];
 
-  const adjustedTargetIdx = copy.findIndex((b) => String(b.id) === targetBookId);
+  const adjustedTargetIdx = copy.findIndex(
+    (b) => String(b.id) === targetBookId
+  );
   if (adjustedTargetIdx < 0) return [...items];
 
-  const insertIdx = position === "after" ? adjustedTargetIdx + 1 : adjustedTargetIdx;
+  const insertIdx =
+    position === "after" ? adjustedTargetIdx + 1 : adjustedTargetIdx;
   copy.splice(insertIdx, 0, moved);
   return copy;
 }
@@ -614,7 +696,13 @@ export function ShelfView({
   const [focusedIndexByRow, setFocusedIndexByRow] = useState<
     Record<string, number>
   >({});
-  const [previewBookId, setPreviewBookId] = useState<string | null>(null);
+  const [previewStore] = useState<PreviewStore>(() => createPreviewStore());
+  const setPreviewBookId = useCallback(
+    (id: string | null) => {
+      previewStore.setId(id);
+    },
+    [previewStore]
+  );
 
   const draggingBookRef = useRef<{ shelfKey: string; bookId: string } | null>(
     null
@@ -625,11 +713,19 @@ export function ShelfView({
     position: "before" | "after";
   } | null>(null);
 
+  const totalBooksCount = useMemo(
+    () => shelves.reduce((sum, s) => sum + s.books.length, 0),
+    [shelves]
+  );
+
   const {
     containerRef: bookcaseRef,
+    handleMouseEnter,
     handleMouseMove,
     handleMouseLeave,
-  } = useShelfParallax<HTMLDivElement>();
+  } = useShelfParallax<HTMLDivElement>({
+    disabled: totalBooksCount > 40,
+  });
 
   // Empacota cada grupo de prateleira para largura fixa ~640px (excedente vai para a prateleira seguinte)
   const packedRows = useMemo<PackedDisplayRow[]>(() => {
@@ -702,6 +798,7 @@ export function ShelfView({
           isLastChunk: chunkIdx === chunks.length - 1,
           startBookIndex: offset,
           books: restoredBooks,
+          visuals,
           rowBooksWidthPx: chunk.rowBooksWidthPx,
           maxBookHeightPx: chunk.maxBookHeightPx,
           colors: rowColors,
@@ -711,29 +808,14 @@ export function ShelfView({
     });
 
     return out;
-  }, [shelves, isEdit, densityGapPx, bookDisplayModes, shelfDecorByRow, onAddBook]);
-
-  // Livro exibido no BookQuickPanel: hover/foco/toque -> selecionado -> em andamento -> primeiro livro
-  const quickPanelBook = useMemo<NormalizedVirtualBook | null>(() => {
-    const allBooks: NormalizedVirtualBook[] = [];
-    for (const shelf of shelves) {
-      for (const b of shelf.books) allBooks.push(b);
-    }
-    if (allBooks.length === 0) return null;
-
-    if (previewBookId) {
-      const matched = allBooks.find((b) => String(b.id) === previewBookId);
-      if (matched) return matched;
-    }
-    if (activeBookId !== null && activeBookId !== undefined) {
-      const matched = allBooks.find(
-        (b) => String(b.id) === String(activeBookId)
-      );
-      if (matched) return matched;
-    }
-    const readingBook = allBooks.find((b) => b.readingStatus === "reading");
-    return readingBook ?? allBooks[0] ?? null;
-  }, [shelves, previewBookId, activeBookId]);
+  }, [
+    shelves,
+    isEdit,
+    densityGapPx,
+    bookDisplayModes,
+    shelfDecorByRow,
+    onAddBook,
+  ]);
 
   const bookcaseWidthPx = FIXED_SHELF_WIDTH_PX;
 
@@ -784,9 +866,9 @@ export function ShelfView({
     dragOverTargetRef.current = nextTarget;
     setDragOverTarget((prev) =>
       prev &&
-        prev.shelfKey === shelfKey &&
-        prev.bookId === targetStr &&
-        prev.position === pos
+      prev.shelfKey === shelfKey &&
+      prev.bookId === targetStr &&
+      prev.position === pos
         ? prev
         : nextTarget
     );
@@ -809,8 +891,8 @@ export function ShelfView({
     const currentTarget = dragOverTargetRef.current;
     const pos =
       currentTarget &&
-        currentTarget.shelfKey === shelf.genreKey &&
-        currentTarget.bookId === targetStr
+      currentTarget.shelfKey === shelf.genreKey &&
+      currentTarget.bookId === targetStr
         ? currentTarget.position
         : "before";
 
@@ -875,6 +957,7 @@ export function ShelfView({
   const bookcaseElement = (
     <div
       ref={bookcaseRef}
+      onMouseEnter={handleMouseEnter}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       data-shelf-mode={mode}
@@ -908,7 +991,7 @@ export function ShelfView({
           const isEditing =
             row.isFirstChunk && editingShelfKey === shelf.genreKey;
           const rowHeightPx = row.maxBookHeightPx + 14;
-          const rowVisuals = resolveRowSpineVisuals(row.books);
+          const rowVisuals = row.visuals;
 
           const pencil =
             isEdit && row.isFirstChunk && onEditShelf ? (
@@ -935,8 +1018,9 @@ export function ShelfView({
                 handleShelfContainerDragOver(e, shelf.genreKey)
               }
               onDrop={(e) => handleShelfContainerDrop(e, shelf)}
-              className={`rf-shelf-row ${styles.shelfSection} ${isDropTargetShelf ? styles.shelfSectionDropActive : ""
-                }`}
+              className={`rf-shelf-row ${styles.shelfSection} ${
+                isDropTargetShelf ? styles.shelfSectionDropActive : ""
+              }`}
             >
               {/* 1. Pill de cabeçalho acima de cada prateleira */}
               <div className={`rf-shelf-header ${styles.shelfHeaderRail}`}>
@@ -978,10 +1062,7 @@ export function ShelfView({
                       {pencil}
                     </div>
                   ) : (
-                    <div
-                      data-shelf-pill="true"
-                      className={styles.categoryPill}
-                    >
+                    <div data-shelf-pill="true" className={styles.categoryPill}>
                       <span>{shelf.genre}</span>
                       {pencil}
                     </div>
@@ -1068,8 +1149,9 @@ export function ShelfView({
                   <div className={styles.shelfTrack}>
                     <ul
                       aria-label={`Prateleira de ${shelf.genre}`}
-                      className={`${styles.booksRow} ${view3dMode === "covers" ? "rf-covers-mode" : ""
-                        }`}
+                      className={`${styles.booksRow} ${
+                        view3dMode === "covers" ? "rf-covers-mode" : ""
+                      }`}
                       style={
                         {
                           "--row-h": `${rowHeightPx}px`,
@@ -1079,20 +1161,20 @@ export function ShelfView({
                       {/* Objetos decorativos posicionados no início da prateleira */}
                       {row.isFirstChunk
                         ? (shelfDecorByRow[shelf.genreKey] ?? [])
-                          .filter((d) => d.afterBookIndex < 0)
-                          .map((decor) => (
-                            <ShelfDecorObject
-                              key={decor.id}
-                              id={decor.id}
-                              decorType={decor.decorType}
-                              mode={mode}
-                              onRemove={
-                                onRemoveDecor
-                                  ? (id) => onRemoveDecor(shelf.genreKey, id)
-                                  : undefined
-                              }
-                            />
-                          ))
+                            .filter((d) => d.afterBookIndex < 0)
+                            .map((decor) => (
+                              <ShelfDecorObject
+                                key={decor.id}
+                                id={decor.id}
+                                decorType={decor.decorType}
+                                mode={mode}
+                                onRemove={
+                                  onRemoveDecor
+                                    ? (id) => onRemoveDecor(shelf.genreKey, id)
+                                    : undefined
+                                }
+                              />
+                            ))
                         : null}
 
                       {row.books.map((book, idx) => {
@@ -1111,7 +1193,7 @@ export function ShelfView({
                           draggingBook.bookId === bookIdStr;
                         const dropPos =
                           dragOverTarget?.shelfKey === shelf.genreKey &&
-                            dragOverTarget.bookId === bookIdStr
+                          dragOverTarget.bookId === bookIdStr
                             ? dragOverTarget.position
                             : null;
                         const canDrag =
@@ -1129,8 +1211,7 @@ export function ShelfView({
 
                           if (
                             e.altKey &&
-                            (e.key === "ArrowLeft" ||
-                              e.key === "ArrowRight") &&
+                            (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
                             !book.isWishlist &&
                             shelf.books.length >= 2
                           ) {
@@ -1192,22 +1273,30 @@ export function ShelfView({
                                 data-book-display="capa_frente"
                                 draggable={canDrag}
                                 onDragStart={(e) =>
-                                  handleBookDragStart(e, shelf.genreKey, book.id)
+                                  handleBookDragStart(
+                                    e,
+                                    shelf.genreKey,
+                                    book.id
+                                  )
                                 }
                                 onDragOver={(e) =>
                                   handleBookDragOver(e, shelf.genreKey, book.id)
                                 }
-                                onDrop={(e) => handleBookDrop(e, shelf, book.id)}
+                                onDrop={(e) =>
+                                  handleBookDrop(e, shelf, book.id)
+                                }
                                 onDragEnd={clearDrag}
-                                className={`${styles.bookFrontSlot} ${activeBookId === book.id
-                                  ? styles.bookFrontSelected
-                                  : ""
-                                  } ${dropPos === "before"
+                                className={`${styles.bookFrontSlot} ${
+                                  activeBookId === book.id
+                                    ? styles.bookFrontSelected
+                                    : ""
+                                } ${
+                                  dropPos === "before"
                                     ? styles.bookFrontDropBefore
                                     : dropPos === "after"
                                       ? styles.bookFrontDropAfter
                                       : ""
-                                  }`}
+                                }`}
                               >
                                 <button
                                   type="button"
@@ -1242,7 +1331,9 @@ export function ShelfView({
                                       seed={book.resolvedSeed}
                                       readingStatus={book.readingStatus}
                                       isWishlist={book.isWishlist}
-                                      progressPercent={book.progressPercent ?? 0}
+                                      progressPercent={
+                                        book.progressPercent ?? 0
+                                      }
                                       sizes="112px"
                                       className="rounded-none border-0 shadow-none"
                                     />
@@ -1253,10 +1344,11 @@ export function ShelfView({
                               <Book3D
                                 className={
                                   displayMode === "inclinado"
-                                    ? `${styles.bookTiltedWrap} ${tiltDir === "left"
-                                      ? styles.bookTiltedLeft
-                                      : styles.bookTiltedRight
-                                    }`
+                                    ? `${styles.bookTiltedWrap} ${
+                                        tiltDir === "left"
+                                          ? styles.bookTiltedLeft
+                                          : styles.bookTiltedRight
+                                      }`
                                     : undefined
                                 }
                                 pages={book.pages}
@@ -1276,16 +1368,23 @@ export function ShelfView({
                                 readingStatus={book.readingStatus}
                                 isWishlist={book.isWishlist}
                                 progressPercent={book.progressPercent ?? 0}
+                                showCoverFace={view3dMode === "covers"}
                                 draggable={canDrag}
                                 isDragging={isBookDragging}
                                 dropPosition={dropPos}
                                 onDragStart={(e) =>
-                                  handleBookDragStart(e, shelf.genreKey, book.id)
+                                  handleBookDragStart(
+                                    e,
+                                    shelf.genreKey,
+                                    book.id
+                                  )
                                 }
                                 onDragOver={(e) =>
                                   handleBookDragOver(e, shelf.genreKey, book.id)
                                 }
-                                onDrop={(e) => handleBookDrop(e, shelf, book.id)}
+                                onDrop={(e) =>
+                                  handleBookDrop(e, shelf, book.id)
+                                }
                                 onDragEnd={clearDrag}
                                 onHoverBook={() => setPreviewBookId(bookIdStr)}
                                 onFocusBook={() => setPreviewBookId(bookIdStr)}
@@ -1320,27 +1419,29 @@ export function ShelfView({
                       {/* Objetos decorativos posicionados ao final da prateleira */}
                       {row.isLastChunk
                         ? (shelfDecorByRow[shelf.genreKey] ?? [])
-                          .filter((d) => d.afterBookIndex >= shelf.books.length)
-                          .map((decor) => (
-                            <ShelfDecorObject
-                              key={decor.id}
-                              id={decor.id}
-                              decorType={decor.decorType}
-                              mode={mode}
-                              onRemove={
-                                onRemoveDecor
-                                  ? (id) => onRemoveDecor(shelf.genreKey, id)
-                                  : undefined
-                              }
-                            />
-                          ))
+                            .filter(
+                              (d) => d.afterBookIndex >= shelf.books.length
+                            )
+                            .map((decor) => (
+                              <ShelfDecorObject
+                                key={decor.id}
+                                id={decor.id}
+                                decorType={decor.decorType}
+                                mode={mode}
+                                onRemove={
+                                  onRemoveDecor
+                                    ? (id) => onRemoveDecor(shelf.genreKey, id)
+                                    : undefined
+                                }
+                              />
+                            ))
                         : null}
 
                       {/* Aparador de livros em L (CSS puro) quando sobra espaço confortável na tábua e não há decor custom */}
                       {!isEdit &&
-                        row.books.length > 0 &&
-                        (shelfDecorByRow[shelf.genreKey]?.length ?? 0) === 0 &&
-                        row.rowBooksWidthPx < FIXED_ROW_PACK_WIDTH_PX * 0.84 ? (
+                      row.books.length > 0 &&
+                      (shelfDecorByRow[shelf.genreKey]?.length ?? 0) === 0 &&
+                      row.rowBooksWidthPx < FIXED_ROW_PACK_WIDTH_PX * 0.84 ? (
                         <li
                           className={styles.bookendSlot}
                           data-bookend="true"
@@ -1398,7 +1499,11 @@ export function ShelfView({
   return (
     <div className={styles.shelfLayoutWithPanel}>
       {bookcaseElement}
-      <BookQuickPanel book={quickPanelBook} />
+      <ConnectedBookQuickPanel
+        store={previewStore}
+        shelves={shelves}
+        activeBookId={activeBookId}
+      />
     </div>
   );
 }

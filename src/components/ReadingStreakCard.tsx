@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import {
@@ -35,10 +35,12 @@ const LEVEL_SWATCH_CLASSES: Record<CalendarIntensityLevel, string> = {
 
 function buildDayTooltipText(day: CalendarMonthDay): string {
   const dateLabel = formatDisplayDatePtBr(day.ymd);
-  const pagesLabel = `${formatNumberPtBr(day.pages)} ${day.pages === 1 ? "página" : "páginas"
-    }`;
-  const sessionsLabel = `${day.sessionsCount} ${day.sessionsCount === 1 ? "sessão" : "sessões"
-    }`;
+  const pagesLabel = `${formatNumberPtBr(day.pages)} ${
+    day.pages === 1 ? "página" : "páginas"
+  }`;
+  const sessionsLabel = `${day.sessionsCount} ${
+    day.sessionsCount === 1 ? "sessão" : "sessões"
+  }`;
   if (day.seconds > 0 && day.pages === 0) {
     const mins = Math.max(1, Math.round(day.seconds / 60));
     return `${dateLabel} · ${formatNumberPtBr(mins)} min ouvidos · ${sessionsLabel}`;
@@ -46,7 +48,7 @@ function buildDayTooltipText(day: CalendarMonthDay): string {
   return `${dateLabel} · ${pagesLabel} · ${sessionsLabel}`;
 }
 
-export function ReadingStreakCard({
+export const ReadingStreakCard = memo(function ReadingStreakCard({
   calendar,
 }: {
   calendar: {
@@ -60,12 +62,23 @@ export function ReadingStreakCard({
     calendar.initialYearMonth
   );
   const [selectedDayYmd, setSelectedDayYmd] = useState<string | null>(null);
-  const [hoveredDay, setHoveredDay] = useState<CalendarMonthDay | null>(null);
+  const hoverHintRef = useRef<HTMLSpanElement | null>(null);
 
   const grid = useMemo(
     () => buildMonthCalendarGrid(selectedYearMonth, calendar.daysByYmd),
     [selectedYearMonth, calendar.daysByYmd]
   );
+
+  const defaultHintText =
+    grid.activeDaysCount === 0
+      ? `Nenhuma leitura registrada em ${grid.monthNameLower} de ${grid.year}.`
+      : "Clique em um dia destacado para abrir as sessões registradas.";
+
+  const setHintText = (text: string) => {
+    if (hoverHintRef.current) {
+      hoverHintRef.current.textContent = text;
+    }
+  };
 
   const canGoNext = selectedYearMonth < calendar.initialYearMonth;
   const minYearMonth = shiftYearMonth(calendar.earliestYearMonth, -12);
@@ -82,7 +95,6 @@ export function ReadingStreakCard({
   const navigateMonth = (delta: number) => {
     setSelectedYearMonth((curr) => shiftYearMonth(curr, delta));
     setSelectedDayYmd(null);
-    setHoveredDay(null);
   };
 
   return (
@@ -94,7 +106,9 @@ export function ReadingStreakCard({
         {/* Cabeçalho com navegação mês anterior / seguinte */}
         <div className="flex items-start justify-between gap-3 border-b border-[var(--rf-divider)] pb-3.5">
           <div className="min-w-0">
-            <p className="rf-type-label text-[var(--rf-text-accent-secondary)]">Registro Diário</p>
+            <p className="rf-type-label text-[var(--rf-text-accent-secondary)]">
+              Registro Diário
+            </p>
             <h2
               id="calendario-titulo"
               className="rf-type-section-title mt-0.5 truncate"
@@ -205,10 +219,14 @@ export function ReadingStreakCard({
                       prev === day.ymd ? null : day.ymd
                     )
                   }
-                  onMouseEnter={() => setHoveredDay(day)}
-                  onMouseLeave={() => setHoveredDay(null)}
-                  onFocus={() => setHoveredDay(day)}
-                  onBlur={() => setHoveredDay(null)}
+                  onMouseEnter={() =>
+                    setHintText(`${tooltip} · Clique para abrir sessões`)
+                  }
+                  onMouseLeave={() => setHintText(defaultHintText)}
+                  onFocus={() =>
+                    setHintText(`${tooltip} · Clique para abrir sessões`)
+                  }
+                  onBlur={() => setHintText(defaultHintText)}
                   className={`rf-icon-btn cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--rf-focus-ring-color)] focus-visible:outline-offset-2 ${sharedClass} ${
                     isSelected
                       ? "outline-2 outline-[var(--rf-text-primary)] outline-offset-1"
@@ -226,8 +244,8 @@ export function ReadingStreakCard({
                 role="gridcell"
                 title={tooltip}
                 aria-label={tooltip}
-                onMouseEnter={() => setHoveredDay(day)}
-                onMouseLeave={() => setHoveredDay(null)}
+                onMouseEnter={() => setHintText(tooltip)}
+                onMouseLeave={() => setHintText(defaultHintText)}
                 className={sharedClass}
               >
                 {day.dayOfMonth}
@@ -236,27 +254,12 @@ export function ReadingStreakCard({
           })}
         </div>
 
-        {/* Tooltip contextual inline */}
+        {/* Tooltip contextual inline (atualizado via ref sem re-renderizar o calendário) */}
         <div
           aria-live="polite"
           className="mt-2.5 min-h-[20px] font-sans text-[13px] font-medium tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-secondary)]"
         >
-          {hoveredDay ? (
-            <span>
-              {buildDayTooltipText(hoveredDay)}
-              {hoveredDay.sessions.length > 0
-                ? " · Clique para abrir sessões"
-                : ""}
-            </span>
-          ) : grid.activeDaysCount === 0 ? (
-            <span>
-              Nenhuma leitura registrada em {grid.monthNameLower} de {grid.year}.
-            </span>
-          ) : (
-            <span>
-              Clique em um dia destacado para abrir as sessões registradas.
-            </span>
-          )}
+          <span ref={hoverHintRef}>{defaultHintText}</span>
         </div>
       </div>
 
@@ -301,7 +304,8 @@ export function ReadingStreakCard({
                 className={rfButtonClassName({
                   variant: "subtle",
                   size: "sm",
-                  className: "!min-h-[30px] !w-7 !px-0 text-[var(--rf-text-secondary)]",
+                  className:
+                    "!min-h-[30px] !w-7 !px-0 text-[var(--rf-text-secondary)]",
                 })}
               >
                 <X className="h-3.5 w-3.5" aria-hidden="true" />
@@ -338,4 +342,4 @@ export function ReadingStreakCard({
       </div>
     </section>
   );
-}
+});
