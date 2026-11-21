@@ -107,11 +107,11 @@ export function AppShell({
           Largura sincronizada com a folha editorial central (max-w-[1360px]).
           ==================================================================== */}
       <header className="sticky top-0 z-50 border-b border-[var(--rf-nav-border-accent)] bg-[var(--rf-nav-bg)] pt-[env(safe-area-inset-top)] text-[var(--rf-nav-text)] shadow-[var(--rf-nav-shadow)]">
-        <div className="mx-auto flex h-16 max-w-[1360px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-10">
+        <div className="mx-auto flex min-h-16 max-w-[1360px] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2 sm:px-6 lg:flex-nowrap lg:py-0 lg:px-10">
           {/* 1. ESQUERDA: Logotipo serifado com subtítulo editorial */}
           <Link
             href="/painel"
-            className="group flex shrink-0 flex-col rounded-[var(--rf-radius-xs)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+            className="group flex min-w-0 max-w-full shrink flex-col rounded-[var(--rf-radius-xs)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >
             <span className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-[var(--rf-nav-text)] transition-colors group-hover:text-[var(--rf-nav-accent)]">
               ReadingFlow
@@ -127,7 +127,7 @@ export function AppShell({
           </div>
 
           {/* 3. DIREITA: Busca rápida, botão + Novo Livro e Menu de Conta */}
-          <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+          <div className="flex max-w-full min-w-0 shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-2.5">
             <div className="hidden xl:block w-48 2xl:w-60">
               <GlobalSearchBar />
             </div>
@@ -154,7 +154,7 @@ export function AppShell({
                 aria-haspopup="menu"
                 aria-label="Menu da conta"
                 onClick={() => setAccountMenuOpen((v) => !v)}
-                className="flex h-11 w-11 lg:h-9 lg:w-9 items-center justify-center rounded-[var(--rf-radius-full)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface)] text-[var(--rf-nav-accent)] transition-colors hover:border-[var(--rf-nav-accent)] hover:text-[var(--rf-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                className="flex h-[44px] w-[44px] lg:h-9 lg:w-9 items-center justify-center rounded-[var(--rf-radius-full)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface)] text-[var(--rf-nav-accent)] transition-colors hover:border-[var(--rf-nav-accent)] hover:text-[var(--rf-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
               >
                 <User size={16} strokeWidth={1.8} aria-hidden="true" />
               </button>
@@ -162,7 +162,7 @@ export function AppShell({
               {accountMenuOpen ? (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-2 w-64 rounded-[var(--rf-radius-lg)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface-elevated)] p-2 font-sans text-[var(--rf-nav-text)] shadow-[var(--rf-nav-popover-shadow)]"
+                  className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-[var(--rf-radius-lg)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface-elevated)] p-2 font-sans text-[var(--rf-nav-text)] shadow-[var(--rf-nav-popover-shadow)]"
                 >
                   <div className="border-b border-[var(--rf-nav-border)] px-3 py-2">
                     <p className="font-sans text-[11px] font-semibold tracking-wider uppercase text-[var(--rf-nav-accent)]">
@@ -217,7 +217,7 @@ export function AppShell({
                   : "Abrir menu de navegação"
               }
               onClick={() => setMobileMenuOpen((v) => !v)}
-              className="flex h-11 w-11 items-center justify-center rounded-[var(--rf-radius-md)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface)] text-[var(--rf-nav-accent)] transition-colors hover:border-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:hidden"
+              className="flex h-[44px] w-[44px] items-center justify-center rounded-[var(--rf-radius-md)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface)] text-[var(--rf-nav-accent)] transition-colors hover:border-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:hidden"
             >
               {mobileMenuOpen ? (
                 <X size={18} strokeWidth={1.8} aria-hidden="true" />

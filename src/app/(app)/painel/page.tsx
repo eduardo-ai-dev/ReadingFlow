@@ -179,9 +179,9 @@ export default async function DashboardPage() {
         ) : (
           <dl
             aria-label="Indicadores principais do acervo"
-            className="grid grid-cols-2 divide-y divide-[var(--rf-divider)] border-b border-[var(--rf-divider)] py-3 md:grid-cols-4 md:divide-y-0"
+            className="rf-kpi-grid divide-y divide-[var(--rf-divider)] border-b border-[var(--rf-divider)] py-3 md:divide-y-0"
           >
-            <div className="py-3 pr-3 md:border-r md:border-[var(--rf-divider)] md:pr-5">
+            <div className="min-w-0 py-3 md:border-r md:border-[var(--rf-divider)] md:pr-5">
               <dt className="rf-type-label text-[var(--rf-text-accent-secondary)]">
                 Obras no Acervo
               </dt>
@@ -193,7 +193,7 @@ export default async function DashboardPage() {
               </dd>
             </div>
 
-            <div className="py-3 pl-3 md:border-r md:border-[var(--rf-divider)] md:px-5">
+            <div className="min-w-0 py-3 md:border-r md:border-[var(--rf-divider)] md:px-5">
               <dt className="rf-type-label text-[var(--rf-text-secondary)]">
                 Lidos no Ano
               </dt>
@@ -205,7 +205,7 @@ export default async function DashboardPage() {
               </dd>
             </div>
 
-            <div className="py-3 pr-3 md:border-r md:border-[var(--rf-divider)] md:px-5">
+            <div className="min-w-0 py-3 md:border-r md:border-[var(--rf-divider)] md:px-5">
               <dt className="rf-type-label text-[var(--rf-text-secondary)]">
                 Páginas Viradas
               </dt>
@@ -220,7 +220,7 @@ export default async function DashboardPage() {
               </dd>
             </div>
 
-            <div className="py-3 pl-3 md:pl-5">
+            <div className="min-w-0 py-3 md:pl-5">
               <dt className="rf-type-label text-[var(--rf-text-secondary)]">
                 Em Audiolivros
               </dt>
@@ -255,7 +255,7 @@ export default async function DashboardPage() {
             className={rfButtonClassName({
               variant: "subtle",
               size: "sm",
-              className: "-mr-2",
+              className: "sm:-mr-2",
             })}
           >
             <span>Ver todas as leituras</span>
@@ -432,7 +432,7 @@ export default async function DashboardPage() {
                       className={rfButtonClassName({
                         variant: "subtle",
                         size: "sm",
-                        className: "-mr-2",
+                        className: "sm:-mr-2",
                       })}
                     >
                       <span>Ver fila</span>
@@ -576,7 +576,7 @@ export default async function DashboardPage() {
                       className={rfButtonClassName({
                         variant: "subtle",
                         size: "sm",
-                        className: "-mr-2",
+                        className: "sm:-mr-2",
                       })}
                     >
                       <span>Gerenciar</span>
@@ -756,7 +756,7 @@ export default async function DashboardPage() {
                     className={rfButtonClassName({
                       variant: "subtle",
                       size: "sm",
-                      className: "-mr-2",
+                      className: "sm:-mr-2",
                     })}
                   >
                     <span>Ver ranking</span>

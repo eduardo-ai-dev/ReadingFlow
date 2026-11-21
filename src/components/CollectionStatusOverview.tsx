@@ -131,7 +131,7 @@ export const CollectionStatusOverview = memo(function CollectionStatusOverview({
           className={rfButtonClassName({
             variant: "subtle",
             size: "sm",
-            className: "-mr-2",
+            className: "sm:-mr-2",
           })}
         >
           <span>Abrir estantes completas</span>

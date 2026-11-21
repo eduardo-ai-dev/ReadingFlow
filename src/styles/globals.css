@@ -349,6 +349,7 @@ textarea:focus {
   box-shadow: var(--rf-card-shadow);
   padding: var(--rf-card-padding-sm);
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 @media (min-width: 640px) {
@@ -368,6 +369,7 @@ textarea:focus {
   box-shadow: var(--rf-shadow-spotlight);
   padding: var(--rf-card-padding-sm);
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 @media (min-width: 640px) {
@@ -550,10 +552,24 @@ textarea:focus {
   animation: rfSkeletonPulse 1.6s ease-in-out infinite;
 }
 
-/* Grade de capas da Coleção: 2 cols mobile -> 3 sm -> 6 tablet (full width) -> 6 desktop (8/12) */
+/* Faixa de KPIs do /painel: 2 colunas no mobile 100%, colapsa para 1 coluna sob zoom 200%, 4 colunas em >= 768px */
+.rf-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+  gap: 0 12px;
+}
+
+@media (min-width: 768px) {
+  .rf-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+  }
+}
+
+/* Grade de capas da Coleção: 2 cols mobile -> 1 col sob zoom 200% -> 3 sm -> 6 tablet/desktop */
 .rf-collection-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
   column-gap: 12px;
   row-gap: 20px;
 }
