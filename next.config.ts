@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const isProd = process.env.NODE_ENV === "production";
+
 const securityHeaders = [
   {
     key: "X-Content-Type-Options",
@@ -21,7 +23,9 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      isProd
+        ? "script-src 'self' 'unsafe-inline'"
+        : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://covers.openlibrary.org https://archive.org https://*.archive.org https://books.google.com https://books.googleusercontent.com https://brasilapi.com.br https://api.mercadoeditorial.org https://mercadoeditorial.org https://m.media-amazon.com https://images-na.ssl-images-amazon.com https://http2.mlstatic.com https://hardcover.app https://*.hardcover.app https://storage.googleapis.com https://*.mzstatic.com",
       "font-src 'self' data:",
