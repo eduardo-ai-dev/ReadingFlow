@@ -7,31 +7,21 @@ export type ThemeId = "caderno" | "dark-academia" | "escandinavo" | "gotico";
  * - "editorial-light" | "editorial-dark" | "light" | "dark": aliases legados mantidos para 100% de compatibilidade.
  */
 export type ThemePreference =
-  | "system"
-  | ThemeId
-  | "editorial-light"
-  | "editorial-dark"
-  | "light"
-  | "dark";
+  "system" | ThemeId | "editorial-light" | "editorial-dark" | "light" | "dark";
 
 export type DensityPreference = "compact" | "comfortable" | "spacious";
 
 export type MotionPreference = "system" | "reduced" | "full";
 
+export type FxPreference = "full" | "min";
+
 export type AllowedFontId = "playfair" | "hanken" | "jetbrains-mono";
 
 export type AllowedAccentId =
-  | "camel"
-  | "wine-plum"
-  | "petrol"
-  | "terracotta"
-  | "crimson"
-  | "silver";
+  "camel" | "wine-plum" | "petrol" | "terracotta" | "crimson" | "silver";
 
 export type ThemeShelfMaterial =
-  | "classic-wood"
-  | "minimal-modern"
-  | "editorial-bordeaux";
+  "classic-wood" | "minimal-modern" | "editorial-bordeaux";
 
 export interface ThemeContrastPairSpec {
   label: string;
@@ -75,4 +65,5 @@ export interface UserThemePreferences {
   theme: ThemePreference;
   density: DensityPreference;
   motion: MotionPreference;
+  fx?: FxPreference;
 }

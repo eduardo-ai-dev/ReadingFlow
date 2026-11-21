@@ -1,6 +1,7 @@
 import type {
   AllowedFontId,
   DensityPreference,
+  FxPreference,
   MotionPreference,
   ThemeContrastPairSpec,
   ThemeDefinition,
@@ -11,6 +12,7 @@ import type {
 export const DEFAULT_THEME_ID: ThemeId = "caderno";
 export const DEFAULT_DENSITY: DensityPreference = "comfortable";
 export const DEFAULT_MOTION: MotionPreference = "system";
+export const DEFAULT_FX: FxPreference = "full";
 
 /** Par claro/escuro usado quando a preferência do usuário é "system" ("Automático": Caderno ↔ Dark Academia). */
 export const SYSTEM_THEME_PAIR: Readonly<{ light: ThemeId; dark: ThemeId }> = {
@@ -21,6 +23,7 @@ export const SYSTEM_THEME_PAIR: Readonly<{ light: ThemeId; dark: ThemeId }> = {
 export const THEME_COOKIE_NAME = "rf_theme";
 export const DENSITY_COOKIE_NAME = "rf_density";
 export const MOTION_COOKIE_NAME = "rf_motion";
+export const FX_COOKIE_NAME = "rf_fx";
 
 export const ALLOWED_FONTS: Record<
   AllowedFontId,
@@ -482,4 +485,11 @@ export function normalizeMotionPreference(
     return raw;
   }
   return DEFAULT_MOTION;
+}
+
+export function normalizeFxPreference(raw?: string | null): FxPreference {
+  if (raw === "min" || raw === "full") {
+    return raw;
+  }
+  return DEFAULT_FX;
 }

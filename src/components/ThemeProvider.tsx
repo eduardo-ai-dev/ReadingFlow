@@ -11,19 +11,23 @@ import {
 } from "react";
 import {
   DEFAULT_DENSITY,
+  DEFAULT_FX,
   DEFAULT_MOTION,
   DEFAULT_THEME_ID,
   DENSITY_COOKIE_NAME,
+  FX_COOKIE_NAME,
   MOTION_COOKIE_NAME,
   THEME_COOKIE_NAME,
   THEMES,
   normalizeDensityPreference,
+  normalizeFxPreference,
   normalizeMotionPreference,
   normalizeThemePreference,
   resolveThemeId,
 } from "@/lib/themes/themes.config";
 import type {
   DensityPreference,
+  FxPreference,
   MotionPreference,
   ThemeId,
   ThemePreference,
@@ -35,9 +39,11 @@ export interface ThemeContextValue {
   resolvedTheme: ThemeId;
   density: DensityPreference;
   motion: MotionPreference;
+  fx: FxPreference;
   setTheme: (next: ThemePreference) => void;
   setDensity: (next: DensityPreference) => void;
   setMotion: (next: MotionPreference) => void;
+  setFx: (next: FxPreference) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -63,13 +69,16 @@ function applyHtmlThemeAttributes(params: {
   resolved: ThemeId;
   density: DensityPreference;
   motion: MotionPreference;
+  fx: FxPreference;
   disableTransitionsForFrame?: boolean;
 }): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const prevTheme = root.getAttribute("data-theme");
   const isThemeChange =
-    params.disableTransitionsForFrame && prevTheme && prevTheme !== params.resolved;
+    params.disableTransitionsForFrame &&
+    prevTheme &&
+    prevTheme !== params.resolved;
 
   if (isThemeChange) {
     root.setAttribute("data-theme-switching", "true");
@@ -79,6 +88,8 @@ function applyHtmlThemeAttributes(params: {
   root.setAttribute("data-theme-pref", params.preference);
   root.setAttribute("data-density", params.density);
   root.setAttribute("data-motion", params.motion);
+  root.setAttribute("data-fx", params.fx);
+  root.style.setProperty("--rf-fx", params.fx === "min" ? "0" : "1");
   root.style.colorScheme = THEMES[params.resolved].colorScheme;
 
   if (isThemeChange) {
@@ -93,11 +104,13 @@ export function ThemeProvider({
   initialTheme = DEFAULT_THEME_ID,
   initialDensity = DEFAULT_DENSITY,
   initialMotion = DEFAULT_MOTION,
+  initialFx = DEFAULT_FX,
   children,
 }: {
   initialTheme?: ThemePreference;
   initialDensity?: DensityPreference;
   initialMotion?: MotionPreference;
+  initialFx?: FxPreference;
   children: ReactNode;
 }) {
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(
@@ -108,6 +121,9 @@ export function ThemeProvider({
   );
   const [motion, setMotionState] = useState<MotionPreference>(() =>
     normalizeMotionPreference(initialMotion)
+  );
+  const [fx, setFxState] = useState<FxPreference>(() =>
+    normalizeFxPreference(initialFx)
   );
   const [systemPrefersDark, setSystemPrefersDark] = useState(false);
 
@@ -130,6 +146,15 @@ export function ThemeProvider({
       if (cookieMotion) {
         setMotionState(normalizeMotionPreference(cookieMotion));
       }
+      const perfParam = new URLSearchParams(window.location.search).get("perf");
+      if (perfParam === "min" || perfParam === "full") {
+        setFxState(perfParam);
+      } else {
+        const cookieFx = readClientCookie(FX_COOKIE_NAME);
+        if (cookieFx) {
+          setFxState(normalizeFxPreference(cookieFx));
+        }
+      }
     });
 
     const handleChange = (e: MediaQueryListEvent) => {
@@ -148,15 +173,16 @@ export function ThemeProvider({
     [themePreference, systemPrefersDark]
   );
 
-  // Mantém o <html> sincronizado sempre que preferência, sistema, densidade ou movimento mudarem
+  // Mantém o <html> sincronizado sempre que preferência, sistema, densidade, movimento ou efeitos mudarem
   useEffect(() => {
     applyHtmlThemeAttributes({
       preference: themePreference,
       resolved: resolvedTheme,
       density,
       motion,
+      fx,
     });
-  }, [themePreference, resolvedTheme, density, motion]);
+  }, [themePreference, resolvedTheme, density, motion, fx]);
 
   const setTheme = useCallback(
     (nextRaw: ThemePreference) => {
@@ -169,11 +195,12 @@ export function ThemeProvider({
         resolved: nextResolved,
         density,
         motion,
+        fx,
         disableTransitionsForFrame: true,
       });
       void updateThemePreferencesAction({ theme: next }).catch(() => {});
     },
-    [density, motion, systemPrefersDark]
+    [density, fx, motion, systemPrefersDark]
   );
 
   const setDensity = useCallback(
@@ -186,10 +213,11 @@ export function ThemeProvider({
         resolved: resolvedTheme,
         density: next,
         motion,
+        fx,
       });
       void updateThemePreferencesAction({ density: next }).catch(() => {});
     },
-    [motion, resolvedTheme, themePreference]
+    [fx, motion, resolvedTheme, themePreference]
   );
 
   const setMotion = useCallback(
@@ -202,10 +230,28 @@ export function ThemeProvider({
         resolved: resolvedTheme,
         density,
         motion: next,
+        fx,
       });
       void updateThemePreferencesAction({ motion: next }).catch(() => {});
     },
-    [density, resolvedTheme, themePreference]
+    [density, fx, resolvedTheme, themePreference]
+  );
+
+  const setFx = useCallback(
+    (nextRaw: FxPreference) => {
+      const next = normalizeFxPreference(nextRaw);
+      setFxState(next);
+      writeClientCookie(FX_COOKIE_NAME, next);
+      applyHtmlThemeAttributes({
+        preference: themePreference,
+        resolved: resolvedTheme,
+        density,
+        motion,
+        fx: next,
+      });
+      void updateThemePreferencesAction({ fx: next }).catch(() => {});
+    },
+    [density, motion, resolvedTheme, themePreference]
   );
 
   const value = useMemo<ThemeContextValue>(
@@ -214,18 +260,22 @@ export function ThemeProvider({
       resolvedTheme,
       density,
       motion,
+      fx,
       setTheme,
       setDensity,
       setMotion,
+      setFx,
     }),
     [
       themePreference,
       resolvedTheme,
       density,
       motion,
+      fx,
       setTheme,
       setDensity,
       setMotion,
+      setFx,
     ]
   );
 

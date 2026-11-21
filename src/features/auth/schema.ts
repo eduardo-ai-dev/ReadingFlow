@@ -74,10 +74,13 @@ export const densityPreferenceSchema = z.enum([
 
 export const motionPreferenceSchema = z.enum(["system", "reduced", "full"]);
 
+export const fxPreferenceSchema = z.enum(["full", "min"]);
+
 export const updateThemePreferencesSchema = z.object({
   theme: themePreferenceSchema.optional(),
   density: densityPreferenceSchema.optional(),
   motion: motionPreferenceSchema.optional(),
+  fx: fxPreferenceSchema.optional(),
 });
 
 export const updateProfileSchema = z.object({
@@ -87,6 +90,7 @@ export const updateProfileSchema = z.object({
   theme: themePreferenceSchema.optional(),
   density: densityPreferenceSchema.optional(),
   motion: motionPreferenceSchema.optional(),
+  fx: fxPreferenceSchema.optional(),
   threeD: z.enum(["auto", "on", "off"]).optional(),
   goalsCountRereads: z.boolean().optional(),
   maxSimultaneousReadings: z.coerce.number().int().min(1).max(20).optional(),

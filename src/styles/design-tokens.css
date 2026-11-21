@@ -69,8 +69,14 @@
   --rf-type-caption: 0.8125rem;
   /* 13px texto funcional mínimo */
 
-  /* Textura única de papel para todo o aplicativo */
-  --rf-paper-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='cotton'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23cotton)'/%3E%3C/svg%3E");
+  /* Textura raster leve (PNG 64x64 em tile) — substitui SVG feTurbulence em tempo real */
+  --rf-paper-texture: url("/textures/paper-noise-64.png");
+  /* Flag de efeitos ambientais (1 = completos, 0 = reduzidos via ?perf=min ou preferência) */
+  --rf-fx: 1;
+}
+
+[data-fx="min"] {
+  --rf-fx: 0;
 }
 
 /* ==========================================================================

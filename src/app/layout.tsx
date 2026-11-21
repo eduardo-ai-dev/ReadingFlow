@@ -11,9 +11,11 @@ import { CustomCursor } from "@/components/CustomCursor";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import {
   DENSITY_COOKIE_NAME,
+  FX_COOKIE_NAME,
   MOTION_COOKIE_NAME,
   THEME_COOKIE_NAME,
   normalizeDensityPreference,
+  normalizeFxPreference,
   normalizeMotionPreference,
   normalizeThemePreference,
   resolveThemeId,
@@ -113,6 +115,9 @@ export default async function RootLayout({
   const motionPref = normalizeMotionPreference(
     cookieStore.get(MOTION_COOKIE_NAME)?.value ?? profile?.motion
   );
+  const fxPref = normalizeFxPreference(
+    cookieStore.get(FX_COOKIE_NAME)?.value ?? profile?.fx
+  );
   const initialResolvedTheme = resolveThemeId(themePref, false);
   const initScript = buildThemeInitScript();
 
@@ -123,6 +128,7 @@ export default async function RootLayout({
       data-theme-pref={themePref}
       data-density={densityPref}
       data-motion={motionPref}
+      data-fx={fxPref}
       className={`${hanken.variable} ${playfair.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
@@ -136,13 +142,12 @@ export default async function RootLayout({
         className="rf-desk-surface antialiased selection:bg-[var(--rf-accent-primary-subtle)] selection:text-[var(--rf-text-primary)]"
         suppressHydrationWarning
       >
-        {/* Textura global de papel algodão quase imperceptível (pointer-events: none, z-40) */}
-        <div aria-hidden="true" className="rf-cotton-paper" />
         <CustomCursor />
         <ThemeProvider
           initialTheme={themePref}
           initialDensity={densityPref}
           initialMotion={motionPref}
+          initialFx={fxPref}
         >
           {children}
         </ThemeProvider>

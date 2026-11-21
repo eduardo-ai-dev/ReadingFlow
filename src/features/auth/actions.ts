@@ -24,14 +24,17 @@ import {
 } from "@/features/auth/schema";
 import {
   DENSITY_COOKIE_NAME,
+  FX_COOKIE_NAME,
   MOTION_COOKIE_NAME,
   THEME_COOKIE_NAME,
   normalizeDensityPreference,
+  normalizeFxPreference,
   normalizeMotionPreference,
   normalizeThemePreference,
 } from "@/lib/themes/themes.config";
 import type {
   DensityPreference,
+  FxPreference,
   MotionPreference,
   ThemePreference,
 } from "@/lib/themes/themes.types";
@@ -65,6 +68,7 @@ async function writeThemePreferenceCookies(prefs: {
   theme?: ThemePreference;
   density?: DensityPreference;
   motion?: MotionPreference;
+  fx?: FxPreference;
 }): Promise<void> {
   const cookieStore = await cookies();
   const baseOpts = {
@@ -94,6 +98,9 @@ async function writeThemePreferenceCookies(prefs: {
       normalizeMotionPreference(prefs.motion),
       baseOpts
     );
+  }
+  if (prefs.fx) {
+    cookieStore.set(FX_COOKIE_NAME, normalizeFxPreference(prefs.fx), baseOpts);
   }
 }
 
@@ -493,12 +500,14 @@ export async function updateThemePreferencesAction(rawInput: {
   theme?: ThemePreference;
   density?: DensityPreference;
   motion?: MotionPreference;
+  fx?: FxPreference;
 }): Promise<
   | {
       ok: true;
       theme?: ThemePreference;
       density?: DensityPreference;
       motion?: MotionPreference;
+      fx?: FxPreference;
       persistedToProfile: boolean;
     }
   | { ok: false; error: string }
@@ -521,12 +530,16 @@ export async function updateThemePreferencesAction(rawInput: {
   const nextMotion = parsed.data.motion
     ? normalizeMotionPreference(parsed.data.motion)
     : undefined;
+  const nextFx = parsed.data.fx
+    ? normalizeFxPreference(parsed.data.fx)
+    : undefined;
 
   // Sempre persiste nos cookies para a primeira renderização sem flash
   await writeThemePreferenceCookies({
     theme: nextTheme,
     density: nextDensity,
     motion: nextMotion,
+    fx: nextFx,
   });
 
   // Se houver usuário autenticado, persiste também no perfil (sincronizado entre dispositivos)
@@ -537,6 +550,7 @@ export async function updateThemePreferencesAction(rawInput: {
       ...(nextTheme ? { theme: nextTheme } : {}),
       ...(nextDensity ? { density: nextDensity } : {}),
       ...(nextMotion ? { motion: nextMotion } : {}),
+      ...(nextFx ? { fx: nextFx } : {}),
     };
 
     await ormUpdateUser(ws.profile.id, {
@@ -551,6 +565,7 @@ export async function updateThemePreferencesAction(rawInput: {
     theme: nextTheme,
     density: nextDensity,
     motion: nextMotion,
+    fx: nextFx,
     persistedToProfile: Boolean(ws),
   };
 }
@@ -562,6 +577,7 @@ export async function updateProfileAction(rawInput: {
   theme?: ThemePreference;
   density?: DensityPreference;
   motion?: MotionPreference;
+  fx?: FxPreference;
   threeD?: "auto" | "on" | "off";
   goalsCountRereads?: boolean;
   maxSimultaneousReadings?: number;
@@ -589,6 +605,9 @@ export async function updateProfileAction(rawInput: {
   const normalizedMotion = parsed.data.motion
     ? normalizeMotionPreference(parsed.data.motion)
     : undefined;
+  const normalizedFx = parsed.data.fx
+    ? normalizeFxPreference(parsed.data.fx)
+    : undefined;
 
   ws.profile = {
     ...ws.profile,
@@ -602,6 +621,7 @@ export async function updateProfileAction(rawInput: {
     ...(normalizedTheme ? { theme: normalizedTheme } : {}),
     ...(normalizedDensity ? { density: normalizedDensity } : {}),
     ...(normalizedMotion ? { motion: normalizedMotion } : {}),
+    ...(normalizedFx ? { fx: normalizedFx } : {}),
     ...(parsed.data.threeD ? { threeD: parsed.data.threeD } : {}),
     ...(parsed.data.goalsCountRereads !== undefined
       ? { goalsCountRereads: parsed.data.goalsCountRereads }
@@ -614,11 +634,17 @@ export async function updateProfileAction(rawInput: {
       : {}),
   };
 
-  if (normalizedTheme || normalizedDensity || normalizedMotion) {
+  if (
+    normalizedTheme ||
+    normalizedDensity ||
+    normalizedMotion ||
+    normalizedFx
+  ) {
     await writeThemePreferenceCookies({
       theme: normalizedTheme,
       density: normalizedDensity,
       motion: normalizedMotion,
+      fx: normalizedFx,
     });
   }
 

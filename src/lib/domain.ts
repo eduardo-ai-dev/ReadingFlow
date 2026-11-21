@@ -28,6 +28,7 @@ export type WishStatus = "wanted" | "purchased" | "dropped";
 
 export type {
   DensityPreference,
+  FxPreference,
   MotionPreference,
   ThemeId,
   ThemePreference,
@@ -35,6 +36,7 @@ export type {
 
 import type {
   DensityPreference,
+  FxPreference,
   MotionPreference,
   ThemePreference,
 } from "@/lib/themes/themes.types";
@@ -222,6 +224,7 @@ export interface UserProfile {
   theme: ThemePreference;
   density?: DensityPreference;
   motion?: MotionPreference;
+  fx?: FxPreference;
   threeD: ThreeDPreference;
   goalsCountRereads: boolean;
   maxSimultaneousReadings: number;

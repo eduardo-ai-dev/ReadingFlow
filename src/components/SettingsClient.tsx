@@ -13,7 +13,7 @@ import { ThemeCardsPicker } from "@/components/ThemeCardsPicker";
 
 export function SettingsClient({ profile }: { profile: UserProfile }) {
   const router = useRouter();
-  const { themePreference } = useTheme();
+  const { themePreference, fx, setFx } = useTheme();
   const [defaultCurrency, setDefaultCurrency] = useState(
     profile.defaultCurrency
   );
@@ -141,6 +141,7 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
               const res = await updateProfileAction({
                 defaultCurrency,
                 theme: themePreference,
+                fx,
                 threeD,
                 goalsCountRereads,
                 maxSimultaneousReadings: parsedMax,
@@ -234,6 +235,24 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
         </div>
 
         <div className="space-y-3 pt-2">
+          <label className="flex min-h-[44px] cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={fx === "full"}
+              onChange={(e) => setFx(e.target.checked ? "full" : "min")}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-primary)]"
+            />
+            <span className="text-xs text-[var(--text-primary)]">
+              <strong className="block font-semibold">
+                Efeitos ambientais (textura de papel, estantes laterais,
+                paralaxe e cursor)
+              </strong>
+              Desative para priorizar fluidez máxima e menor uso de GPU em telas
+              ou notebooks mais simples (equivalente a{" "}
+              <code className="font-mono">?perf=min</code>).
+            </span>
+          </label>
+
           <label className="flex min-h-[44px] cursor-pointer items-start gap-3">
             <input
               type="checkbox"

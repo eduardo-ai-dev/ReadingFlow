@@ -162,7 +162,7 @@ export function AppShell({
               {accountMenuOpen ? (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-2 w-64 rounded-[var(--rf-radius-lg)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface-elevated)] p-2 font-sans text-[var(--rf-nav-text)] shadow-[var(--rf-nav-popover-shadow)] backdrop-blur-md"
+                  className="absolute right-0 mt-2 w-64 rounded-[var(--rf-radius-lg)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface-elevated)] p-2 font-sans text-[var(--rf-nav-text)] shadow-[var(--rf-nav-popover-shadow)]"
                 >
                   <div className="border-b border-[var(--rf-nav-border)] px-3 py-2">
                     <p className="font-sans text-[11px] font-semibold tracking-wider uppercase text-[var(--rf-nav-accent)]">
@@ -340,7 +340,7 @@ export function AppShell({
       {/* Navegação inferior rápida para toque no celular e tablet (< 1024px) */}
       <nav
         aria-label="Acesso rápido móvel"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--rf-nav-border)] bg-[var(--rf-nav-bg-translucent)] px-2 py-1 font-sans text-[var(--rf-nav-text)] backdrop-blur-md lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--rf-nav-border)] bg-[var(--rf-nav-bg)] px-2 py-1 font-sans text-[var(--rf-nav-text)] lg:hidden"
       >
         <ul className="grid grid-cols-5 gap-1">
           {MOBILE_BOTTOM_NAV.map((item) => {
