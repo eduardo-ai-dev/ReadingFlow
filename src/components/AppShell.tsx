@@ -106,7 +106,7 @@ export function AppShell({
           MASTHEAD EDITORIAL SUPERIOR (HORIZONTAL)
           Largura sincronizada com a folha editorial central (max-w-[1360px]).
           ==================================================================== */}
-      <header className="sticky top-0 z-50 border-b border-[var(--rf-nav-border-accent)] bg-[var(--rf-nav-bg)] text-[var(--rf-nav-text)] shadow-[var(--rf-nav-shadow)]">
+      <header className="sticky top-0 z-50 border-b border-[var(--rf-nav-border-accent)] bg-[var(--rf-nav-bg)] pt-[env(safe-area-inset-top)] text-[var(--rf-nav-text)] shadow-[var(--rf-nav-shadow)]">
         <div className="mx-auto flex h-16 max-w-[1360px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-10">
           {/* 1. ESQUERDA: Logotipo serifado com subtítulo editorial */}
           <Link
@@ -330,7 +330,7 @@ export function AppShell({
         <main
           id="conteudo-principal"
           tabIndex={-1}
-          className="rf-editorial-sheet relative z-10 min-h-[calc(100dvh-4rem)] min-w-0 px-4 py-6 pb-24 sm:px-6 lg:px-10 lg:py-9 lg:pb-16"
+          className="rf-editorial-sheet relative z-10 min-h-[calc(100dvh-4rem)] min-w-0 px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-10 lg:py-9 lg:pb-16"
         >
           <UndoBanner undoInfo={undoInfo} />
           {children}
@@ -340,7 +340,7 @@ export function AppShell({
       {/* Navegação inferior rápida para toque no celular e tablet (< 1024px) */}
       <nav
         aria-label="Acesso rápido móvel"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--rf-nav-border)] bg-[var(--rf-nav-bg)] px-2 py-1 font-sans text-[var(--rf-nav-text)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--rf-nav-border)] bg-[var(--rf-nav-bg)] px-2 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] font-sans text-[var(--rf-nav-text)] lg:hidden"
       >
         <ul className="grid grid-cols-5 gap-1">
           {MOBILE_BOTTOM_NAV.map((item) => {

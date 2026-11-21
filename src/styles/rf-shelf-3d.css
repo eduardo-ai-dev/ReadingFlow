@@ -540,6 +540,7 @@ a:hover .rf-book-cover-wishlist {
   overflow: hidden;
   backface-visibility: hidden;
   user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* Dois vincos finos horizontais via pseudo-elementos (elimina 2 nós DOM por livro) */

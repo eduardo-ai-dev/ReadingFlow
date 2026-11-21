@@ -24,15 +24,35 @@ textarea,
     transform 200ms var(--ease);
 }
 
-button:not(:disabled):not(.rf-book-prism):not(.lr-book-prism):not(
-    .rf-icon-btn
-  ):hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-btn-hover, 0 8px 20px -6px rgba(44, 34, 30, 0.2));
+@media (hover: hover) {
+  button:not(:disabled):not(.rf-book-prism):not(.lr-book-prism):not(
+      .rf-icon-btn
+    ):hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-btn-hover, 0 8px 20px -6px rgba(44, 34, 30, 0.2));
+  }
 }
 
 button:not(:disabled):not(.rf-book-prism):not(.lr-book-prism):active {
   transform: scale(0.99);
+}
+
+/* Impede zoom automático no iOS Safari ao focar campos no celular/tablet (< 1024px) */
+@media (max-width: 1023px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
+      [type="file"]
+    ):not([type="color"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: max(1rem, 16px) !important;
+  }
+}
+
+/* Âncoras de seção nunca ficam ocultas atrás do cabeçalho fixo/sticky */
+section[id],
+h1[id],
+h2[id] {
+  scroll-margin-top: calc(4.75rem + env(safe-area-inset-top, 0px));
 }
 
 /* Foco fluido em campos de entrada via tokens do tema */
@@ -102,30 +122,34 @@ textarea:focus {
     filter 220ms var(--ease);
 }
 
-.rf-exlibris-seal:hover {
-  transform: translateY(-1px);
-  filter: drop-shadow(0 0 8px rgba(200, 164, 110, 0.35));
+@media (hover: hover) {
+  .rf-exlibris-seal:hover {
+    transform: translateY(-1px);
+    filter: drop-shadow(0 0 8px rgba(200, 164, 110, 0.35));
+  }
 }
 
 /* ==========================================================================
    SISTEMA VISUAL GLOBAL & ATMOSFERA EDITORIAL (Caderno sobre Mesa)
    ========================================================================== */
 
-/* Fundo arquitetônico lateral de estantes — 1 nó com máscara CSS estática em camada própria */
+/* Fundo arquitetônico lateral de estantes — carregado SOMENTE em desktop (>= 1024px) para não baixar no mobile */
 .rf-library-backdrop {
   contain: strict;
   transform: translateZ(0);
 }
 
-.rf-library-backdrop-art {
-  -webkit-mask-image: url("/textures/library-backdrop.svg");
-  mask-image: url("/textures/library-backdrop.svg");
-  -webkit-mask-size: cover;
-  mask-size: cover;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
+@media (min-width: 1024px) {
+  .rf-library-backdrop-art {
+    -webkit-mask-image: url("/textures/library-backdrop.svg");
+    mask-image: url("/textures/library-backdrop.svg");
+    -webkit-mask-size: cover;
+    mask-size: cover;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+  }
 }
 
 /* Flag de efeitos ambientais reduzidos (?perf=min ou preferência "Efeitos ambientais" desativada) */

@@ -22,7 +22,7 @@ export function LandingHeroClient({
   return (
     <section
       aria-label="Apresentação do ReadingFlow"
-      className="relative h-[100dvh] min-h-screen w-full overflow-hidden border-b border-[#C8A46E]/30 bg-[#141514]"
+      className="relative h-[100dvh] min-h-[100dvh] w-full overflow-hidden border-b border-[#C8A46E]/30 bg-[#141514]"
     >
       {/* 1. Imagem 4K otimizada via next/image (WebP/AVIF, priority, fetchPriority="high", dimensões 3840x2160 anti-CLS) */}
       <div className="rf-ken-burns motion-reduce:animate-none absolute inset-0 h-full w-full">
@@ -102,7 +102,7 @@ export function LandingHeroClient({
             .getElementById("sobre")
             ?.scrollIntoView({ behavior: "smooth" });
         }}
-        className="rf-icon-btn absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 cursor-pointer flex-col items-center gap-1 rounded-full border border-[#C8A46E]/30 bg-[#141514]/60 px-3 py-2 font-sans text-[#DFBE88] backdrop-blur-sm transition-transform duration-300 hover:translate-y-1 hover:bg-[#141514]/80 hover:text-[#F4EFE6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E] motion-reduce:animate-none motion-reduce:transition-none"
+        className="rf-icon-btn absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 z-20 flex min-h-[44px] min-w-[44px] -translate-x-1/2 cursor-pointer flex-col items-center justify-center gap-1 rounded-full border border-[#C8A46E]/30 bg-[#141514]/60 px-3 py-2 font-sans text-[#DFBE88] backdrop-blur-sm transition-transform duration-300 hover:translate-y-1 hover:bg-[#141514]/80 hover:text-[#F4EFE6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E] motion-reduce:animate-none motion-reduce:transition-none"
       >
         <span className="rf-scroll-pulse motion-reduce:animate-none flex flex-col items-center gap-1">
           <span className="h-5 w-[1px] bg-gradient-to-b from-transparent via-[#DFBE88]/80 to-[#DFBE88]" />

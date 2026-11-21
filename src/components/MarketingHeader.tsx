@@ -57,7 +57,7 @@ export function MarketingHeader() {
   return (
     <header
       data-scrolled={isScrolled ? "true" : "false"}
-      className={`rf-marketing-header fixed inset-x-0 top-0 z-40 border-b border-[var(--rf-nav-border)] bg-[var(--rf-nav-bg-marketing)] text-[var(--rf-nav-text)] transition-shadow duration-200 ${
+      className={`rf-marketing-header fixed inset-x-0 top-0 z-40 border-b border-[var(--rf-nav-border)] bg-[var(--rf-nav-bg-marketing)] pt-[env(safe-area-inset-top)] text-[var(--rf-nav-text)] transition-shadow duration-200 ${
         isScrolled ? "shadow-[var(--rf-nav-shadow-scrolled)]" : ""
       }`}
     >
@@ -121,9 +121,7 @@ export function MarketingHeader() {
             aria-expanded={menuOpen}
             aria-haspopup="menu"
             aria-label={
-              menuOpen
-                ? ptBR.landingRoom.closeMenu
-                : ptBR.landingRoom.openMenu
+              menuOpen ? ptBR.landingRoom.closeMenu : ptBR.landingRoom.openMenu
             }
             className="flex lg:hidden h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[var(--rf-radius-full)] border border-[var(--rf-nav-border)] bg-[var(--rf-nav-surface-alt)] text-[var(--rf-nav-text)] hover:border-[var(--rf-nav-accent)] hover:text-[var(--rf-nav-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
           >

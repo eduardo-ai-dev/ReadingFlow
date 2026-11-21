@@ -144,6 +144,7 @@
   transform-style: flat;
   transition: transform 240ms ease-out;
   box-sizing: border-box;
+  touch-action: pan-y;
 }
 
 :global([data-fx="min"]) .bookcase {
@@ -1413,8 +1414,10 @@
   transition: transform 150ms ease;
 }
 
-.addRoundBtn:hover {
-  transform: scale(1.06);
+@media (hover: hover) {
+  .addRoundBtn:hover {
+    transform: scale(1.06);
+  }
 }
 
 /* ==========================================================================
@@ -1425,7 +1428,7 @@
   position: fixed;
   left: 10px;
   right: 10px;
-  bottom: 60px;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   z-index: 40;
   min-width: 0;
   border-radius: var(--rf-card-radius);
@@ -1747,9 +1750,11 @@
     border-color 160ms ease;
 }
 
-.quickPanelBtnSecondary:hover:not(:disabled) {
-  border-color: var(--rf-accent-secondary);
-  background-color: var(--rf-surface-subtle);
+@media (hover: hover) {
+  .quickPanelBtnSecondary:hover:not(:disabled) {
+    border-color: var(--rf-accent-secondary);
+    background-color: var(--rf-surface-subtle);
+  }
 }
 
 .quickPanelBtnSecondary:disabled {
