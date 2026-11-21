@@ -43,7 +43,10 @@ export function LandingProductPreview() {
   const completedBooksCount = isCurrentBookFinished
     ? completedBooksInitial + 1
     : completedBooksInitial;
-  const remainingBooksCount = Math.max(0, goalBooksTarget - completedBooksCount);
+  const remainingBooksCount = Math.max(
+    0,
+    goalBooksTarget - completedBooksCount
+  );
   const liveGoalPercent = Math.round(
     ((completedBooksInitial +
       (liveCurrentPage - baseCurrentPage) /
@@ -77,7 +80,7 @@ export function LandingProductPreview() {
       <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[var(--rf-border-subtle)] bg-[var(--rf-surface-subtle)] px-4 py-3 sm:px-5">
         <div className="flex items-center gap-2">
           <span
-            className="h-2 w-2 rounded-full bg-[var(--rf-accent-secondary)]"
+            className="h-2 w-2 rounded-full bg-[var(--rf-progress-fill)]"
             aria-hidden="true"
           />
           <span
@@ -99,7 +102,10 @@ export function LandingProductPreview() {
                 "physical",
                 `Física (${LANDING_PREVIEW_SHELVES.physical.length})`,
               ],
-              ["digital", `Digital (${LANDING_PREVIEW_SHELVES.digital.length})`],
+              [
+                "digital",
+                `Digital (${LANDING_PREVIEW_SHELVES.digital.length})`,
+              ],
               ["audio", `Áudio (${LANDING_PREVIEW_SHELVES.audio.length})`],
             ] as const
           ).map(([key, label]) => {
@@ -116,7 +122,7 @@ export function LandingProductPreview() {
                 onClick={() => setTab(key)}
                 className={`relative min-h-[34px] cursor-pointer rounded-[var(--rf-radius-sm)] px-3 font-sans text-xs font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                   active
-                    ? "text-[var(--rf-accent-on-secondary)]"
+                    ? "text-[var(--rf-tab-active-text)]"
                     : "text-[var(--rf-text-heading)] hover:text-[var(--rf-text-accent-secondary)]"
                 }`}
               >
@@ -124,7 +130,7 @@ export function LandingProductPreview() {
                   <motion.span
                     layoutId="preview-shelf-tab"
                     aria-hidden="true"
-                    className="absolute inset-0 rounded-[var(--rf-radius-sm)] bg-[var(--rf-accent-secondary)] shadow-[var(--rf-shadow-xs)]"
+                    className="absolute inset-0 rounded-[var(--rf-radius-sm)] bg-[var(--rf-tab-active-bg)] shadow-[var(--rf-shadow-xs)]"
                     transition={{ type: "spring", stiffness: 420, damping: 32 }}
                   />
                 ) : null}
@@ -184,9 +190,7 @@ export function LandingProductPreview() {
                             : "reading"
                           : "finished"
                       }
-                      progressPercent={
-                        isReadingNow ? liveBookPercent : 100
-                      }
+                      progressPercent={isReadingNow ? liveBookPercent : 100}
                       disableDevDiagnostics
                       sizes="64px"
                       className="group-hover:-translate-y-0.5"
@@ -201,7 +205,7 @@ export function LandingProductPreview() {
                         {isReadingNow ? (
                           <span
                             data-badge="status"
-                            className="badge inline-flex items-center gap-1.5 rounded-[var(--rf-radius-full)] bg-[var(--rf-status-success-bg)] px-2.5 py-0.5 font-sans text-xs font-semibold tracking-wide text-[var(--rf-status-success)]"
+                            className="badge inline-flex items-center gap-1.5 rounded-[var(--rf-radius-full)] border border-[var(--rf-status-success)]/45 bg-[var(--rf-status-success-bg)] px-2.5 py-0.5 font-sans text-xs font-semibold tracking-wide text-[var(--rf-status-success)]"
                           >
                             <BookOpen
                               className="h-3 w-3 shrink-0"
@@ -247,7 +251,7 @@ export function LandingProductPreview() {
                             aria-valuemin={0}
                             aria-valuemax={100}
                             aria-valuenow={liveBookPercent}
-                            className="h-2 w-full overflow-hidden rounded-[var(--rf-radius-full)] border border-[var(--rf-border-default)] bg-[var(--rf-surface-subtle)]"
+                            className="h-2 w-full overflow-hidden rounded-[var(--rf-radius-full)] border border-[var(--rf-border-default)] bg-[var(--rf-progress-track)]"
                           >
                             <motion.div
                               initial={{ width: `${liveBookPercent}%` }}
@@ -256,7 +260,7 @@ export function LandingProductPreview() {
                                 duration: 0.45,
                                 ease: [0.22, 1, 0.36, 1],
                               }}
-                              className="h-full rounded-[var(--rf-radius-full)] bg-[var(--rf-accent-secondary)]"
+                              className="h-full rounded-[var(--rf-radius-full)] bg-[var(--rf-progress-fill)]"
                             />
                           </div>
                         </div>
@@ -301,7 +305,7 @@ export function LandingProductPreview() {
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={liveGoalPercent}
-                className="h-3 w-full overflow-hidden rounded-[var(--rf-radius-full)] border border-[var(--rf-border-default)] bg-[var(--rf-surface-card-solid)] shadow-inner"
+                className="h-3 w-full overflow-hidden rounded-[var(--rf-radius-full)] border border-[var(--rf-border-default)] bg-[var(--rf-progress-track)] shadow-inner"
               >
                 <motion.div
                   initial={{ width: "67%" }}
@@ -312,7 +316,7 @@ export function LandingProductPreview() {
                     duration: addedPages > 0 ? 0.45 : 0.9,
                     ease: [0.22, 1, 0.36, 1],
                   }}
-                  className="h-full rounded-[var(--rf-radius-full)] bg-[var(--rf-accent-secondary)]"
+                  className="h-full rounded-[var(--rf-radius-full)] bg-[var(--rf-progress-fill)]"
                 />
               </div>
             </div>
@@ -333,7 +337,10 @@ export function LandingProductPreview() {
                   className="h-3.5 w-3.5 shrink-0 text-[var(--rf-status-success)]"
                   aria-hidden="true"
                 />
-                <span data-metric="daily-pace" className="rf-metric font-medium">
+                <span
+                  data-metric="daily-pace"
+                  className="rf-metric font-medium"
+                >
                   Ritmo atual: {dailyPaceLabel}
                 </span>
               </div>
@@ -359,7 +366,7 @@ export function LandingProductPreview() {
                 aria-label="Registrar leitura de hoje adicionando 15 páginas na demonstração"
                 onClick={handleRegisterReading}
                 disabled={isCurrentBookFinished}
-                className="inline-flex min-h-[38px] w-full cursor-pointer items-center justify-center rounded-[var(--rf-radius-md)] border border-[var(--rf-accent-secondary)] bg-[var(--rf-accent-secondary)] px-3 py-2 font-sans text-[13px] font-semibold tabular-nums text-[var(--rf-accent-on-secondary)] shadow-[var(--rf-shadow-xs)] transition-all duration-200 hover:bg-[var(--rf-accent-secondary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-[38px] w-full cursor-pointer items-center justify-center rounded-[var(--rf-radius-md)] border border-[var(--rf-tab-active-bg)] bg-[var(--rf-tab-active-bg)] px-3 py-2 font-sans text-[13px] font-semibold tabular-nums text-[var(--rf-tab-active-text)] shadow-[var(--rf-shadow-xs)] transition-all duration-200 hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <span>+ Registrar leitura de hoje (+15 págs)</span>
               </button>

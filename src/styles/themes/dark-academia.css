@@ -11,42 +11,42 @@
 
   /* 1. Superfícies */
   --rf-surface-canvas: #141514;
-  --rf-surface-desk: #1B1C1B;
-  --rf-surface-subtle: #1F201F;
-  --rf-surface-elevated: #2A2521;
+  --rf-surface-desk: #1b1c1b;
+  --rf-surface-subtle: #1f201f;
+  --rf-surface-elevated: #2a2521;
   --rf-surface-card: rgba(34, 36, 34, 0.94);
   --rf-surface-card-solid: #222422;
   --rf-surface-overlay: rgba(8, 9, 8, 0.78);
-  --rf-surface-contrast: #0C0D0C;
-  --rf-surface-contrast-elevated: #1E201E;
-  --rf-surface-contrast-hover: #2C221E;
+  --rf-surface-contrast: #0c0d0c;
+  --rf-surface-contrast-elevated: #1e201e;
+  --rf-surface-contrast-hover: #2c221e;
   --rf-surface-header-translucent: rgba(20, 21, 20, 0.92);
-  --rf-surface-mobile-item: #1E201E;
-  --rf-surface-mobile-item-hover: #2A2C2A;
+  --rf-surface-mobile-item: #1e201e;
+  --rf-surface-mobile-item-hover: #2a2c2a;
 
   /* 1.1 Navegação (#0F100F + borda) */
-  --rf-nav-bg: #0F100F;
-  --rf-nav-bg-marketing: #0F100F;
+  --rf-nav-bg: #0f100f;
+  --rf-nav-bg-marketing: #0f100f;
   --rf-nav-bg-translucent: rgba(15, 16, 15, 0.96);
-  --rf-nav-surface: #1A1B1A;
+  --rf-nav-surface: #1a1b1a;
   --rf-nav-surface-alt: #222422;
   --rf-nav-surface-elevated: #171817;
   --rf-nav-surface-hover: #252725;
-  --rf-nav-border: #383A37;
+  --rf-nav-border: #383a37;
   --rf-nav-border-accent: rgba(200, 164, 110, 0.3);
   --rf-nav-border-accent-hover: rgba(200, 164, 110, 0.55);
   --rf-nav-border-accent-strong: rgba(223, 190, 136, 0.7);
-  --rf-nav-text: #F4EFE6;
-  --rf-nav-text-muted: #D8CDBD;
-  --rf-nav-text-marketing: #E4D9C7;
-  --rf-nav-text-subtle: #C4B8A5;
-  --rf-nav-text-email: #E0CFB0;
-  --rf-nav-accent: #C8A46E;
-  --rf-nav-accent-soft: #DFBE88;
-  --rf-nav-accent-hover: #DFBE88;
+  --rf-nav-text: #f4efe6;
+  --rf-nav-text-muted: #d8cdbd;
+  --rf-nav-text-marketing: #e4d9c7;
+  --rf-nav-text-subtle: #c4b8a5;
+  --rf-nav-text-email: #e0cfb0;
+  --rf-nav-accent: #c8a46e;
+  --rf-nav-accent-soft: #dfbe88;
+  --rf-nav-accent-hover: #dfbe88;
   --rf-nav-accent-subtle: rgba(200, 164, 110, 0.22);
   --rf-nav-accent-ring: rgba(223, 190, 136, 0.35);
-  --rf-nav-danger: #F28B82;
+  --rf-nav-danger: #f28b82;
   --rf-nav-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
   --rf-nav-shadow-scrolled: 0 8px 24px rgba(0, 0, 0, 0.85);
   --rf-nav-popover-shadow: 0 12px 28px rgba(0, 0, 0, 0.78);
@@ -57,63 +57,73 @@
   --rf-nav-mobile-shadow: 0 14px 30px rgba(0, 0, 0, 0.68);
 
   --rf-footer-bg-from: #111211;
-  --rf-footer-bg-via: #0B0C0B;
+  --rf-footer-bg-via: #0b0c0b;
   --rf-footer-bg-to: #060706;
   --rf-footer-border: rgba(200, 164, 110, 0.25);
   --rf-footer-inset-highlight: inset 0 1px 0 rgba(200, 164, 110, 0.18);
-  --rf-footer-glow: radial-gradient(ellipse at top, rgba(200, 164, 110, 0.1) 0%, transparent 70%);
+  --rf-footer-glow: radial-gradient(
+    ellipse at top,
+    rgba(200, 164, 110, 0.1) 0%,
+    transparent 70%
+  );
 
-  --rf-cursor-dot: #DFBE88;
+  --rf-cursor-dot: #dfbe88;
   --rf-cursor-ring: rgba(223, 190, 136, 0.48);
   --rf-cursor-ring-hover: rgba(223, 190, 136, 0.88);
   --rf-cursor-glow: 0 0 8px rgba(223, 190, 136, 0.75);
   --rf-cursor-ring-glow: 0 0 12px rgba(223, 190, 136, 0.3);
 
   /* 2. Texto (WCAG AA >= 4.5:1 sobre #141514, #1B1C1B e #222422) */
-  --rf-text-primary: #F4EFE6;
-  --rf-text-heading: #F4EFE6;
-  --rf-text-secondary: #B9AE9F;
-  --rf-text-tertiary: #9A9080;
-  --rf-text-on-contrast: #F4EFE6;
-  --rf-text-on-contrast-muted: #DFBE88;
-  --rf-text-accent-secondary: #D07A8E; /* ajustado de #C46E82 (4.39:1 em #222422) -> 5.10:1 */
+  --rf-text-primary: #f4efe6;
+  --rf-text-heading: #f4efe6;
+  --rf-text-secondary: #b9ae9f;
+  --rf-text-tertiary: #9a9080;
+  --rf-text-on-contrast: #f4efe6;
+  --rf-text-on-contrast-muted: #dfbe88;
+  --rf-text-accent-secondary: #d07a8e; /* ajustado de #C46E82 (4.39:1 em #222422) -> 5.10:1 */
 
   /* 3. Destaques (Primário: Camel sobre Onyx · Secundário: Bordô sobre Linho) */
-  --rf-accent-primary: #C8A46E;
-  --rf-accent-primary-hover: #DFBE88;
+  --rf-accent-primary: #c8a46e;
+  --rf-accent-primary-hover: #dfbe88;
   --rf-accent-primary-subtle: rgba(200, 164, 110, 0.16);
   --rf-accent-on-primary: #141514;
   --rf-accent-on-primary-muted: rgba(20, 21, 20, 0.85);
 
-  --rf-accent-secondary: #722F3E;
-  --rf-accent-secondary-hover: #8A394C;
+  --rf-accent-secondary: #722f3e;
+  --rf-accent-secondary-hover: #8a394c;
   --rf-accent-secondary-subtle: rgba(208, 122, 142, 0.14);
-  --rf-accent-on-secondary: #F4EFE6;
+  --rf-accent-on-secondary: #f4efe6;
   --rf-accent-on-secondary-muted: rgba(244, 239, 230, 0.9);
-  --rf-accent-secondary-on-dark-hover: #8A394C;
+  --rf-accent-secondary-on-dark-hover: #8a394c;
+
+  /* 3.1 Controles semânticos de abas e barras de progresso (>= 3:1 gráfico / >= 4.5:1 texto) */
+  --rf-tab-active-bg: #c8a46e;
+  --rf-tab-active-text: #141514;
+  --rf-progress-track: #1b1c1b;
+  --rf-progress-fill: #c8a46e;
 
   /* 4. Bordas e divisores (bordas de campo >= 3:1 sobre #222422) */
   --rf-border-default: rgba(196, 167, 125, 0.3);
   --rf-border-subtle: rgba(196, 167, 125, 0.18);
-  --rf-border-strong: #8A847B; /* 4.22:1 em #222422 */
-  --rf-border-accent: #C8A46E;
+  --rf-border-strong: #8a847b; /* 4.22:1 em #222422 */
+  --rf-border-accent: #c8a46e;
   --rf-border-accent-soft: rgba(200, 164, 110, 0.38);
   --rf-border-secondary: rgba(208, 122, 142, 0.6);
   --rf-divider: rgba(196, 167, 125, 0.18);
 
   /* 5. Estados semânticos (texto / fundo >= 4.5:1) */
-  --rf-status-success: #79C48B;
-  --rf-status-success-bg: #172A1C;
-  --rf-status-warning: #E5C17B;
-  --rf-status-warning-bg: #2E2311;
-  --rf-status-error: #F28B82;
+  --rf-status-success: #79c48b;
+  --rf-status-success-bg: #172a1c;
+  --rf-status-warning: #e5c17b;
+  --rf-status-warning-bg: #2e2311;
+  --rf-status-error: #f28b82;
   --rf-status-error-bg: #361719;
-  --rf-status-info: #8BB8E8;
+  --rf-status-info: #8bb8e8;
   --rf-status-info-bg: #162536;
 
   /* 6. Anel de foco (>= 3:1 em todos os fundos) */
-  --rf-focus-ring-color: #C8A46E;
-  --rf-focus-ring: 0 0 0 2px #C8A46E;
+  --rf-focus-ring-color: #c8a46e;
+  --rf-focus-ring: 0 0 0 2px #c8a46e;
   --rf-focus-ring-input: 0 0 0 4px rgba(200, 164, 110, 0.24);
 
   /* 7. Sombras curtas e escuras & Raios (card 10px / botão 6px) */
@@ -142,63 +152,63 @@
   --rf-label-tracking: 0.1em;
 
   /* 9. Material da estante — Madeira Clássica escura + filete latão */
-  --rf-frame: #3D2B20;
-  --rf-plank: #4B3222;
-  --rf-plank-top: #7A583B;
-  --rf-plank-top-mid: #63442D;
+  --rf-frame: #3d2b20;
+  --rf-plank: #4b3222;
+  --rf-plank-top: #7a583b;
+  --rf-plank-top-mid: #63442d;
   --rf-plank-bevel: #382315;
-  --rf-plank-light: #5A3B27;
-  --rf-plank-deep: #2C1B10;
-  --rf-back: #24211E; /* mais claro que o fundo da página (#141514) */
-  --rf-line: #C8A46E; /* filete latão */
+  --rf-plank-light: #5a3b27;
+  --rf-plank-deep: #2c1b10;
+  --rf-back: #24211e; /* mais claro que o fundo da página (#141514) */
+  --rf-line: #c8a46e; /* filete latão */
   --rf-spine-edge-highlight: rgba(244, 239, 230, 0.26);
 
   /* 10. Paleta de gráficos — 6 cores categóricas (distinguíveis em daltonismo, ΔE >= 11.9) */
-  --rf-chart-1: #E6B85C; /* Latão Luminoso */
-  --rf-chart-2: #5BA8E6; /* Azul Celeste */
-  --rf-chart-3: #C9546E; /* Rosé Bordô */
-  --rf-chart-4: #3BC2B4; /* Turquesa Claro */
-  --rf-chart-5: #8A6CD4; /* Lavanda Profunda */
-  --rf-chart-6: #EFEAE2; /* Pergaminho Claro */
+  --rf-chart-1: #e6b85c; /* Latão Luminoso */
+  --rf-chart-2: #5ba8e6; /* Azul Celeste */
+  --rf-chart-3: #c9546e; /* Rosé Bordô */
+  --rf-chart-4: #3bc2b4; /* Turquesa Claro */
+  --rf-chart-5: #8a6cd4; /* Lavanda Profunda */
+  --rf-chart-6: #efeae2; /* Pergaminho Claro */
 
   /* 11. Escala sequencial de intensidade (5 passos — calendário) */
-  --rf-cal-0-bg: #1E1F1E;
-  --rf-cal-0-text: #B9AE9F;
+  --rf-cal-0-bg: #1e1f1e;
+  --rf-cal-0-text: #b9ae9f;
   --rf-cal-0-border: rgba(196, 167, 125, 0.22);
 
-  --rf-cal-1-bg: #35291E;
-  --rf-cal-1-text: #F4EFE6;
+  --rf-cal-1-bg: #35291e;
+  --rf-cal-1-text: #f4efe6;
   --rf-cal-1-border: rgba(200, 164, 110, 0.35);
 
-  --rf-cal-2-bg: #5B4327;
-  --rf-cal-2-text: #FAF6F0;
+  --rf-cal-2-bg: #5b4327;
+  --rf-cal-2-text: #faf6f0;
   --rf-cal-2-border: rgba(200, 164, 110, 0.5);
 
-  --rf-cal-3-bg: #C8A46E;
+  --rf-cal-3-bg: #c8a46e;
   --rf-cal-3-text: #141514;
-  --rf-cal-3-border: #DFBE88;
+  --rf-cal-3-border: #dfbe88;
 
-  --rf-cal-4-bg: #DFBE88;
+  --rf-cal-4-bg: #dfbe88;
   --rf-cal-4-text: #141514;
-  --rf-cal-4-border: #F4EFE6;
+  --rf-cal-4-border: #f4efe6;
 
   /* 12. Compatibilidade com variáveis legadas */
   --color-onyx: #141514;
   --color-carbon-black: #222422;
-  --color-coffee-bean: #2C221E;
-  --color-charcoal-brown: #383A37;
-  --color-camel: #C8A46E;
-  --color-soft-fawn: #DFBE88;
-  --color-wine-plum: #722F3E;
-  --color-hunter-green: #4E7A55;
-  --color-slate-grey: #7C95B0;
-  --color-soft-linen: #F4EFE6;
-  --color-silver: #9A9080;
+  --color-coffee-bean: #2c221e;
+  --color-charcoal-brown: #383a37;
+  --color-camel: #c8a46e;
+  --color-soft-fawn: #dfbe88;
+  --color-wine-plum: #722f3e;
+  --color-hunter-green: #4e7a55;
+  --color-slate-grey: #7c95b0;
+  --color-soft-linen: #f4efe6;
+  --color-silver: #9a9080;
 
-  --espresso: #0C0D0C;
+  --espresso: #0c0d0c;
   --reading: #222422;
-  --paper: #F4EFE6;
-  --gold: #C8A46E;
+  --paper: #f4efe6;
+  --gold: #c8a46e;
 
   --bg-canvas: var(--rf-surface-canvas);
   --bg-surface: var(--rf-surface-card-solid);
@@ -218,7 +228,7 @@
   --accent-secondary: var(--rf-accent-secondary);
   --accent-brass: var(--rf-accent-primary-hover);
   --accent-brass-decorative: var(--rf-accent-primary);
-  --accent-straw: #4A433C;
+  --accent-straw: #4a433c;
 
   --accent-gold: var(--rf-accent-primary);
   --accent-gold-hover: var(--rf-accent-primary-hover);
@@ -235,7 +245,7 @@
   --status-error-bg: var(--rf-status-error-bg);
 
   --border-ui: var(--rf-border-strong);
-  --border-subtle: #383A37;
+  --border-subtle: #383a37;
   --shadow-card: var(--rf-shadow-card);
   --shadow-elevated: var(--rf-shadow-lg);
   --shadow-btn-hover: var(--rf-shadow-md);
@@ -246,7 +256,7 @@
   --rf-card-shadow: var(--rf-shadow-card);
 
   /* 13. Barra de rolagem (contraste >= 3:1 contra --scrollbar-track) */
-  --scrollbar-track: #1B1C1B;
+  --scrollbar-track: #1b1c1b;
   --scrollbar-thumb: rgba(185, 174, 159, 0.58);
-  --scrollbar-thumb-hover: #D07A8E;
+  --scrollbar-thumb-hover: #d07a8e;
 }

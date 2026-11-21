@@ -8,6 +8,7 @@
     "build": "npm run check:contrast && next build",
     "start": "next start",
     "check:contrast": "node scripts/verify-theme-contrast.mjs",
+    "check:contrast:rendered": "node scripts/verify-theme-contrast.mjs --rendered",
     "lint": "eslint .",
     "format": "prettier --write --ignore-unknown .",
     "format:check": "prettier --check --ignore-unknown .",

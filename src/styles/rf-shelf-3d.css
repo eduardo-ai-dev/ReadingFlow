@@ -90,22 +90,33 @@ a:hover .rf-book-cover-wishlist {
   opacity: 1;
 }
 
-/* Capas muito pequenas (< 64px): exibe título compacto em Playfair sem monograma */
-@container (max-width: 63.99px) {
-  .rf-book-cover-author {
-    display: none !important;
-  }
-
+/* Capas compactas (<= 72px, inclui size="xs" 44px e size="sm" 64px): escala proporcional sem cortar título/autor */
+@container (max-width: 72px) {
   .rf-book-cover-inner {
     justify-content: center !important;
     align-items: center !important;
     text-align: center !important;
+    padding: 14% 11% 11% 16% !important;
+    gap: 2px;
   }
 
   .rf-book-cover-title {
-    font-size: clamp(6.5px, 17cqw, 9px) !important;
+    font-size: clamp(6.5px, 14cqw, 9.5px) !important;
+    line-height: 1.12 !important;
     -webkit-line-clamp: 3;
     line-clamp: 3;
+  }
+
+  .rf-book-cover-author {
+    font-size: clamp(5.5px, 8.5cqw, 7px) !important;
+    padding-top: 2px !important;
+    letter-spacing: 0.04em !important;
+  }
+}
+
+@container (max-width: 52px) {
+  .rf-book-cover-author {
+    display: none !important;
   }
 }
 

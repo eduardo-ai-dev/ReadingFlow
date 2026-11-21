@@ -12,12 +12,23 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 const ROOT = process.cwd();
 const THEMES_DIR = path.join(ROOT, "src", "styles", "themes");
-const DESIGN_TOKENS_FILE = path.join(ROOT, "src", "styles", "design-tokens.css");
+const DESIGN_TOKENS_FILE = path.join(
+  ROOT,
+  "src",
+  "styles",
+  "design-tokens.css"
+);
 
-const REQUIRED_SHELF_TOKENS = ["--rf-frame", "--rf-plank", "--rf-back", "--rf-line"];
+const REQUIRED_SHELF_TOKENS = [
+  "--rf-frame",
+  "--rf-plank",
+  "--rf-back",
+  "--rf-line",
+];
 const REQUIRED_CHART_TOKENS = [
   "--rf-chart-1",
   "--rf-chart-2",
@@ -29,55 +40,284 @@ const REQUIRED_CHART_TOKENS = [
 
 const CONTRAST_PAIRS = [
   // Texto normal (>= 4.5:1)
-  { label: "Texto primário / canvas", fg: "--rf-text-primary", bg: "--rf-surface-canvas", min: 4.5 },
-  { label: "Título / canvas", fg: "--rf-text-heading", bg: "--rf-surface-canvas", min: 4.5 },
-  { label: "Texto secundário / canvas", fg: "--rf-text-secondary", bg: "--rf-surface-canvas", min: 4.5 },
-  { label: "Texto secundário / fundo secundário", fg: "--rf-text-secondary", bg: "--rf-surface-desk", min: 4.5 },
-  { label: "Texto terciário / canvas", fg: "--rf-text-tertiary", bg: "--rf-surface-canvas", min: 4.5 },
-  { label: "Texto terciário / fundo secundário", fg: "--rf-text-tertiary", bg: "--rf-surface-desk", min: 4.5 },
-  { label: "Texto primário / card sólido", fg: "--rf-text-primary", bg: "--rf-surface-card-solid", min: 4.5 },
-  { label: "Texto secundário / card sólido", fg: "--rf-text-secondary", bg: "--rf-surface-card-solid", min: 4.5 },
-  { label: "Texto terciário / card sólido", fg: "--rf-text-tertiary", bg: "--rf-surface-card-solid", min: 4.5 },
-  { label: "Texto primário / superfície elevada", fg: "--rf-text-primary", bg: "--rf-surface-elevated", min: 4.5 },
-  { label: "Texto secundário / superfície sutil", fg: "--rf-text-secondary", bg: "--rf-surface-subtle", min: 4.5 },
+  {
+    label: "Texto primário / canvas",
+    fg: "--rf-text-primary",
+    bg: "--rf-surface-canvas",
+    min: 4.5,
+  },
+  {
+    label: "Título / canvas",
+    fg: "--rf-text-heading",
+    bg: "--rf-surface-canvas",
+    min: 4.5,
+  },
+  {
+    label: "Texto secundário / canvas",
+    fg: "--rf-text-secondary",
+    bg: "--rf-surface-canvas",
+    min: 4.5,
+  },
+  {
+    label: "Texto secundário / fundo secundário",
+    fg: "--rf-text-secondary",
+    bg: "--rf-surface-desk",
+    min: 4.5,
+  },
+  {
+    label: "Texto terciário / canvas",
+    fg: "--rf-text-tertiary",
+    bg: "--rf-surface-canvas",
+    min: 4.5,
+  },
+  {
+    label: "Texto terciário / fundo secundário",
+    fg: "--rf-text-tertiary",
+    bg: "--rf-surface-desk",
+    min: 4.5,
+  },
+  {
+    label: "Texto primário / card sólido",
+    fg: "--rf-text-primary",
+    bg: "--rf-surface-card-solid",
+    min: 4.5,
+  },
+  {
+    label: "Texto secundário / card sólido",
+    fg: "--rf-text-secondary",
+    bg: "--rf-surface-card-solid",
+    min: 4.5,
+  },
+  {
+    label: "Texto terciário / card sólido",
+    fg: "--rf-text-tertiary",
+    bg: "--rf-surface-card-solid",
+    min: 4.5,
+  },
+  {
+    label: "Texto primário / superfície elevada",
+    fg: "--rf-text-primary",
+    bg: "--rf-surface-elevated",
+    min: 4.5,
+  },
+  {
+    label: "Texto secundário / superfície sutil",
+    fg: "--rf-text-secondary",
+    bg: "--rf-surface-subtle",
+    min: 4.5,
+  },
   // Texto sobre destaque (>= 4.5:1)
-  { label: "Destaque primário (texto / fundo)", fg: "--rf-accent-on-primary", bg: "--rf-accent-primary", min: 4.5 },
-  { label: "Destaque primário hover (texto / fundo)", fg: "--rf-accent-on-primary", bg: "--rf-accent-primary-hover", min: 4.5 },
-  { label: "Destaque secundário / Chip ativo", fg: "--rf-accent-on-secondary", bg: "--rf-accent-secondary", min: 4.5 },
-  { label: "Destaque secundário hover", fg: "--rf-accent-on-secondary", bg: "--rf-accent-secondary-hover", min: 4.5 },
-  { label: "Destaque texto-ícone / canvas", fg: "--rf-text-accent-secondary", bg: "--rf-surface-canvas", min: 4.5 },
-  { label: "Destaque texto-ícone / card sólido", fg: "--rf-text-accent-secondary", bg: "--rf-surface-card-solid", min: 4.5 },
+  {
+    label: "Destaque primário (texto / fundo)",
+    fg: "--rf-accent-on-primary",
+    bg: "--rf-accent-primary",
+    min: 4.5,
+  },
+  {
+    label: "Destaque primário hover (texto / fundo)",
+    fg: "--rf-accent-on-primary",
+    bg: "--rf-accent-primary-hover",
+    min: 4.5,
+  },
+  {
+    label: "Destaque secundário / Chip ativo",
+    fg: "--rf-accent-on-secondary",
+    bg: "--rf-accent-secondary",
+    min: 4.5,
+  },
+  {
+    label: "Destaque secundário hover",
+    fg: "--rf-accent-on-secondary",
+    bg: "--rf-accent-secondary-hover",
+    min: 4.5,
+  },
+  {
+    label: "Destaque texto-ícone / canvas",
+    fg: "--rf-text-accent-secondary",
+    bg: "--rf-surface-canvas",
+    min: 4.5,
+  },
+  {
+    label: "Destaque texto-ícone / card sólido",
+    fg: "--rf-text-accent-secondary",
+    bg: "--rf-surface-card-solid",
+    min: 4.5,
+  },
   // Spotlight
-  { label: "Spotlight (texto / fundo contraste)", fg: "--rf-text-on-contrast", bg: "--rf-surface-contrast", min: 4.5 },
-  { label: "Spotlight muted / fundo contraste", fg: "--rf-text-on-contrast-muted", bg: "--rf-surface-contrast", min: 4.5 },
+  {
+    label: "Spotlight (texto / fundo contraste)",
+    fg: "--rf-text-on-contrast",
+    bg: "--rf-surface-contrast",
+    min: 4.5,
+  },
+  {
+    label: "Spotlight muted / fundo contraste",
+    fg: "--rf-text-on-contrast-muted",
+    bg: "--rf-surface-contrast",
+    min: 4.5,
+  },
   // Estados semânticos (>= 4.5:1)
-  { label: "Status sucesso (texto / fundo)", fg: "--rf-status-success", bg: "--rf-status-success-bg", min: 4.5 },
-  { label: "Status aviso (texto / fundo)", fg: "--rf-status-warning", bg: "--rf-status-warning-bg", min: 4.5 },
-  { label: "Status erro (texto / fundo)", fg: "--rf-status-error", bg: "--rf-status-error-bg", min: 4.5 },
-  { label: "Status info (texto / fundo)", fg: "--rf-status-info", bg: "--rf-status-info-bg", min: 4.5 },
+  {
+    label: "Status sucesso (texto / fundo)",
+    fg: "--rf-status-success",
+    bg: "--rf-status-success-bg",
+    min: 4.5,
+  },
+  {
+    label: "Status aviso (texto / fundo)",
+    fg: "--rf-status-warning",
+    bg: "--rf-status-warning-bg",
+    min: 4.5,
+  },
+  {
+    label: "Status erro (texto / fundo)",
+    fg: "--rf-status-error",
+    bg: "--rf-status-error-bg",
+    min: 4.5,
+  },
+  {
+    label: "Status info (texto / fundo)",
+    fg: "--rf-status-info",
+    bg: "--rf-status-info-bg",
+    min: 4.5,
+  },
   // Bordas de campo, ícones e anel de foco (UI >= 3.0:1)
-  { label: "Borda de campo / canvas (UI >= 3:1)", fg: "--rf-border-strong", bg: "--rf-surface-canvas", min: 3.0 },
-  { label: "Borda de campo / card sólido (UI >= 3:1)", fg: "--rf-border-strong", bg: "--rf-surface-card-solid", min: 3.0 },
-  { label: "Anel de foco / canvas (UI >= 3:1)", fg: "--rf-focus-ring-color", bg: "--rf-surface-canvas", min: 3.0 },
-  { label: "Anel de foco / card sólido (UI >= 3:1)", fg: "--rf-focus-ring-color", bg: "--rf-surface-card-solid", min: 3.0 },
-  { label: "Anel de foco / navegação (UI >= 3:1)", fg: "--rf-focus-ring-color", bg: "--rf-nav-bg", min: 3.0 },
-  { label: "Ícone destaque nav / superfície nav (UI >= 3:1)", fg: "--rf-nav-accent", bg: "--rf-nav-surface", min: 3.0 },
+  {
+    label: "Borda de campo / canvas (UI >= 3:1)",
+    fg: "--rf-border-strong",
+    bg: "--rf-surface-canvas",
+    min: 3.0,
+  },
+  {
+    label: "Borda de campo / card sólido (UI >= 3:1)",
+    fg: "--rf-border-strong",
+    bg: "--rf-surface-card-solid",
+    min: 3.0,
+  },
+  {
+    label: "Anel de foco / canvas (UI >= 3:1)",
+    fg: "--rf-focus-ring-color",
+    bg: "--rf-surface-canvas",
+    min: 3.0,
+  },
+  {
+    label: "Anel de foco / card sólido (UI >= 3:1)",
+    fg: "--rf-focus-ring-color",
+    bg: "--rf-surface-card-solid",
+    min: 3.0,
+  },
+  {
+    label: "Anel de foco / navegação (UI >= 3:1)",
+    fg: "--rf-focus-ring-color",
+    bg: "--rf-nav-bg",
+    min: 3.0,
+  },
+  {
+    label: "Ícone destaque nav / superfície nav (UI >= 3:1)",
+    fg: "--rf-nav-accent",
+    bg: "--rf-nav-surface",
+    min: 3.0,
+  },
   // Calendário (5 passos >= 4.5:1)
-  { label: "Calendário nível 0", fg: "--rf-cal-0-text", bg: "--rf-cal-0-bg", min: 4.5 },
-  { label: "Calendário nível 1", fg: "--rf-cal-1-text", bg: "--rf-cal-1-bg", min: 4.5 },
-  { label: "Calendário nível 2", fg: "--rf-cal-2-text", bg: "--rf-cal-2-bg", min: 4.5 },
-  { label: "Calendário nível 3", fg: "--rf-cal-3-text", bg: "--rf-cal-3-bg", min: 4.5 },
-  { label: "Calendário nível 4", fg: "--rf-cal-4-text", bg: "--rf-cal-4-bg", min: 4.5 },
+  {
+    label: "Calendário nível 0",
+    fg: "--rf-cal-0-text",
+    bg: "--rf-cal-0-bg",
+    min: 4.5,
+  },
+  {
+    label: "Calendário nível 1",
+    fg: "--rf-cal-1-text",
+    bg: "--rf-cal-1-bg",
+    min: 4.5,
+  },
+  {
+    label: "Calendário nível 2",
+    fg: "--rf-cal-2-text",
+    bg: "--rf-cal-2-bg",
+    min: 4.5,
+  },
+  {
+    label: "Calendário nível 3",
+    fg: "--rf-cal-3-text",
+    bg: "--rf-cal-3-bg",
+    min: 4.5,
+  },
+  {
+    label: "Calendário nível 4",
+    fg: "--rf-cal-4-text",
+    bg: "--rf-cal-4-bg",
+    min: 4.5,
+  },
   // Navegação (>= 4.5:1)
-  { label: "Navegação (texto / masthead)", fg: "--rf-nav-text", bg: "--rf-nav-bg", min: 4.5 },
-  { label: "Navegação (muted / cápsula)", fg: "--rf-nav-text-muted", bg: "--rf-nav-surface", min: 4.5 },
-  { label: "Navegação (placeholder / busca)", fg: "--rf-nav-text-subtle", bg: "--rf-nav-surface", min: 4.5 },
-  { label: "Navegação (accent / popover)", fg: "--rf-nav-accent", bg: "--rf-nav-surface-elevated", min: 4.5 },
-  { label: "Navegação (perigo sair / popover)", fg: "--rf-nav-danger", bg: "--rf-nav-surface-elevated", min: 4.5 },
-  { label: "Navegação (marketing links / header)", fg: "--rf-nav-text-marketing", bg: "--rf-nav-bg-marketing", min: 4.5 },
+  {
+    label: "Navegação (texto / masthead)",
+    fg: "--rf-nav-text",
+    bg: "--rf-nav-bg",
+    min: 4.5,
+  },
+  {
+    label: "Navegação (muted / cápsula)",
+    fg: "--rf-nav-text-muted",
+    bg: "--rf-nav-surface",
+    min: 4.5,
+  },
+  {
+    label: "Navegação (placeholder / busca)",
+    fg: "--rf-nav-text-subtle",
+    bg: "--rf-nav-surface",
+    min: 4.5,
+  },
+  {
+    label: "Navegação (accent / popover)",
+    fg: "--rf-nav-accent",
+    bg: "--rf-nav-surface-elevated",
+    min: 4.5,
+  },
+  {
+    label: "Navegação (perigo sair / popover)",
+    fg: "--rf-nav-danger",
+    bg: "--rf-nav-surface-elevated",
+    min: 4.5,
+  },
+  {
+    label: "Navegação (marketing links / header)",
+    fg: "--rf-nav-text-marketing",
+    bg: "--rf-nav-bg-marketing",
+    min: 4.5,
+  },
   // Barra de rolagem (UI >= 3.0:1)
-  { label: "Scrollbar (thumb / track >= 3:1)", fg: "--scrollbar-thumb", bg: "--scrollbar-track", min: 3.0 },
-  { label: "Scrollbar hover (thumb-hover / track >= 3:1)", fg: "--scrollbar-thumb-hover", bg: "--scrollbar-track", min: 3.0 },
+  {
+    label: "Scrollbar (thumb / track >= 3:1)",
+    fg: "--scrollbar-thumb",
+    bg: "--scrollbar-track",
+    min: 3.0,
+  },
+  {
+    label: "Scrollbar hover (thumb-hover / track >= 3:1)",
+    fg: "--scrollbar-thumb-hover",
+    bg: "--scrollbar-track",
+    min: 3.0,
+  },
+  // Abas ativas e barras de progresso semânticas (Landing preview + app)
+  {
+    label: "Aba ativa (texto / fundo >= 4.5:1)",
+    fg: "--rf-tab-active-text",
+    bg: "--rf-tab-active-bg",
+    min: 4.5,
+  },
+  {
+    label: "Aba ativa (pílula / trilha >= 3:1)",
+    fg: "--rf-tab-active-bg",
+    bg: "--rf-surface-desk",
+    min: 3.0,
+  },
+  {
+    label: "Barra de progresso (preenchimento / trilha >= 3:1)",
+    fg: "--rf-progress-fill",
+    bg: "--rf-progress-track",
+    min: 3.0,
+  },
 ];
 
 function stripCssComments(css) {
@@ -93,16 +333,25 @@ function parseCssCustomProperties(css) {
     vars.set(match[1].trim(), match[2].trim());
   }
   const schemeMatch = /color-scheme\s*:\s*(light|dark)\s*;/i.exec(clean);
-  return { vars, colorScheme: schemeMatch ? schemeMatch[1].toLowerCase() : "light" };
+  return {
+    vars,
+    colorScheme: schemeMatch ? schemeMatch[1].toLowerCase() : "light",
+  };
 }
 
 function resolveVarValue(vars, token, depth = 0) {
   if (depth > 8) return null;
   const raw = vars.get(token);
   if (!raw) return null;
-  const varMatch = /^var\(\s*(--[a-zA-Z0-9_-]+)\s*(?:,\s*([^)]+))?\)$/.exec(raw);
+  const varMatch = /^var\(\s*(--[a-zA-Z0-9_-]+)\s*(?:,\s*([^)]+))?\)$/.exec(
+    raw
+  );
   if (varMatch) {
-    return resolveVarValue(vars, varMatch[1], depth + 1) ?? varMatch[2]?.trim() ?? null;
+    return (
+      resolveVarValue(vars, varMatch[1], depth + 1) ??
+      varMatch[2]?.trim() ??
+      null
+    );
   }
   return raw;
 }
@@ -217,8 +466,12 @@ let hasErrors = false;
 
 // 1. Garante que design-tokens.css não contém cores literais
 if (fs.existsSync(DESIGN_TOKENS_FILE)) {
-  const tokensCss = stripCssComments(fs.readFileSync(DESIGN_TOKENS_FILE, "utf8"));
-  const literalColors = tokensCss.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/gi);
+  const tokensCss = stripCssComments(
+    fs.readFileSync(DESIGN_TOKENS_FILE, "utf8")
+  );
+  const literalColors = tokensCss.match(
+    /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/gi
+  );
   if (literalColors && literalColors.length > 0) {
     console.error(
       `[ERRO] src/styles/design-tokens.css contém cores literais proibidas: ${literalColors.join(", ")}`
@@ -249,7 +502,9 @@ for (const fileName of themeFiles) {
     resolveVarValue(vars, "--rf-surface-canvas")
   ) ?? { r: 244, g: 239, b: 230, a: 1 };
 
-  console.log(`\n=== Verificando contraste WCAG AA (${colorScheme}): ${fileName} ===`);
+  console.log(
+    `\n=== Verificando contraste WCAG AA (${colorScheme}): ${fileName} ===`
+  );
 
   for (const pair of CONTRAST_PAIRS) {
     const fgRaw = resolveVarValue(vars, pair.fg);
@@ -292,7 +547,10 @@ for (const fileName of themeFiles) {
   }
   if (colorScheme === "dark") {
     const backColor = parseColorToRgba(resolveVarValue(vars, "--rf-back"));
-    if (!backColor || relativeLuminance(backColor) <= relativeLuminance(canvasColor)) {
+    if (
+      !backColor ||
+      relativeLuminance(backColor) <= relativeLuminance(canvasColor)
+    ) {
       console.error(
         `  [FALHA] Estante escura: --rf-back (${resolveVarValue(vars, "--rf-back")}) precisa ser mais claro que --rf-surface-canvas (${resolveVarValue(vars, "--rf-surface-canvas")})`
       );
@@ -329,7 +587,9 @@ for (const fileName of themeFiles) {
         hasErrors = true;
       }
     }
-    console.log(`  [OK] Paleta de gráficos (6 cores · CVD): ${cvdSummary.join(" · ")}`);
+    console.log(
+      `  [OK] Paleta de gráficos (6 cores · CVD): ${cvdSummary.join(" · ")}`
+    );
   }
 }
 
@@ -343,3 +603,21 @@ if (hasErrors) {
 console.log(
   `\n[OK] Todos os ${themeFiles.length} temas curados passaram na verificação WCAG AA (texto >= 4.5:1, UI/foco/bordas >= 3:1, estante escura e daltonismo) sem cores literais em design-tokens.css.`
 );
+
+if (process.argv.includes("--rendered")) {
+  console.log(
+    "\n=== Executando verificação de contraste RENDERIZADO (Playwright) ==="
+  );
+  const renderedScript = path.join(
+    ROOT,
+    "scripts",
+    "verify-rendered-contrast.mjs"
+  );
+  const child = spawnSync(process.execPath, [renderedScript], {
+    stdio: "inherit",
+    env: process.env,
+  });
+  if (child.status !== 0) {
+    process.exit(child.status ?? 1);
+  }
+}
