@@ -1,23 +1,44 @@
 import { z } from "zod";
-import { evaluatePasswordStrength } from "@/features/auth/rules";
+import {
+  MAX_BCRYPT_PASSWORD_BYTES,
+  MIN_PASSWORD_LENGTH,
+  getUtf8ByteLength,
+  isCommonOrTrivialPassword,
+} from "@/features/auth/rules";
 
 export const signInSchema = z.object({
   email: z.string().email("Informe um e-mail válido."),
-  password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres."),
+  password: z
+    .string()
+    .min(1, "Informe sua senha.")
+    .refine(
+      (val) => getUtf8ByteLength(val) <= MAX_BCRYPT_PASSWORD_BYTES,
+      "E-mail ou senha incorretos."
+    ),
+  rememberMe: z.boolean().optional(),
+  captchaToken: z.string().max(4096).optional(),
 });
 
 export const strongPasswordSchema = z
   .string()
-  .min(8, "A senha deve ter no mínimo 8 caracteres.")
+  .min(
+    MIN_PASSWORD_LENGTH,
+    `A senha deve ter no mínimo ${MIN_PASSWORD_LENGTH} caracteres.`
+  )
   .refine(
-    (val) => evaluatePasswordStrength(val).isValid,
-    "A senha deve conter no mínimo 8 caracteres, letra maiúscula, letra minúscula, número e caractere especial."
+    (val) => getUtf8ByteLength(val) <= MAX_BCRYPT_PASSWORD_BYTES,
+    `A senha excede o limite de ${MAX_BCRYPT_PASSWORD_BYTES} bytes UTF-8 (caracteres acentuados ou emojis ocupam mais bytes).`
+  )
+  .refine(
+    (val) => !isCommonOrTrivialPassword(val),
+    "Escolha uma senha menos comum (dica: use uma frase com espaços)."
   );
 
 export const signUpSchema = z.object({
   email: z.string().email("Informe um e-mail válido."),
   password: strongPasswordSchema,
   displayName: z.string().optional(),
+  captchaToken: z.string().max(4096).optional(),
   confirmMinimumAge16: z
     .boolean()
     .refine(
@@ -34,6 +55,7 @@ export const signUpSchema = z.object({
 
 export const requestPasswordResetSchema = z.object({
   email: z.string().email("Informe um e-mail válido."),
+  captchaToken: z.string().max(4096).optional(),
 });
 
 export const resetPasswordSchema = z.object({
@@ -44,6 +66,25 @@ export const resetPasswordSchema = z.object({
     .min(16, "Informe o código de verificação enviado ao seu e-mail.")
     .max(128, "Código de verificação inválido."),
   password: strongPasswordSchema,
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Informe sua senha atual.").optional(),
+  newPassword: strongPasswordSchema,
+});
+
+export const requestMagicLinkSchema = z.object({
+  email: z.string().email("Informe um e-mail válido."),
+  captchaToken: z.string().max(4096).optional(),
+});
+
+export const verifyMagicLinkSchema = z.object({
+  email: z.string().email("Informe um e-mail válido."),
+  code: z
+    .string()
+    .trim()
+    .min(16, "Código inválido ou expirado.")
+    .max(128, "Código inválido ou expirado."),
 });
 
 export const onboardingSchema = z.object({

@@ -167,6 +167,44 @@ function initTables(sqlite: DatabaseSync) {
       created_at TEXT NOT NULL
     );
 
+    -- Tabelas de segurança de autenticação (nunca armazenam e-mail em claro nem senhas)
+    CREATE TABLE IF NOT EXISTS auth_login_attempts (
+      scope_type TEXT NOT NULL,
+      scope_key TEXT NOT NULL,
+      consecutive_failures INTEGER NOT NULL DEFAULT 0,
+      window_started_at_ms INTEGER NOT NULL DEFAULT 0,
+      locked_until_ms INTEGER NOT NULL DEFAULT 0,
+      lockout_level INTEGER NOT NULL DEFAULT 0,
+      last_failure_at_ms INTEGER NOT NULL DEFAULT 0,
+      last_success_at_ms INTEGER NOT NULL DEFAULT 0,
+      alert_sent_at_ms INTEGER NOT NULL DEFAULT 0,
+      updated_at_ms INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (scope_type, scope_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS auth_attack_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ip_key TEXT NOT NULL,
+      account_hmac TEXT NOT NULL,
+      created_at_ms INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS auth_security_state (
+      state_key TEXT PRIMARY KEY,
+      value_int INTEGER NOT NULL DEFAULT 0,
+      updated_at_ms INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS auth_secrets (
+      id TEXT PRIMARY KEY,
+      purpose TEXT NOT NULL,
+      account_hmac TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      secret_hash TEXT NOT NULL,
+      expires_at_ms INTEGER NOT NULL,
+      created_at_ms INTEGER NOT NULL
+    );
+
     -- Índices compostos cobrindo user_id + filtros/ordenação de Painel, Estantes, Busca e Métricas
     CREATE INDEX IF NOT EXISTS idx_works_user_created ON works (user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_works_user_genre ON works (user_id, primary_genre);
@@ -185,6 +223,9 @@ function initTables(sqlite: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_goals_user_starts ON goals (user_id, starts_on ASC);
     CREATE INDEX IF NOT EXISTS idx_wishlist_user_status_priority ON wishlist (user_id, status, priority ASC);
     CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id);
+    CREATE INDEX IF NOT EXISTS idx_auth_attack_events_created ON auth_attack_events (created_at_ms DESC);
+    CREATE INDEX IF NOT EXISTS idx_auth_secrets_purpose_account ON auth_secrets (purpose, account_hmac);
+    CREATE INDEX IF NOT EXISTS idx_auth_secrets_expires ON auth_secrets (expires_at_ms);
   `);
 
   // Migração idempotente para bases SQLite locais já existentes

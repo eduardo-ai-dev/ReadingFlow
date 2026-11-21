@@ -207,7 +207,7 @@ export default function RecoverPasswordPage() {
             }
             if (!passwordStrength.isValid) {
               setPasswordError(
-                "A nova senha deve atender a todos os 5 requisitos abaixo."
+                "A nova senha deve ter no mínimo 12 caracteres (até 72 bytes UTF-8) e não pode ser comum."
               );
               hasFieldError = true;
             }

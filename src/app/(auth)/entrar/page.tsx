@@ -82,8 +82,8 @@ function SignInPageContent() {
             setEmailError("Informe um endereço de e-mail válido.");
             hasFieldError = true;
           }
-          if (!password || password.length < 6) {
-            setPasswordError("A senha deve ter pelo menos 6 caracteres.");
+          if (!password) {
+            setPasswordError("Informe sua senha.");
             hasFieldError = true;
           }
           if (hasFieldError) {

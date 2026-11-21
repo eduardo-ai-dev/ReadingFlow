@@ -107,7 +107,7 @@ describe("Segurança de autenticação — hash scrypt e recuperação com token
     const replayAttempt = await resetPasswordAction({
       email,
       token: rawToken,
-      password: "Replay#2026",
+      password: "Replay#2026!",
     });
     expect(replayAttempt.ok).toBe(false);
 

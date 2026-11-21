@@ -19,6 +19,7 @@ export default function SignUpPage() {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [formNotice, setFormNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isBusy = isPending || isSubmitting;
@@ -47,6 +48,7 @@ export default function SignUpPage() {
           setEmailError(null);
           setPasswordError(null);
           setFormError(null);
+          setFormNotice(null);
 
           const cleanEmail = email.trim();
           const passwordStrength = evaluatePasswordStrength(password);
@@ -62,7 +64,7 @@ export default function SignUpPage() {
           }
           if (!passwordStrength.isValid) {
             setPasswordError(
-              "A senha deve atender a todos os 5 requisitos de segurança abaixo."
+              "A senha deve ter no mínimo 12 caracteres (até 72 bytes UTF-8) e não pode ser comum."
             );
             hasFieldError = true;
           }
@@ -91,6 +93,10 @@ export default function SignUpPage() {
               });
               if (!res.ok) {
                 setFormError(res.error);
+                return;
+              }
+              if (res.requiresConfirmation) {
+                setFormNotice(res.message);
                 return;
               }
               router.push("/onboarding");
@@ -161,7 +167,7 @@ export default function SignUpPage() {
             htmlFor="signup-password"
             className="block font-sans text-sm font-medium text-[#141514]"
           >
-            Senha (mínimo de 8 caracteres)
+            Senha (mínimo de 12 caracteres)
           </label>
           <div className="rf-input-group group relative mt-1.5">
             <input
@@ -171,7 +177,7 @@ export default function SignUpPage() {
               autoComplete="new-password"
               enterKeyHint="done"
               required
-              minLength={8}
+              minLength={12}
               disabled={isBusy}
               aria-invalid={Boolean(passwordError)}
               aria-describedby={
@@ -299,6 +305,14 @@ export default function SignUpPage() {
                 aria-hidden="true"
               />
               <span>{formError}</span>
+            </p>
+          ) : formNotice ? (
+            <p
+              id="signup-form-notice"
+              role="status"
+              className="font-sans text-xs font-medium text-[#3B523E]"
+            >
+              {formNotice}
             </p>
           ) : null}
         </div>

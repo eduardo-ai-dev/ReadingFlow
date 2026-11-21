@@ -113,7 +113,7 @@ describe("auth/rules & shelves/rules", () => {
     expect(byStatus[0]?.primaryAuthor).toBe("Clarice Lispector");
   });
 
-  it("evaluates password strength across 4 segments and validates all 5 mandatory criteria", () => {
+  it("evaluates password strength under NIST/OWASP policy (min 12 chars, <=72 UTF-8 bytes, spaces/Unicode allowed, blocks common passwords)", () => {
     const empty = evaluatePasswordStrength("");
     expect(empty.segments).toBe(0);
     expect(empty.isValid).toBe(false);
@@ -123,28 +123,39 @@ describe("auth/rules & shelves/rules", () => {
     expect(weak.colorHex).toBe("#722F3E");
     expect(weak.isValid).toBe(false);
 
-    const fair = evaluatePasswordStrength("Abcdefgh");
+    const common = evaluatePasswordStrength("123456789012");
+    expect(common.segments).toBe(1);
+    expect(common.isValid).toBe(false);
+
+    const fair = evaluatePasswordStrength("livros bons"); // 11 chars
     expect(fair.segments).toBe(2);
-    expect(fair.label).toBe("Razoável");
+    expect(fair.label).toBe("Curta");
     expect(fair.colorHex).toBe("#C8A46E");
     expect(fair.isValid).toBe(false);
 
-    const good = evaluatePasswordStrength("Abcdefg1");
+    // 12+ caracteres sem regras artificiais de composição (aceita espaços e minúsculas)
+    const good = evaluatePasswordStrength("café na estante");
     expect(good.segments).toBe(3);
     expect(good.label).toBe("Boa");
     expect(good.colorHex).toBe("#6B7F94");
-    expect(good.isValid).toBe(false);
+    expect(good.isValid).toBe(true);
 
-    const strong = evaluatePasswordStrength("Abcdefg1!");
+    // 16+ caracteres com Unicode até 72 bytes
+    const strong = evaluatePasswordStrength("leitura serena à noite");
     expect(strong.segments).toBe(4);
     expect(strong.label).toBe("Forte");
     expect(strong.colorHex).toBe("#3B523E");
     expect(strong.isValid).toBe(true);
 
+    // Excede 72 bytes UTF-8 com emojis multibyte (20 emojis * 4 bytes = 80 bytes)
+    const tooManyBytes = evaluatePasswordStrength("📚".repeat(20));
+    expect(tooManyBytes.isValid).toBe(false);
+    expect(tooManyBytes.utf8Bytes).toBe(80);
+
     expect(
       signUpSchema.safeParse({
         email: "leitor@readingflow.local",
-        password: "Abcdefg1",
+        password: "curta demais".slice(0, 10),
         confirmMinimumAge16: true,
         acceptTerms: true,
       }).success
@@ -153,7 +164,7 @@ describe("auth/rules & shelves/rules", () => {
     expect(
       signUpSchema.safeParse({
         email: "leitor@readingflow.local",
-        password: "Abcdefg1!",
+        password: "café na estante calma",
         confirmMinimumAge16: true,
         acceptTerms: true,
       }).success

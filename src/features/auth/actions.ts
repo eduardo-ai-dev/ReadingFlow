@@ -1,7 +1,7 @@
 "use server";
 
 import crypto from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { isDemoSessionAllowed } from "@/lib/auth-demo";
 import {
@@ -18,14 +18,17 @@ import {
 } from "@/server/store/memory-repository";
 import {
   ambientPreferencesSchema,
+  changePasswordSchema,
   deleteAccountSchema,
   onboardingSchema,
+  requestMagicLinkSchema,
   requestPasswordResetSchema,
   resetPasswordSchema,
   signInSchema,
   signUpSchema,
   updateProfileSchema,
   updateThemePreferencesSchema,
+  verifyMagicLinkSchema,
 } from "@/features/auth/schema";
 import {
   normalizeAmbientPreferences,
@@ -51,17 +54,37 @@ import {
   CURRENT_TERMS_VERSION,
   isValidIanaTimezone,
 } from "@/features/auth/rules";
+import { sanitizePlainText } from "@/server/security/sanitize";
 import {
-  checkSlidingRateLimit,
-  sanitizePlainText,
-} from "@/server/security/sanitize";
-import {
-  generatePasswordResetToken,
+  hashPassword,
   hashPasswordAsync,
   hashResetToken,
   isHashedPassword,
   verifyPasswordAsync,
 } from "@/server/security/password";
+import { getAuthSecurityConfig } from "@/server/security/auth-config";
+import { logAuthEvent } from "@/server/security/auth-logger";
+import { dispatchAuthEmail } from "@/server/security/auth-mailer";
+import { verifyCaptchaTokenServer } from "@/server/security/captcha";
+import { checkPwnedPasswordServer } from "@/server/security/pwned-passwords";
+import {
+  KNOWN_DEVICE_COOKIE_NAME,
+  computeAccountHmac,
+  equalizeAuthResponseTime,
+  extractTrustedClientIp,
+  hashAppSecretArgon2id,
+  normalizeEmailForIdentity,
+  signKnownDeviceCookie,
+  verifyKnownDeviceCookie,
+} from "@/server/security/secrets";
+import {
+  consumeOneTimeAuthSecret,
+  evaluatePreAuthGate,
+  issueOneTimeAuthSecret,
+  recordAuthFailureAtomic,
+  recordAuthSuccessAtomic,
+  withAccountAuthLock,
+} from "@/server/security/auth-throttle";
 import { formatDateInTimezone } from "@/lib/dates";
 import {
   ormCreateSession,
@@ -72,6 +95,68 @@ import {
   ormUpdateUser,
   ormDeleteUser,
 } from "@/server/db/orm-repository";
+
+const UNIFORM_INVALID_CREDENTIALS_ERROR = "E-mail ou senha incorretos.";
+const UNIFORM_LOCKOUT_ERROR =
+  "Muitas tentativas. Tente novamente em instantes.";
+const UNIFORM_INSTRUCTIONS_SENT_MESSAGE =
+  "Se o e-mail existir, enviaremos instruções.";
+const UNIFORM_CAPTCHA_ERROR =
+  "Confirme a verificação de segurança para continuar.";
+const UNIFORM_PWNED_PASSWORD_ERROR =
+  "Esta senha apareceu em vazamentos públicos conhecidos. Escolha outra senha.";
+
+const PASSWORD_RESET_TTL_MS = 15 * 60 * 1000;
+const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
+const RECENT_SESSION_WINDOW_MS = 15 * 60 * 1000;
+
+// Hash scrypt fixo usado para equalizar custo de CPU quando o e-mail não existe
+const DUMMY_PASSWORD_HASH = hashPassword(
+  "readingflow-dummy-password-equalization-v1"
+);
+
+async function readSafeRequestContext(overrides?: {
+  clientIp?: string;
+  userAgent?: string | null;
+  requestId?: string;
+  knownDeviceCookie?: string | null;
+}): Promise<{
+  clientIp: string;
+  userAgent: string | null;
+  requestId: string;
+  knownDeviceId: string | null;
+}> {
+  let hdrs: Awaited<ReturnType<typeof headers>> | null = null;
+  try {
+    if (typeof headers === "function") {
+      hdrs = await headers();
+    }
+  } catch {
+    hdrs = null;
+  }
+
+  let cookieDeviceVal = overrides?.knownDeviceCookie ?? null;
+  if (cookieDeviceVal === null) {
+    try {
+      const cookieStore = await cookies();
+      cookieDeviceVal =
+        cookieStore.get(KNOWN_DEVICE_COOKIE_NAME)?.value ?? null;
+    } catch {
+      cookieDeviceVal = null;
+    }
+  }
+
+  const clientIp = overrides?.clientIp ?? extractTrustedClientIp(hdrs);
+  const userAgent =
+    overrides?.userAgent !== undefined
+      ? overrides.userAgent
+      : (hdrs?.get("user-agent") ?? null);
+  const requestId =
+    overrides?.requestId ?? hdrs?.get("x-request-id") ?? crypto.randomUUID();
+  const knownDeviceId = verifyKnownDeviceCookie(cookieDeviceVal);
+
+  return { clientIp, userAgent, requestId, knownDeviceId };
+}
 
 async function writeThemePreferenceCookies(prefs: {
   theme?: ThemePreference;
@@ -115,11 +200,13 @@ async function writeThemePreferenceCookies(prefs: {
 
 async function createSessionCookie(
   userId: string,
-  rememberMe = true
-): Promise<void> {
+  rememberMe = true,
+  existingKnownDeviceId?: string | null
+): Promise<string> {
   const token = crypto.randomBytes(24).toString("hex");
   const store = getMemoryStore();
   store.sessions.set(token, userId);
+  store.sessionCreatedAt.set(token, Date.now());
   await ormCreateSession(token, userId).catch(() => {});
 
   const cookieStore = await cookies();
@@ -131,6 +218,18 @@ async function createSessionCookie(
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge,
+  });
+
+  // Emite ou renova cookie assinado de dispositivo conhecido para mitigar DoS contra a vítima
+  const deviceCookie = signKnownDeviceCookie(
+    existingKnownDeviceId ?? undefined
+  );
+  cookieStore.set(KNOWN_DEVICE_COOKIE_NAME, deviceCookie, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 90,
   });
 
   if (userId === DEMO_USER_ID) {
@@ -156,6 +255,8 @@ async function createSessionCookie(
       fx: ws.profile.fx ?? settings.fx,
     });
   }
+
+  return token;
 }
 
 export async function signInDemoAction(): Promise<
@@ -197,87 +298,402 @@ export async function signInDemoAction(): Promise<
   return { ok: true, redirectTo: "/painel" };
 }
 
-export async function signInWithEmailAction(rawInput: {
-  email: string;
-  password: string;
-  rememberMe?: boolean;
-}): Promise<
-  { ok: true; needsOnboarding: boolean } | { ok: false; error: string }
-> {
+export type SignInActionResult =
+  | { ok: true; needsOnboarding: boolean }
+  | {
+      ok: false;
+      error: string;
+      statusCode?: number;
+      retryAfterSeconds?: number;
+      captchaRequired?: boolean;
+    };
+
+export async function signInWithEmailAction(
+  rawInput: {
+    email: string;
+    password: string;
+    rememberMe?: boolean;
+    captchaToken?: string;
+  },
+  internalContext?: {
+    clientIp?: string;
+    userAgent?: string | null;
+    requestId?: string;
+    knownDeviceCookie?: string | null;
+    skipCookieWrite?: boolean;
+  }
+): Promise<SignInActionResult> {
+  const startedAtMs = performance.now();
+  const ctx = await readSafeRequestContext(internalContext);
+
   const parsed = signInSchema.safeParse(rawInput);
   if (!parsed.success) {
+    // Se falhar limite de 72 bytes UTF-8 ou validação de senha, retorna resposta uniforme sem vazar estado
+    const firstIssue = parsed.error.issues[0];
+    const isEmailFormatError = firstIssue?.path?.[0] === "email";
+    if (!isEmailFormatError) {
+      await verifyPasswordAsync("invalid-placeholder", DUMMY_PASSWORD_HASH);
+      await equalizeAuthResponseTime(startedAtMs);
+      return {
+        ok: false,
+        error: UNIFORM_INVALID_CREDENTIALS_ERROR,
+        statusCode: 401,
+      };
+    }
+    await equalizeAuthResponseTime(startedAtMs);
     return {
       ok: false,
-      error: parsed.error.issues[0]?.message ?? "Dados inválidos.",
+      error: firstIssue?.message ?? "Informe um e-mail válido.",
+      statusCode: 400,
     };
   }
 
-  const rl = checkSlidingRateLimit(
-    `login:${parsed.data.email.toLowerCase()}`,
-    15
+  const normalizedEmail = normalizeEmailForIdentity(parsed.data.email);
+  const accountHmac = computeAccountHmac(normalizedEmail);
+
+  // Serializa tentativas simultâneas na MESMA conta (impede corrida TOCTOU de 100 palpites paralelos)
+  const outcome = await withAccountAuthLock<SignInActionResult>(
+    accountHmac,
+    async () => {
+      // 1. Gate atômico pré-autenticação (conta, IP, par, modo ataque, dispositivo conhecido)
+      const gate = evaluatePreAuthGate({
+        accountHmac,
+        clientIp: ctx.clientIp,
+        knownDeviceId: ctx.knownDeviceId,
+      });
+
+      if (!gate.allowed) {
+        logAuthEvent({
+          event: "lockout_blocked",
+          requestId: ctx.requestId,
+          accountHmac,
+          clientIp: ctx.clientIp,
+          userAgent: ctx.userAgent,
+          internalReason: gate.blockedBy ?? "lockout_active",
+          meta: {
+            retry_after_seconds: gate.retryAfterSeconds,
+            attack_mode: gate.attackModeActive,
+          },
+        });
+        return {
+          ok: false,
+          error: UNIFORM_LOCKOUT_ERROR,
+          statusCode: 429,
+          retryAfterSeconds: gate.retryAfterSeconds,
+        };
+      }
+
+      // 2. Verificação CAPTCHA quando exigida (modo ataque ou degrau pré-bloqueio para dispositivo desconhecido)
+      if (gate.requiresCaptcha) {
+        const captchaRes = await verifyCaptchaTokenServer({
+          token: parsed.data.captchaToken,
+          remoteIp: ctx.clientIp,
+        });
+        if (!captchaRes.ok) {
+          logAuthEvent({
+            event: "captcha_failed",
+            requestId: ctx.requestId,
+            accountHmac,
+            clientIp: ctx.clientIp,
+            userAgent: ctx.userAgent,
+            internalReason: captchaRes.reason ?? "captcha_rejected",
+            meta: { attack_mode: gate.attackModeActive },
+          });
+          return {
+            ok: false,
+            error: UNIFORM_CAPTCHA_ERROR,
+            statusCode: 403,
+            captchaRequired: true,
+          };
+        }
+      }
+
+      // 3. Verificação em tempo equalizado (sempre executa scrypt, mesmo para e-mails inexistentes)
+      const store = getMemoryStore();
+      const userId = store.userIdByEmail.get(normalizedEmail);
+      const ws = userId ? store.usersById.get(userId) : undefined;
+
+      const targetHash = ws ? ws.passwordHashSim : DUMMY_PASSWORD_HASH;
+      const passwordValid = await verifyPasswordAsync(
+        parsed.data.password,
+        targetHash
+      );
+
+      // 4. Caso especial anti-enumeração: senha correta + e-mail não confirmado
+      // Nunca revela que o e-mail não está confirmado; devolve a mesma mensagem e reenvia em background com rate limit.
+      if (ws && passwordValid && ws.emailConfirmed === false) {
+        logAuthEvent({
+          event: "login_failed",
+          requestId: ctx.requestId,
+          accountHmac,
+          clientIp: ctx.clientIp,
+          userAgent: ctx.userAgent,
+          internalReason: "email_not_confirmed",
+        });
+        await dispatchAuthEmail({
+          kind: "email_confirmation",
+          toEmail: ws.profile.email,
+          accountHmac,
+          requestId: ctx.requestId,
+          clientIp: ctx.clientIp,
+          userAgent: ctx.userAgent,
+        });
+        return {
+          ok: false,
+          error: UNIFORM_INVALID_CREDENTIALS_ERROR,
+          statusCode: 401,
+        };
+      }
+
+      // 5. Credenciais inválidas (e-mail inexistente OU senha incorreta) -> mesma lógica, mesmo contador, mesma mensagem
+      if (!ws || !passwordValid) {
+        const failure = recordAuthFailureAtomic({
+          accountHmac,
+          clientIp: ctx.clientIp,
+          knownDeviceId: ctx.knownDeviceId,
+        });
+
+        logAuthEvent({
+          event: "login_failed",
+          requestId: ctx.requestId,
+          accountHmac,
+          clientIp: ctx.clientIp,
+          userAgent: ctx.userAgent,
+          internalReason: ws ? "invalid_password" : "account_not_found",
+          meta: {
+            lockout_started: failure.accountLockoutStarted,
+            lockout_level: failure.accountLockoutLevel,
+            attack_mode: failure.attackModeActive,
+          },
+        });
+
+        if (failure.attackModeTriggeredNow) {
+          logAuthEvent({
+            event: "attack_mode_triggered",
+            requestId: ctx.requestId,
+            accountHmac,
+            clientIp: ctx.clientIp,
+            userAgent: ctx.userAgent,
+            internalReason: "distributed_or_stuffing_threshold_exceeded",
+          });
+        }
+
+        if (failure.accountLockoutStarted || failure.accountWasAlreadyLocked) {
+          if (failure.accountLockoutStarted) {
+            logAuthEvent({
+              event: "lockout_started",
+              requestId: ctx.requestId,
+              accountHmac,
+              clientIp: ctx.clientIp,
+              userAgent: ctx.userAgent,
+              internalReason: "consecutive_failures_threshold_reached",
+              meta: {
+                level: failure.accountLockoutLevel,
+                retry_after_seconds: failure.accountRetryAfterSeconds,
+              },
+            });
+            // Envia alerta ao dono no 1º bloqueio (somente se a conta existir, sem revelar na resposta)
+            if (failure.shouldSendLockoutAlert && ws) {
+              await dispatchAuthEmail({
+                kind: "lockout_alert",
+                toEmail: ws.profile.email,
+                accountHmac,
+                requestId: ctx.requestId,
+                clientIp: ctx.clientIp,
+                userAgent: ctx.userAgent,
+              });
+            }
+          }
+          return {
+            ok: false,
+            error: UNIFORM_LOCKOUT_ERROR,
+            statusCode: 429,
+            retryAfterSeconds: failure.accountRetryAfterSeconds,
+          };
+        }
+
+        return {
+          ok: false,
+          error: UNIFORM_INVALID_CREDENTIALS_ERROR,
+          statusCode: 401,
+        };
+      }
+
+      // 6. Sucesso: zera contadores de falha e nível de bloqueio
+      recordAuthSuccessAtomic({
+        accountHmac,
+        clientIp: ctx.clientIp,
+        knownDeviceId: ctx.knownDeviceId,
+      });
+
+      // Migra registros legados sem hash para scrypt salgado no login bem-sucedido
+      if (!isHashedPassword(ws.passwordHashSim)) {
+        const upgraded = await hashPasswordAsync(parsed.data.password);
+        ws.passwordHashSim = upgraded;
+        await ormUpdateUser(ws.profile.id, { passwordHash: upgraded }).catch(
+          () => {}
+        );
+      }
+
+      if (!internalContext?.skipCookieWrite) {
+        await createSessionCookie(
+          ws.profile.id,
+          rawInput.rememberMe ?? true,
+          ctx.knownDeviceId
+        );
+        revalidatePath("/", "layout");
+      }
+
+      logAuthEvent({
+        event: "login_success",
+        requestId: ctx.requestId,
+        accountHmac,
+        clientIp: ctx.clientIp,
+        userAgent: ctx.userAgent,
+        internalReason: "credentials_verified",
+        meta: { known_device: Boolean(ctx.knownDeviceId) },
+      });
+
+      return { ok: true, needsOnboarding: !ws.profile.onboardingCompleted };
+    }
   );
-  if (!rl.allowed) {
-    return {
-      ok: false,
-      error: `Muitas tentativas. Aguarde ${rl.retryAfterSeconds}s e tente novamente.`,
-    };
-  }
 
-  const store = getMemoryStore();
-  const userId = store.userIdByEmail.get(parsed.data.email.toLowerCase());
-  const ws = userId ? store.usersById.get(userId) : undefined;
-
-  // Generic error message so we never reveal whether an email exists (§11.2)
-  if (
-    !ws ||
-    !(await verifyPasswordAsync(parsed.data.password, ws.passwordHashSim))
-  ) {
-    return { ok: false, error: "E-mail ou senha incorretos." };
-  }
-
-  // Migra registros legados sem hash para scrypt salgado no login bem-sucedido
-  if (!isHashedPassword(ws.passwordHashSim)) {
-    const upgraded = await hashPasswordAsync(parsed.data.password);
-    ws.passwordHashSim = upgraded;
-    await ormUpdateUser(ws.profile.id, { passwordHash: upgraded }).catch(
-      () => {}
-    );
-  }
-
-  await createSessionCookie(ws.profile.id, rawInput.rememberMe ?? true);
-  revalidatePath("/", "layout");
-  return { ok: true, needsOnboarding: !ws.profile.onboardingCompleted };
+  await equalizeAuthResponseTime(startedAtMs);
+  return outcome;
 }
 
-export async function signUpAction(rawInput: {
-  email: string;
-  password: string;
-  displayName?: string;
-  confirmMinimumAge16?: boolean;
-  acceptTerms?: boolean;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function signUpAction(
+  rawInput: {
+    email: string;
+    password: string;
+    displayName?: string;
+    confirmMinimumAge16?: boolean;
+    acceptTerms?: boolean;
+    captchaToken?: string;
+  },
+  internalContext?: {
+    clientIp?: string;
+    userAgent?: string | null;
+    requestId?: string;
+    uniformNoSession?: boolean;
+  }
+): Promise<
+  | { ok: true; message: string; requiresConfirmation?: boolean }
+  | {
+      ok: false;
+      error: string;
+      statusCode?: number;
+      retryAfterSeconds?: number;
+    }
+> {
+  const startedAtMs = performance.now();
+  const cfg = getAuthSecurityConfig();
+  const ctx = await readSafeRequestContext(internalContext);
+
   const parsed = signUpSchema.safeParse(rawInput);
   if (!parsed.success) {
+    await equalizeAuthResponseTime(startedAtMs);
     return {
       ok: false,
       error: parsed.error.issues[0]?.message ?? "Dados inválidos.",
+      statusCode: 400,
     };
   }
 
-  const emailKey = parsed.data.email.toLowerCase().trim();
-  const rl = checkSlidingRateLimit(`signup:${emailKey}`, 10);
-  if (!rl.allowed) {
+  const emailKey = normalizeEmailForIdentity(parsed.data.email);
+  const accountHmac = computeAccountHmac(emailKey);
+
+  const gate = evaluatePreAuthGate({
+    accountHmac,
+    clientIp: ctx.clientIp,
+    knownDeviceId: ctx.knownDeviceId,
+  });
+  if (!gate.allowed) {
+    logAuthEvent({
+      event: "lockout_blocked",
+      requestId: ctx.requestId,
+      accountHmac,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      internalReason: "signup_rate_limited",
+    });
+    await equalizeAuthResponseTime(startedAtMs);
     return {
       ok: false,
-      error: "Muitas tentativas de cadastro. Aguarde um minuto.",
+      error: UNIFORM_LOCKOUT_ERROR,
+      statusCode: 429,
+      retryAfterSeconds: gate.retryAfterSeconds,
+    };
+  }
+
+  if (gate.requiresCaptcha) {
+    const captchaRes = await verifyCaptchaTokenServer({
+      token: parsed.data.captchaToken,
+      remoteIp: ctx.clientIp,
+    });
+    if (!captchaRes.ok) {
+      logAuthEvent({
+        event: "captcha_failed",
+        requestId: ctx.requestId,
+        accountHmac,
+        clientIp: ctx.clientIp,
+        userAgent: ctx.userAgent,
+        internalReason: captchaRes.reason ?? "signup_captcha_failed",
+      });
+      await equalizeAuthResponseTime(startedAtMs);
+      return {
+        ok: false,
+        error: UNIFORM_CAPTCHA_ERROR,
+        statusCode: 403,
+      };
+    }
+  }
+
+  // Verificação k-anonymity no Pwned Passwords (somente no servidor)
+  const pwned = await checkPwnedPasswordServer(parsed.data.password);
+  if (pwned.compromised) {
+    logAuthEvent({
+      event: "signup_requested",
+      requestId: ctx.requestId,
+      accountHmac,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      internalReason: "password_compromised_hibp",
+    });
+    await equalizeAuthResponseTime(startedAtMs);
+    return {
+      ok: false,
+      error: UNIFORM_PWNED_PASSWORD_ERROR,
+      statusCode: 400,
     };
   }
 
   const store = getMemoryStore();
+  // Anti-enumeração: se o e-mail já existe, NÃO informa erro nem sobrescreve a conta.
+  // Executa trabalho equivalente de hash, envia aviso silencioso ao dono e retorna resposta uniforme.
   if (store.userIdByEmail.has(emailKey)) {
+    await hashPasswordAsync(parsed.data.password);
+    await dispatchAuthEmail({
+      kind: "signup_existing_account_notice",
+      toEmail: emailKey,
+      accountHmac,
+      requestId: ctx.requestId,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+    });
+    logAuthEvent({
+      event: "signup_requested",
+      requestId: ctx.requestId,
+      accountHmac,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      internalReason: "email_already_registered_suppressed",
+    });
+    await equalizeAuthResponseTime(startedAtMs);
     return {
-      ok: false,
-      error: "Não foi possível concluir o cadastro com este e-mail.",
+      ok: true,
+      requiresConfirmation: true,
+      message: UNIFORM_INSTRUCTIONS_SENT_MESSAGE,
     };
   }
 
@@ -289,6 +705,8 @@ export async function signUpAction(rawInput: {
 
   const passwordHash = await hashPasswordAsync(parsed.data.password);
   const defaultShelves = createDefaultShelves(userId);
+  const needsConfirmation =
+    cfg.requireEmailConfirmation || Boolean(internalContext?.uniformNoSession);
   const newProfile = {
     id: userId,
     email: emailKey,
@@ -311,6 +729,7 @@ export async function signUpAction(rawInput: {
   store.usersById.set(userId, {
     profile: newProfile,
     passwordHashSim: passwordHash,
+    emailConfirmed: !needsConfirmation,
     works: [],
     editions: [],
     shelves: defaultShelves,
@@ -345,126 +764,279 @@ export async function signUpAction(rawInput: {
   }).catch(() => {});
   await ormInsertShelves(defaultShelves).catch(() => {});
 
-  await createSessionCookie(userId);
-  revalidatePath("/", "layout");
-  return { ok: true };
-}
+  logAuthEvent({
+    event: "signup_requested",
+    requestId: ctx.requestId,
+    accountHmac,
+    clientIp: ctx.clientIp,
+    userAgent: ctx.userAgent,
+    internalReason: "account_created",
+  });
 
-const PASSWORD_RESET_TTL_MS = 15 * 60 * 1000;
-
-export async function requestPasswordResetAction(rawInput: {
-  email: string;
-}): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
-  const parsed = requestPasswordResetSchema.safeParse(rawInput);
-  if (!parsed.success) {
+  if (needsConfirmation) {
+    await dispatchAuthEmail({
+      kind: "email_confirmation",
+      toEmail: emailKey,
+      accountHmac,
+      requestId: ctx.requestId,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+    });
+    await equalizeAuthResponseTime(startedAtMs);
     return {
-      ok: false,
-      error: parsed.error.issues[0]?.message ?? "Informe um e-mail válido.",
+      ok: true,
+      requiresConfirmation: true,
+      message: UNIFORM_INSTRUCTIONS_SENT_MESSAGE,
     };
   }
 
-  const emailKey = parsed.data.email.toLowerCase().trim();
-  const rl = checkSlidingRateLimit(`reset-req:${emailKey}`, 5);
-  if (!rl.allowed) {
+  await createSessionCookie(userId);
+  revalidatePath("/", "layout");
+  await equalizeAuthResponseTime(startedAtMs);
+  return {
+    ok: true,
+    requiresConfirmation: false,
+    message: UNIFORM_INSTRUCTIONS_SENT_MESSAGE,
+  };
+}
+
+export async function requestPasswordResetAction(
+  rawInput: {
+    email: string;
+    captchaToken?: string;
+  },
+  internalContext?: {
+    clientIp?: string;
+    userAgent?: string | null;
+    requestId?: string;
+  }
+): Promise<
+  | { ok: true; message: string }
+  | {
+      ok: false;
+      error: string;
+      statusCode?: number;
+      retryAfterSeconds?: number;
+    }
+> {
+  const startedAtMs = performance.now();
+  const ctx = await readSafeRequestContext(internalContext);
+
+  const parsed = requestPasswordResetSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    await equalizeAuthResponseTime(startedAtMs);
     return {
       ok: false,
-      error: "Muitas tentativas. Aguarde um minuto e tente novamente.",
+      error: parsed.error.issues[0]?.message ?? "Informe um e-mail válido.",
+      statusCode: 400,
+    };
+  }
+
+  const emailKey = normalizeEmailForIdentity(parsed.data.email);
+  const accountHmac = computeAccountHmac(emailKey);
+
+  const gate = evaluatePreAuthGate({
+    accountHmac,
+    clientIp: ctx.clientIp,
+    knownDeviceId: ctx.knownDeviceId,
+  });
+  if (!gate.allowed) {
+    logAuthEvent({
+      event: "lockout_blocked",
+      requestId: ctx.requestId,
+      accountHmac,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      internalReason: "password_reset_rate_limited",
+    });
+    await equalizeAuthResponseTime(startedAtMs);
+    return {
+      ok: false,
+      error: UNIFORM_LOCKOUT_ERROR,
+      statusCode: 429,
+      retryAfterSeconds: gate.retryAfterSeconds,
     };
   }
 
   const store = getMemoryStore();
-  const nowMs = Date.now();
-  // Remove tokens expirados antes de emitir um novo
-  for (const [hash, entry] of store.passwordResetTokens.entries()) {
-    if (entry.expiresAtMs <= nowMs) {
-      store.passwordResetTokens.delete(hash);
-    }
-  }
-
   const userId = store.userIdByEmail.get(emailKey);
   if (userId && store.usersById.has(userId)) {
-    // Invalida tokens anteriores do mesmo usuário (apenas o mais recente permanece válido)
-    for (const [hash, entry] of store.passwordResetTokens.entries()) {
-      if (entry.userId === userId) {
-        store.passwordResetTokens.delete(hash);
-      }
-    }
-
-    const { rawToken, tokenHash } = generatePasswordResetToken();
-    store.passwordResetTokens.set(tokenHash, {
+    // Segredo de recuperação armazenado com Argon2id + sal aleatório (nunca logado em texto puro)
+    const issued = await issueOneTimeAuthSecret({
+      purpose: "password_reset",
+      accountHmac,
       userId,
-      expiresAtMs: nowMs + PASSWORD_RESET_TTL_MS,
+      ttlMs: PASSWORD_RESET_TTL_MS,
     });
-
-    if (process.env.NODE_ENV !== "production") {
-      console.info(
-        `[ReadingFlow/auth][dev] Código único de recuperação para ${emailKey} (válido por 15 min): ${rawToken}`
-      );
-    }
+    await dispatchAuthEmail({
+      kind: "password_reset",
+      toEmail: emailKey,
+      accountHmac,
+      requestId: ctx.requestId,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      secretCodeForDelivery: issued.rawSecret,
+    });
+    logAuthEvent({
+      event: "password_reset_requested",
+      requestId: ctx.requestId,
+      accountHmac,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      internalReason: "reset_token_issued",
+    });
+  } else {
+    // Executa derivação Argon2id dummy para manter custo de CPU e latência indistinguíveis
+    await hashAppSecretArgon2id(crypto.randomBytes(24).toString("hex"));
+    logAuthEvent({
+      event: "password_reset_requested",
+      requestId: ctx.requestId,
+      accountHmac,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      internalReason: "account_not_found_suppressed",
+    });
   }
 
-  // Mensagem neutra: nunca revela se o e-mail existe no cadastro
+  await equalizeAuthResponseTime(startedAtMs);
   return {
     ok: true,
-    message:
-      "Se houver uma conta associada a este endereço, enviamos um código único de redefinição (válido por 15 minutos).",
+    message: UNIFORM_INSTRUCTIONS_SENT_MESSAGE,
   };
 }
 
-export async function resetPasswordAction(rawInput: {
-  email: string;
-  token: string;
-  password: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function resetPasswordAction(
+  rawInput: {
+    email: string;
+    token: string;
+    password: string;
+  },
+  internalContext?: {
+    clientIp?: string;
+    userAgent?: string | null;
+    requestId?: string;
+  }
+): Promise<
+  | { ok: true }
+  | {
+      ok: false;
+      error: string;
+      statusCode?: number;
+      retryAfterSeconds?: number;
+    }
+> {
+  const startedAtMs = performance.now();
+  const ctx = await readSafeRequestContext(internalContext);
+
   const parsed = resetPasswordSchema.safeParse(rawInput);
   if (!parsed.success) {
+    await equalizeAuthResponseTime(startedAtMs);
     return {
       ok: false,
       error: parsed.error.issues[0]?.message ?? "Dados inválidos.",
+      statusCode: 400,
     };
   }
 
-  const emailKey = parsed.data.email.toLowerCase().trim();
-  const rl = checkSlidingRateLimit(`reset:${emailKey}`, 10);
-  if (!rl.allowed) {
+  const emailKey = normalizeEmailForIdentity(parsed.data.email);
+  const accountHmac = computeAccountHmac(emailKey);
+
+  const gate = evaluatePreAuthGate({
+    accountHmac,
+    clientIp: ctx.clientIp,
+    knownDeviceId: ctx.knownDeviceId,
+  });
+  if (!gate.allowed) {
+    logAuthEvent({
+      event: "lockout_blocked",
+      requestId: ctx.requestId,
+      accountHmac,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      internalReason: "reset_confirm_rate_limited",
+    });
+    await equalizeAuthResponseTime(startedAtMs);
     return {
       ok: false,
-      error: "Muitas tentativas. Aguarde um minuto e tente novamente.",
+      error: UNIFORM_LOCKOUT_ERROR,
+      statusCode: 429,
+      retryAfterSeconds: gate.retryAfterSeconds,
+    };
+  }
+
+  const pwned = await checkPwnedPasswordServer(parsed.data.password);
+  if (pwned.compromised) {
+    await equalizeAuthResponseTime(startedAtMs);
+    return {
+      ok: false,
+      error: UNIFORM_PWNED_PASSWORD_ERROR,
+      statusCode: 400,
     };
   }
 
   const store = getMemoryStore();
   const userId = store.userIdByEmail.get(emailKey);
   const ws = userId ? store.usersById.get(userId) : undefined;
-  const tokenHash = hashResetToken(parsed.data.token);
-  const record = store.passwordResetTokens.get(tokenHash);
+
+  // 1. Verifica token Argon2id em auth_secrets
+  const argonCheck = await consumeOneTimeAuthSecret({
+    purpose: "password_reset",
+    accountHmac,
+    rawSecret: parsed.data.token,
+  });
+
+  // 2. Fallback legado compatível apenas para registros antigos em memória já emitidos
+  let legacyMatched = false;
+  if (!argonCheck.valid && ws) {
+    const legacyHash = hashResetToken(parsed.data.token);
+    const legacyRecord = store.passwordResetTokens.get(legacyHash);
+    if (
+      legacyRecord &&
+      legacyRecord.userId === ws.profile.id &&
+      legacyRecord.expiresAtMs > Date.now()
+    ) {
+      store.passwordResetTokens.delete(legacyHash);
+      legacyMatched = true;
+    } else if (legacyRecord && legacyRecord.expiresAtMs <= Date.now()) {
+      store.passwordResetTokens.delete(legacyHash);
+    }
+  }
 
   if (
     !ws ||
-    !record ||
-    record.userId !== ws.profile.id ||
-    record.expiresAtMs <= Date.now()
+    (!legacyMatched &&
+      (!argonCheck.valid || argonCheck.userId !== ws.profile.id))
   ) {
-    if (record && record.expiresAtMs <= Date.now()) {
-      store.passwordResetTokens.delete(tokenHash);
-    }
+    recordAuthFailureAtomic({
+      accountHmac,
+      clientIp: ctx.clientIp,
+      knownDeviceId: ctx.knownDeviceId,
+    });
+    logAuthEvent({
+      event: "login_failed",
+      requestId: ctx.requestId,
+      accountHmac,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      internalReason: "invalid_or_expired_reset_token",
+    });
+    await equalizeAuthResponseTime(startedAtMs);
     return {
       ok: false,
       error:
         "Código de verificação inválido ou expirado. Solicite um novo código.",
+      statusCode: 400,
     };
   }
-
-  // Token de uso único: remove imediatamente após validação
-  store.passwordResetTokens.delete(tokenHash);
 
   const nextHash = await hashPasswordAsync(parsed.data.password);
   ws.passwordHashSim = nextHash;
 
-  // Revoga todas as sessões ativas do usuário após troca de senha
+  // Revoga todas as sessões ativas do usuário após redefinição de senha
   for (const [sessionToken, uid] of store.sessions.entries()) {
     if (uid === ws.profile.id) {
       store.sessions.delete(sessionToken);
+      store.sessionCreatedAt.delete(sessionToken);
     }
   }
 
@@ -473,7 +1045,372 @@ export async function resetPasswordAction(rawInput: {
   );
   await ormDeleteSessionsByUserId(ws.profile.id).catch(() => {});
 
+  recordAuthSuccessAtomic({
+    accountHmac,
+    clientIp: ctx.clientIp,
+    knownDeviceId: ctx.knownDeviceId,
+  });
+
+  await dispatchAuthEmail({
+    kind: "password_changed_notice",
+    toEmail: ws.profile.email,
+    accountHmac,
+    requestId: ctx.requestId,
+    clientIp: ctx.clientIp,
+    userAgent: ctx.userAgent,
+  });
+
+  logAuthEvent({
+    event: "password_reset_completed",
+    requestId: ctx.requestId,
+    accountHmac,
+    clientIp: ctx.clientIp,
+    userAgent: ctx.userAgent,
+    internalReason: "password_updated_all_sessions_revoked",
+  });
+
+  await equalizeAuthResponseTime(startedAtMs);
   return { ok: true };
+}
+
+/**
+ * Troca de senha autenticado:
+ * - Exige senha atual OU sessão recente (<= 15 minutos).
+ * - Valida política de >= 12 caracteres, <= 72 bytes UTF-8, sem senhas comuns e HIBP k-anonymity.
+ * - Encerra todas as OUTRAS sessões do usuário e envia aviso por e-mail.
+ */
+export async function changePasswordAction(
+  rawInput: {
+    currentPassword?: string;
+    newPassword: string;
+  },
+  internalContext?: {
+    clientIp?: string;
+    userAgent?: string | null;
+    requestId?: string;
+  }
+): Promise<
+  | { ok: true; revokedOtherSessions: number }
+  | { ok: false; error: string; statusCode?: number }
+> {
+  const startedAtMs = performance.now();
+  const ctx = await readSafeRequestContext(internalContext);
+  const ws = await requireAuthenticatedWorkspace();
+
+  const parsed = changePasswordSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    await equalizeAuthResponseTime(startedAtMs);
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Dados inválidos.",
+      statusCode: 400,
+    };
+  }
+
+  const cookieStore = await cookies();
+  const currentSessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const store = getMemoryStore();
+  const accountHmac = computeAccountHmac(ws.profile.email);
+
+  const sessionCreatedMs = currentSessionToken
+    ? (store.sessionCreatedAt.get(currentSessionToken) ?? 0)
+    : 0;
+  const hasRecentSession =
+    sessionCreatedMs > 0 &&
+    Date.now() - sessionCreatedMs <= RECENT_SESSION_WINDOW_MS;
+
+  if (parsed.data.currentPassword) {
+    const validCurrent = await verifyPasswordAsync(
+      parsed.data.currentPassword,
+      ws.passwordHashSim
+    );
+    if (!validCurrent) {
+      logAuthEvent({
+        event: "login_failed",
+        requestId: ctx.requestId,
+        accountHmac,
+        clientIp: ctx.clientIp,
+        userAgent: ctx.userAgent,
+        internalReason: "change_password_invalid_current",
+      });
+      await equalizeAuthResponseTime(startedAtMs);
+      return {
+        ok: false,
+        error: "Senha atual incorreta.",
+        statusCode: 401,
+      };
+    }
+  } else if (!hasRecentSession) {
+    await equalizeAuthResponseTime(startedAtMs);
+    return {
+      ok: false,
+      error:
+        "Para trocar sua senha, informe sua senha atual ou faça login novamente.",
+      statusCode: 401,
+    };
+  }
+
+  const pwned = await checkPwnedPasswordServer(parsed.data.newPassword);
+  if (pwned.compromised) {
+    await equalizeAuthResponseTime(startedAtMs);
+    return {
+      ok: false,
+      error: UNIFORM_PWNED_PASSWORD_ERROR,
+      statusCode: 400,
+    };
+  }
+
+  const nextHash = await hashPasswordAsync(parsed.data.newPassword);
+  ws.passwordHashSim = nextHash;
+
+  // Encerra todas as OUTRAS sessões do usuário, mantendo apenas a sessão atual
+  let revokedOtherSessions = 0;
+  for (const [sessionToken, uid] of Array.from(store.sessions.entries())) {
+    if (uid === ws.profile.id && sessionToken !== currentSessionToken) {
+      store.sessions.delete(sessionToken);
+      store.sessionCreatedAt.delete(sessionToken);
+      await ormDeleteSession(sessionToken).catch(() => {});
+      revokedOtherSessions += 1;
+    }
+  }
+
+  await ormUpdateUser(ws.profile.id, { passwordHash: nextHash }).catch(
+    () => {}
+  );
+
+  await dispatchAuthEmail({
+    kind: "password_changed_notice",
+    toEmail: ws.profile.email,
+    accountHmac,
+    requestId: ctx.requestId,
+    clientIp: ctx.clientIp,
+    userAgent: ctx.userAgent,
+  });
+
+  logAuthEvent({
+    event: "password_changed",
+    requestId: ctx.requestId,
+    accountHmac,
+    clientIp: ctx.clientIp,
+    userAgent: ctx.userAgent,
+    internalReason: "password_changed_other_sessions_revoked",
+    meta: { revoked_other_sessions: revokedOtherSessions },
+  });
+
+  await equalizeAuthResponseTime(startedAtMs);
+  return { ok: true, revokedOtherSessions };
+}
+
+/**
+ * Fluxo uniforme de Link Mágico / OTP:
+ * Sempre retorna a mesma resposta ("Se o e-mail existir, enviaremos instruções.")
+ * com tempo equalizado e código armazenado em Argon2id.
+ */
+export async function requestMagicLinkAction(
+  rawInput: {
+    email: string;
+    captchaToken?: string;
+  },
+  internalContext?: {
+    clientIp?: string;
+    userAgent?: string | null;
+    requestId?: string;
+  }
+): Promise<
+  | { ok: true; message: string }
+  | {
+      ok: false;
+      error: string;
+      statusCode?: number;
+      retryAfterSeconds?: number;
+    }
+> {
+  const startedAtMs = performance.now();
+  const ctx = await readSafeRequestContext(internalContext);
+
+  const parsed = requestMagicLinkSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    await equalizeAuthResponseTime(startedAtMs);
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Informe um e-mail válido.",
+      statusCode: 400,
+    };
+  }
+
+  const emailKey = normalizeEmailForIdentity(parsed.data.email);
+  const accountHmac = computeAccountHmac(emailKey);
+
+  const gate = evaluatePreAuthGate({
+    accountHmac,
+    clientIp: ctx.clientIp,
+    knownDeviceId: ctx.knownDeviceId,
+  });
+  if (!gate.allowed) {
+    logAuthEvent({
+      event: "lockout_blocked",
+      requestId: ctx.requestId,
+      accountHmac,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      internalReason: "magic_link_rate_limited",
+    });
+    await equalizeAuthResponseTime(startedAtMs);
+    return {
+      ok: false,
+      error: UNIFORM_LOCKOUT_ERROR,
+      statusCode: 429,
+      retryAfterSeconds: gate.retryAfterSeconds,
+    };
+  }
+
+  const store = getMemoryStore();
+  const userId = store.userIdByEmail.get(emailKey);
+  if (userId && store.usersById.has(userId)) {
+    const issued = await issueOneTimeAuthSecret({
+      purpose: "magic_link_otp",
+      accountHmac,
+      userId,
+      ttlMs: MAGIC_LINK_TTL_MS,
+    });
+    await dispatchAuthEmail({
+      kind: "magic_link_otp",
+      toEmail: emailKey,
+      accountHmac,
+      requestId: ctx.requestId,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      secretCodeForDelivery: issued.rawSecret,
+    });
+    logAuthEvent({
+      event: "magic_link_requested",
+      requestId: ctx.requestId,
+      accountHmac,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      internalReason: "magic_link_otp_issued",
+    });
+  } else {
+    await hashAppSecretArgon2id(crypto.randomBytes(24).toString("hex"));
+    logAuthEvent({
+      event: "magic_link_requested",
+      requestId: ctx.requestId,
+      accountHmac,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      internalReason: "account_not_found_suppressed",
+    });
+  }
+
+  await equalizeAuthResponseTime(startedAtMs);
+  return {
+    ok: true,
+    message: UNIFORM_INSTRUCTIONS_SENT_MESSAGE,
+  };
+}
+
+export async function verifyMagicLinkAction(
+  rawInput: {
+    email: string;
+    code: string;
+  },
+  internalContext?: {
+    clientIp?: string;
+    userAgent?: string | null;
+    requestId?: string;
+  }
+): Promise<SignInActionResult> {
+  const startedAtMs = performance.now();
+  const ctx = await readSafeRequestContext(internalContext);
+
+  const parsed = verifyMagicLinkSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    await equalizeAuthResponseTime(startedAtMs);
+    return {
+      ok: false,
+      error: UNIFORM_INVALID_CREDENTIALS_ERROR,
+      statusCode: 401,
+    };
+  }
+
+  const emailKey = normalizeEmailForIdentity(parsed.data.email);
+  const accountHmac = computeAccountHmac(emailKey);
+
+  const gate = evaluatePreAuthGate({
+    accountHmac,
+    clientIp: ctx.clientIp,
+    knownDeviceId: ctx.knownDeviceId,
+  });
+  if (!gate.allowed) {
+    await equalizeAuthResponseTime(startedAtMs);
+    return {
+      ok: false,
+      error: UNIFORM_LOCKOUT_ERROR,
+      statusCode: 429,
+      retryAfterSeconds: gate.retryAfterSeconds,
+    };
+  }
+
+  const store = getMemoryStore();
+  const userId = store.userIdByEmail.get(emailKey);
+  const ws = userId ? store.usersById.get(userId) : undefined;
+
+  const check = await consumeOneTimeAuthSecret({
+    purpose: "magic_link_otp",
+    accountHmac,
+    rawSecret: parsed.data.code,
+  });
+
+  if (!ws || !check.valid || check.userId !== ws.profile.id) {
+    const failure = recordAuthFailureAtomic({
+      accountHmac,
+      clientIp: ctx.clientIp,
+      knownDeviceId: ctx.knownDeviceId,
+    });
+    logAuthEvent({
+      event: "login_failed",
+      requestId: ctx.requestId,
+      accountHmac,
+      clientIp: ctx.clientIp,
+      userAgent: ctx.userAgent,
+      internalReason: "invalid_magic_link_otp",
+    });
+    await equalizeAuthResponseTime(startedAtMs);
+    if (failure.accountLockoutStarted) {
+      return {
+        ok: false,
+        error: UNIFORM_LOCKOUT_ERROR,
+        statusCode: 429,
+        retryAfterSeconds: failure.accountRetryAfterSeconds,
+      };
+    }
+    return {
+      ok: false,
+      error: UNIFORM_INVALID_CREDENTIALS_ERROR,
+      statusCode: 401,
+    };
+  }
+
+  ws.emailConfirmed = true;
+  recordAuthSuccessAtomic({
+    accountHmac,
+    clientIp: ctx.clientIp,
+    knownDeviceId: ctx.knownDeviceId,
+  });
+  await createSessionCookie(ws.profile.id, true, ctx.knownDeviceId);
+  revalidatePath("/", "layout");
+
+  logAuthEvent({
+    event: "login_success",
+    requestId: ctx.requestId,
+    accountHmac,
+    clientIp: ctx.clientIp,
+    userAgent: ctx.userAgent,
+    internalReason: "magic_link_otp_verified",
+  });
+
+  await equalizeAuthResponseTime(startedAtMs);
+  return { ok: true, needsOnboarding: !ws.profile.onboardingCompleted };
 }
 
 export async function completeOnboardingAction(rawInput: {
@@ -559,7 +1496,6 @@ export async function updateThemePreferencesAction(rawInput: {
     ? normalizeFxPreference(parsed.data.fx)
     : undefined;
 
-  // Sempre persiste nos cookies para a primeira renderização sem flash
   await writeThemePreferenceCookies({
     theme: nextTheme,
     density: nextDensity,
@@ -567,7 +1503,6 @@ export async function updateThemePreferencesAction(rawInput: {
     fx: nextFx,
   });
 
-  // Se houver usuário autenticado, persiste também no perfil e em user_settings (sincronizado entre dispositivos)
   const ws = await getAuthenticatedWorkspace();
   if (ws) {
     ws.profile = {
@@ -740,7 +1675,9 @@ export async function signOutAction(): Promise<{ ok: true }> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (token) {
-    getMemoryStore().sessions.delete(token);
+    const store = getMemoryStore();
+    store.sessions.delete(token);
+    store.sessionCreatedAt.delete(token);
     await ormDeleteSession(token).catch(() => {});
   }
   cookieStore.delete(SESSION_COOKIE_NAME);
@@ -767,7 +1704,6 @@ export async function deleteMyAccountAction(rawInput: {
 
   await ormDeleteUser(ws.profile.id).catch(() => {});
 
-  // Apaga capas privadas enviadas pela conta e invalida o cache do usuário
   if (ws.uploadedCovers) {
     ws.uploadedCovers = {};
   }
@@ -780,6 +1716,7 @@ export async function deleteMyAccountAction(rawInput: {
   for (const [token, uid] of store.sessions.entries()) {
     if (uid === ws.profile.id) {
       store.sessions.delete(token);
+      store.sessionCreatedAt.delete(token);
     }
   }
 

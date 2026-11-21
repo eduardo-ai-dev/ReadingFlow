@@ -42,6 +42,8 @@ export const DEMO_USER_ID = "user-demo-acervo";
 export interface UserWorkspaceData {
   profile: UserProfile;
   passwordHashSim: string;
+  /** Indica se o e-mail da conta já foi confirmado (false aciona reenvio silencioso no login sem revelar estado). */
+  emailConfirmed?: boolean;
   works: Work[];
   editions: Edition[];
   shelves: Shelf[];
@@ -72,7 +74,8 @@ interface GlobalStoreShape {
   usersById: Map<string, UserWorkspaceData>;
   userIdByEmail: Map<string, string>;
   sessions: Map<string, string>; // sessionToken -> userId
-  passwordResetTokens: Map<string, PasswordResetTokenRecord>; // sha256(token) -> record
+  sessionCreatedAt: Map<string, number>; // sessionToken -> epoch ms (para validar sessão recente na troca de senha)
+  passwordResetTokens: Map<string, PasswordResetTokenRecord>; // legado (novos tokens usam auth_secrets com Argon2id)
 }
 
 declare global {
@@ -1067,6 +1070,7 @@ export function getMemoryStore(): GlobalStoreShape {
     const usersById = new Map<string, UserWorkspaceData>();
     const userIdByEmail = new Map<string, string>();
     const sessions = new Map<string, string>();
+    const sessionCreatedAt = new Map<string, number>();
     const passwordResetTokens = new Map<string, PasswordResetTokenRecord>();
     if (allowDemoSeed) {
       const demo = buildDemoWorkspace();
@@ -1079,9 +1083,13 @@ export function getMemoryStore(): GlobalStoreShape {
       usersById,
       userIdByEmail,
       sessions,
+      sessionCreatedAt,
       passwordResetTokens,
     };
   } else {
+    if (!globalThis.__readingFlowMemoryStore.sessionCreatedAt) {
+      globalThis.__readingFlowMemoryStore.sessionCreatedAt = new Map();
+    }
     if (!globalThis.__readingFlowMemoryStore.passwordResetTokens) {
       globalThis.__readingFlowMemoryStore.passwordResetTokens = new Map();
     }

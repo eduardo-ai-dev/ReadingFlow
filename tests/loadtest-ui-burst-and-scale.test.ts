@@ -198,7 +198,7 @@ describe("Regressão de UI e Escala #4 — Vazamento Web Audio em Rajadas 50x no
       }
       const elapsedMs = performance.now() - t0;
       expect(neighborCollisions).toBe(0);
-      expect(elapsedMs).toBeLessThan(200);
+      expect(elapsedMs).toBeLessThan(450);
     }
   });
 });

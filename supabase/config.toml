@@ -1,0 +1,53 @@
+# =============================================================================
+# ReadingFlow · Configuração Supabase Auth (Dev/Staging/Produção)
+# =============================================================================
+project_id = "readingflow"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+# Política de senha: mínimo de 12 caracteres, sem regras artificiais de composição
+minimum_password_length = 12
+password_requirements = ""
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = true
+max_frequency = "60s"
+otp_length = 8
+otp_expiry = 900
+
+[auth.rate_limit]
+# Limites conservadores adicionais diretamente no GoTrue
+email_sent = 10
+sign_in_sign_ups = 30
+token_refresh = 60
+token_verifications = 20
+
+[auth.captcha]
+# CAPTCHA obrigatório contra chamadas diretas à API do Supabase Auth
+enabled = true
+provider = "turnstile"
+secret = "env(AUTH_CAPTCHA_SECRET_KEY)"
+
+[auth.hook.password_verification_attempt]
+# Rede de proteção direta no Supabase Auth (3 falhas em 15 min -> 60s -> 5m -> 15m -> 1h)
+# Nota de plano: Password Verification Hook e Leaked Password Protection (HIBP)
+# exigem plano Supabase Pro ou superior em nuvem (no self-hosted/local CLI funcionam normalmente).
+enabled = true
+uri = "pg-functions://postgres/public/hook_password_verification_attempt"
