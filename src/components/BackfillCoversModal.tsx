@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
@@ -22,6 +22,7 @@ import {
   type CoverSelectionPayload,
 } from "@/components/CoverEditionPicker";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 
 export interface BackfillBookTarget {
   editionId: string;
@@ -84,6 +85,8 @@ export function BackfillCoversModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const closeModal = useCallback(() => {
     abortRef.current?.abort();
@@ -93,14 +96,13 @@ export function BackfillCoversModal({
     router.refresh();
   }, [router]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeModal();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, closeModal]);
+  useFocusTrap({
+    active: open,
+    containerRef: dialogRef,
+    initialFocusRef: closeBtnRef,
+    onEscape: closeModal,
+    lockScroll: true,
+  });
 
   const startBackfillScan = async () => {
     if (booksWithoutCover.length === 0) return;
@@ -165,9 +167,9 @@ export function BackfillCoversModal({
           notice = data.notice ?? null;
           apiUnavailable = Boolean(
             data.apiUnavailable ||
-              res.status === 429 ||
-              res.status === 403 ||
-              (data.degraded && candidates.length === 0)
+            res.status === 429 ||
+            res.status === 403 ||
+            (data.degraded && candidates.length === 0)
           );
 
           const badge =
@@ -318,12 +320,19 @@ export function BackfillCoversModal({
 
       {open ? (
         <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="backfill-covers-title"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--rf-surface-overlay)] p-4 backdrop-blur-xs"
         >
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[var(--rf-card-radius)] border border-[var(--rf-border-default)] bg-[var(--rf-surface-canvas)] p-5 text-[var(--rf-text-primary)] shadow-[var(--rf-shadow-lg)] sm:p-6">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="backfill-covers-title"
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[var(--rf-card-radius)] border border-[var(--rf-border-default)] bg-[var(--rf-surface-canvas)] p-5 text-[var(--rf-text-primary)] shadow-[var(--rf-shadow-lg)] sm:p-6"
+          >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--rf-divider)] pb-3.5">
               <div>
                 <p className="rf-type-label text-[var(--rf-text-accent-secondary)]">
@@ -337,6 +346,7 @@ export function BackfillCoversModal({
                 </h2>
               </div>
               <button
+                ref={closeBtnRef}
                 type="button"
                 onClick={closeModal}
                 aria-label="Fechar busca de capas"

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
+import { useId, useRef, type ReactNode, type RefObject } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 
 export type RfModalTone = "default" | "dark";
 export type RfModalSize = "sm" | "md" | "lg";
@@ -37,42 +38,25 @@ export function Modal({
   children,
 }: ModalProps) {
   const headingId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const prefersReducedMotion = useReducedMotion();
 
-  useEffect(() => {
-    if (!open) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose();
-        returnFocusRef?.current?.focus();
-      }
-    };
-
-    const focusTimer = window.setTimeout(() => {
-      closeButtonRef.current?.focus();
-    }, 30);
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.clearTimeout(focusTimer);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open, onClose, returnFocusRef]);
+  useFocusTrap({
+    active: open,
+    containerRef: dialogRef,
+    initialFocusRef: closeButtonRef,
+    returnFocusRef,
+    onEscape: onClose,
+    lockScroll: true,
+  });
 
   const handleClose = () => {
     onClose();
-    returnFocusRef?.current?.focus();
   };
 
   const sizeClass =
-    size === "sm"
-      ? "max-w-sm"
-      : size === "lg"
-        ? "max-w-2xl"
-        : "max-w-md";
+    size === "sm" ? "max-w-sm" : size === "lg" ? "max-w-2xl" : "max-w-md";
 
   const surfaceClass =
     tone === "dark"
@@ -109,6 +93,7 @@ export function Modal({
           className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--rf-surface-overlay)] p-4 backdrop-blur-[2px]"
         >
           <motion.div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby={headingId}

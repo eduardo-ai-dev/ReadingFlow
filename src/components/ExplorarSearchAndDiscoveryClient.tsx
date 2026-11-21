@@ -35,7 +35,23 @@ export function ExplorarSearchAndDiscoveryClient({
   const [query, setQuery] = useState("");
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("buscar") === "1") {
+      inputRef.current?.focus();
+    }
+  }, []);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const isCtrlK =
+        (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k";
+      if (isCtrlK) {
+        event.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+        return;
+      }
+
       const target = event.target as HTMLElement | null;
       const isEditingText =
         target?.tagName === "INPUT" ||
@@ -44,10 +60,7 @@ export function ExplorarSearchAndDiscoveryClient({
         target?.isContentEditable;
       if (isEditingText) return;
 
-      if (
-        event.key === "/" ||
-        ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k")
-      ) {
+      if (event.key === "/") {
         event.preventDefault();
         inputRef.current?.focus();
       }
@@ -61,7 +74,9 @@ export function ExplorarSearchAndDiscoveryClient({
       items.map((item) => ({
         ...item,
         normTitle: normalizeSearchText(item.title),
-        normAuthors: normalizeSearchText(`${item.author} ${item.searchAuthors}`),
+        normAuthors: normalizeSearchText(
+          `${item.author} ${item.searchAuthors}`
+        ),
         cleanIsbn: `${item.isbn13 ?? ""} ${item.isbn10 ?? ""}`
           .replace(/[^0-9xX]/g, "")
           .toLowerCase(),
@@ -112,6 +127,7 @@ export function ExplorarSearchAndDiscoveryClient({
           <input
             ref={inputRef}
             id={inputId}
+            data-rf-global-search-input="true"
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -155,7 +171,8 @@ export function ExplorarSearchAndDiscoveryClient({
           {results.length === 0 ? (
             <div className="flex flex-col items-start justify-between gap-3 rounded-[var(--rf-radius-lg)] border border-[var(--rf-border-accent-soft)] bg-[var(--rf-surface-contrast-elevated)] p-4 sm:flex-row sm:items-center">
               <p className="font-sans text-sm text-[var(--rf-text-on-contrast)] opacity-90">
-                Nenhuma obra no seu acervo ou lista de desejos corresponde a esta busca.
+                Nenhuma obra no seu acervo ou lista de desejos corresponde a
+                esta busca.
               </p>
               <Link
                 href={`/adicionar?q=${encodeURIComponent(trimmedQuery)}`}

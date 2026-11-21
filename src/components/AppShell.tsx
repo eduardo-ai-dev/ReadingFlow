@@ -41,6 +41,8 @@ export function AppShell({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [isSigningOut, startSignOut] = useTransition();
   const accountMenuRef = useRef<HTMLDivElement>(null);
+  const accountMenuBtnRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuBtnRef = useRef<HTMLButtonElement>(null);
 
   // Fecha o menu de conta ao clicar fora
   useEffect(() => {
@@ -57,6 +59,25 @@ export function AppShell({
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [accountMenuOpen]);
+
+  // Fecha menus abertos ao pressionar Escape e restaura foco ao botão disparador
+  useEffect(() => {
+    if (!accountMenuOpen && !mobileMenuOpen) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (accountMenuOpen) {
+        e.preventDefault();
+        setAccountMenuOpen(false);
+        accountMenuBtnRef.current?.focus();
+      } else if (mobileMenuOpen) {
+        e.preventDefault();
+        setMobileMenuOpen(false);
+        mobileMenuBtnRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [accountMenuOpen, mobileMenuOpen]);
 
   const [prevPathname, setPrevPathname] = useState(pathname);
   if (prevPathname !== pathname) {
@@ -127,6 +148,7 @@ export function AppShell({
             {/* Menu de Conta do Usuário */}
             <div ref={accountMenuRef} className="relative">
               <button
+                ref={accountMenuBtnRef}
                 type="button"
                 aria-expanded={accountMenuOpen}
                 aria-haspopup="menu"
@@ -158,7 +180,11 @@ export function AppShell({
                       onClick={() => setAccountMenuOpen(false)}
                       className="flex items-center gap-2.5 rounded-[var(--rf-radius-md)] px-3 py-2 font-sans text-xs font-medium text-[var(--rf-nav-text)] transition-colors hover:bg-[var(--rf-nav-surface-hover)] hover:text-[var(--rf-nav-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
                     >
-                      <Settings size={14} strokeWidth={1.8} aria-hidden="true" />
+                      <Settings
+                        size={14}
+                        strokeWidth={1.8}
+                        aria-hidden="true"
+                      />
                       Configurações do acervo
                     </Link>
                   </div>
@@ -181,6 +207,7 @@ export function AppShell({
 
             {/* Botão de menu móvel / tablet (< 1024px) */}
             <button
+              ref={mobileMenuBtnRef}
               type="button"
               aria-expanded={mobileMenuOpen}
               aria-controls="menu-movel-masthead"

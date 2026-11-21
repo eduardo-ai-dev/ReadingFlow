@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  useCallback,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -15,9 +16,7 @@ import {
   type ShelfQuickFilter,
   type VirtualBookItem,
 } from "@/features/shelves/virtual-bookshelf";
-import {
-  extractPredominantDotColors,
-} from "@/features/shelves/arrange-shelves";
+import { extractPredominantDotColors } from "@/features/shelves/arrange-shelves";
 import {
   getClientShelfLayoutSnapshot,
   getServerShelfLayoutSnapshot,
@@ -37,13 +36,13 @@ const QUICK_FILTER_OPTIONS: ReadonlyArray<{
   key: ShelfQuickFilter;
   label: string;
 }> = [
-    { key: "all", label: "Todos" },
-    { key: "physical", label: "Só Físicos" },
-    { key: "digital", label: "Só Digitais" },
-    { key: "reading", label: "Em Andamento" },
-    { key: "finished", label: "Concluídos" },
-    { key: "wishlist", label: "Desejos" },
-  ];
+  { key: "all", label: "Todos" },
+  { key: "physical", label: "Só Físicos" },
+  { key: "digital", label: "Só Digitais" },
+  { key: "reading", label: "Em Andamento" },
+  { key: "finished", label: "Concluídos" },
+  { key: "wishlist", label: "Desejos" },
+];
 
 const FORMAT_LABELS_PT: Record<RealisticBookFormat, string> = {
   capa_dura: "Capa dura",
@@ -87,11 +86,16 @@ export function VirtualBookshelf({
     if (!overrides || Object.keys(overrides).length === 0) return [...books];
     return books.map((b) => {
       const customColor = overrides[String(b.id)];
-      return customColor ? { ...b, spineColor: customColor, spineAccent: undefined } : b;
+      return customColor
+        ? { ...b, spineColor: customColor, spineAccent: undefined }
+        : b;
     });
   }, [books, layout.bookColorOverrides]);
 
-  const hydratedWishlistBooks = useMemo(() => [...wishlistBooks], [wishlistBooks]);
+  const hydratedWishlistBooks = useMemo(
+    () => [...wishlistBooks],
+    [wishlistBooks]
+  );
 
   const filterCounts = useMemo<Record<ShelfQuickFilter, number>>(
     () => ({
@@ -274,37 +278,47 @@ export function VirtualBookshelf({
     return null;
   }, [shelves, activeId]);
 
-  const drawerBook: BookDrawerData | null = activeBook
-    ? {
-      id: String(activeBook.id),
-      workId: activeBook.workId,
-      editionId: activeBook.editionId,
-      libraryItemId: activeBook.libraryItemId,
-      readingId: activeBook.readingId,
-      title: activeBook.title,
-      author:
-        activeBook.author ?? activeBook.authorSurname ?? "Autor do acervo",
-      genre: activeBook.displayGenre,
-      publisher: activeBook.publisher,
-      pages: activeBook.pages,
-      coverUrl: activeBook.coverUrl,
-      spineColor: activeBook.spineBg,
-      spineAccent: activeBook.spineAccentHex,
-      seed: activeBook.resolvedSeed,
-      format: activeBook.format ?? activeBook.realisticFormat,
-      readingStatus: activeBook.readingStatus,
-      statusLabel: activeBook.statusLabel,
-      progressUnit: activeBook.progressUnit,
-      progressValue: activeBook.progressValue,
-      progressTotal: activeBook.progressTotal,
-      progressPercent: activeBook.progressPercent ?? 0,
-      rating: activeBook.rating,
-      href: activeBook.href,
-      isWishlist: activeBook.isWishlist,
-      wishlistPriority: activeBook.wishlistPriority,
-      targetPrice: activeBook.targetPrice,
-    }
-    : null;
+  const drawerBook = useMemo<BookDrawerData | null>(
+    () =>
+      activeBook
+        ? {
+            id: String(activeBook.id),
+            workId: activeBook.workId,
+            editionId: activeBook.editionId,
+            libraryItemId: activeBook.libraryItemId,
+            readingId: activeBook.readingId,
+            title: activeBook.title,
+            author:
+              activeBook.author ??
+              activeBook.authorSurname ??
+              "Autor do acervo",
+            genre: activeBook.displayGenre,
+            publisher: activeBook.publisher,
+            pages: activeBook.pages,
+            coverUrl: activeBook.coverUrl,
+            spineColor: activeBook.spineBg,
+            spineAccent: activeBook.spineAccentHex,
+            seed: activeBook.resolvedSeed,
+            format: activeBook.format ?? activeBook.realisticFormat,
+            readingStatus: activeBook.readingStatus,
+            statusLabel: activeBook.statusLabel,
+            progressUnit: activeBook.progressUnit,
+            progressValue: activeBook.progressValue,
+            progressTotal: activeBook.progressTotal,
+            progressPercent: activeBook.progressPercent ?? 0,
+            rating: activeBook.rating,
+            href: activeBook.href,
+            isWishlist: activeBook.isWishlist,
+            wishlistPriority: activeBook.wishlistPriority,
+            targetPrice: activeBook.targetPrice,
+          }
+        : null,
+    [activeBook]
+  );
+
+  const handleCloseDrawer = useCallback(() => {
+    setActiveId(null);
+  }, []);
 
   const handleReorderWithinShelf = (
     shelf: ShelfRenderGroup,
@@ -397,10 +411,13 @@ export function VirtualBookshelf({
     );
   };
 
-  const handleSelectBook = (book: NormalizedVirtualBook) => {
-    onBookSelect?.(book);
-    setActiveId((curr) => (curr === book.id ? null : book.id));
-  };
+  const handleSelectBook = useCallback(
+    (book: NormalizedVirtualBook) => {
+      onBookSelect?.(book);
+      setActiveId((curr) => (curr === book.id ? null : book.id));
+    },
+    [onBookSelect]
+  );
 
   if (books.length === 0 && wishlistBooks.length === 0) {
     return null;
@@ -418,8 +435,8 @@ export function VirtualBookshelf({
             Estante 3D por Gênero Literário
           </h2>
           <p className={styles.subtitle}>
-            Passe o cursor sobre uma lombada para revelar a capa frontal real em 3D,
-            arraste para organizar ou clique para abrir a ficha rápida.
+            Passe o cursor sobre uma lombada para revelar a capa frontal real em
+            3D, arraste para organizar ou clique para abrir a ficha rápida.
           </p>
         </div>
 
@@ -438,9 +455,7 @@ export function VirtualBookshelf({
 
           <FilterChip
             active={view3dMode === "covers"}
-            label={
-              view3dMode === "covers" ? "Ver Lombadas" : "Ver Capas em 3D"
-            }
+            label={view3dMode === "covers" ? "Ver Lombadas" : "Ver Capas em 3D"}
             onClick={() =>
               setView3dMode((m) => (m === "spines" ? "covers" : "spines"))
             }
@@ -557,10 +572,7 @@ export function VirtualBookshelf({
         </div>
       ) : null}
 
-      <BookSlideOverDrawer
-        book={drawerBook}
-        onClose={() => setActiveId(null)}
-      />
+      <BookSlideOverDrawer book={drawerBook} onClose={handleCloseDrawer} />
     </section>
   );
 }

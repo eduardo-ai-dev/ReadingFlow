@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import {
   updateReadingProgressAction,
 } from "@/features/reading/actions";
 import { BookCover } from "@/components/BookCover";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 
 export interface BookDrawerData {
   id: string;
@@ -291,6 +292,10 @@ function DrawerBody({
           })
         );
         router.refresh();
+      } catch {
+        setErrorMsg(
+          "Não foi possível concluir a leitura agora. Tente novamente."
+        );
       } finally {
         setBusyAction(null);
       }
@@ -311,6 +316,10 @@ function DrawerBody({
         }
         onClose();
         router.push(`/leitura/foco?readingId=${encodeURIComponent(targetId)}`);
+      } catch {
+        setErrorMsg(
+          "Não foi possível iniciar a sessão de foco agora. Tente novamente."
+        );
       } finally {
         setBusyAction(null);
       }
@@ -646,42 +655,17 @@ export function BookSlideOverDrawer({
   onClose: () => void;
 }) {
   const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
-  const previousFocusedRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    if (!book) return;
-
-    previousFocusedRef.current =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const rafId = window.requestAnimationFrame(() => {
-      closeBtnRef.current?.focus();
-    });
-
-    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = prevOverflow;
-      const target = previousFocusedRef.current;
-      if (target && target.isConnected) {
-        target.focus();
-      }
-    };
-  }, [book, onClose]);
+  useFocusTrap({
+    active: Boolean(book),
+    activationKey: book?.id ?? null,
+    containerRef: dialogRef,
+    initialFocusRef: closeBtnRef,
+    onEscape: onClose,
+    lockScroll: true,
+  });
 
   if (!book || typeof document === "undefined") return null;
 
@@ -695,6 +679,7 @@ export function BookSlideOverDrawer({
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

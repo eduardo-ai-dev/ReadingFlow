@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useRef, useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
 import { X, BookPlus } from "lucide-react";
 import { addBookToLibraryAction } from "@/features/catalog/actions";
@@ -9,6 +9,7 @@ import type { BookSearchResult } from "@/features/catalog/search-types";
 import type { BookFormat } from "@/lib/domain";
 import type { VirtualBookItem } from "@/features/shelves/virtual-bookshelf";
 import { BookSearchAutocomplete } from "@/components/BookSearchAutocomplete";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 
 export interface ArrangeQuickAddModalProps {
   open: boolean;
@@ -45,15 +46,16 @@ export function ArrangeQuickAddModal({
   const [spineColor, setSpineColor] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  useFocusTrap({
+    active: open,
+    containerRef: dialogRef,
+    initialFocusRef: closeBtnRef,
+    onEscape: onClose,
+    lockScroll: true,
+  });
 
   if (!open) return null;
 
@@ -153,6 +155,7 @@ export function ArrangeQuickAddModal({
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="arrange-quick-add-title"
@@ -172,6 +175,7 @@ export function ArrangeQuickAddModal({
           </div>
 
           <button
+            ref={closeBtnRef}
             type="button"
             onClick={onClose}
             aria-label="Fechar janela de adição rápida"

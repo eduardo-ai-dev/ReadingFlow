@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 
 interface BarcodeScannerModalProps {
   open: boolean;
@@ -18,18 +19,25 @@ export function BarcodeScannerModal({
   onDetected,
 }: BarcodeScannerModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const onDetectedRef = useRef(onDetected);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [manualFallbackIsbn, setManualFallbackIsbn] = useState("");
 
   useEffect(() => {
-    if (!open) return;
+    onCloseRef.current = onClose;
+    onDetectedRef.current = onDetected;
+  }, [onClose, onDetected]);
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
+  useFocusTrap({
+    active: open,
+    containerRef: dialogRef,
+    initialFocusRef: closeBtnRef,
+    onEscape: onClose,
+    lockScroll: true,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -81,8 +89,8 @@ export function BarcodeScannerModal({
                 (c) => c.rawValue && c.rawValue.length >= 10
               );
               if (hit?.rawValue) {
-                onDetected(hit.rawValue);
-                onClose();
+                onDetectedRef.current(hit.rawValue);
+                onCloseRef.current();
                 return;
               }
             } catch {
@@ -107,8 +115,8 @@ export function BarcodeScannerModal({
             if (!cancelled && result) {
               const raw = result.getText();
               if (raw && raw.length >= 10) {
-                onDetected(raw);
-                onClose();
+                onDetectedRef.current(raw);
+                onCloseRef.current();
               }
             }
           }
@@ -133,18 +141,25 @@ export function BarcodeScannerModal({
         stream.getTracks().forEach((t) => t.stop());
       }
     };
-  }, [open, onClose, onDetected]);
+  }, [open]);
 
   if (!open) return null;
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="scanner-modal-title"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
     >
-      <div className="w-full max-w-md rounded-[12px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] p-5 shadow-[var(--shadow-elevated)]">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="scanner-modal-title"
+        className="w-full max-w-md rounded-[12px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] p-5 shadow-[var(--shadow-elevated)]"
+      >
         <div className="flex items-center justify-between gap-2">
           <h2
             id="scanner-modal-title"
@@ -153,6 +168,7 @@ export function BarcodeScannerModal({
             Escanear código de barras (ISBN)
           </h2>
           <button
+            ref={closeBtnRef}
             type="button"
             onClick={onClose}
             className="min-h-[40px] rounded-[6px] border border-[var(--border-subtle)] px-3 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"

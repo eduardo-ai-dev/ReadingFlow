@@ -1,35 +1,75 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useId, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+
+function isSearchInputVisible(el: HTMLElement | null): boolean {
+  if (!el || !el.isConnected) return false;
+  let node: HTMLElement | null = el;
+  while (node && node !== document.body) {
+    const style = window.getComputedStyle(node);
+    if (style.display === "none" || style.visibility === "hidden") {
+      return false;
+    }
+    node = node.parentElement;
+  }
+  return true;
+}
 
 /** Gatilho compacto de busca do masthead (Ctrl+K ou "/" para focar). */
 export function GlobalSearchBar({ className = "" }: { className?: string }) {
   const [query, setQuery] = useState("");
+  const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isInput =
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement ||
         (e.target instanceof HTMLElement && e.target.isContentEditable);
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      const isCtrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k";
+      const isSlash = e.key === "/" && !isInput;
+      if (!isCtrlK && !isSlash) return;
+
+      const currentInput = inputRef.current;
+      if (currentInput && isSearchInputVisible(currentInput)) {
         e.preventDefault();
-        inputRef.current?.focus();
-        inputRef.current?.select();
-      } else if (e.key === "/" && !isInput) {
+        currentInput.focus();
+        currentInput.select();
+        return;
+      }
+
+      // Se outro campo de busca global estiver visível (ex.: menu móvel aberto ou /explorar), deixa ele assumir.
+      const allSearchInputs = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-rf-global-search-input="true"]'
+        )
+      );
+      if (allSearchInputs.some((node) => isSearchInputVisible(node))) {
+        return;
+      }
+
+      // Em larguras menores (ex.: 1024px/390px) onde o campo do cabeçalho está oculto,
+      // redireciona Ctrl+K para a busca global em /explorar?buscar=1 (evitando duplicar chamadas).
+      if (
+        isCtrlK &&
+        pathname !== "/explorar" &&
+        currentInput &&
+        allSearchInputs[0] === currentInput
+      ) {
         e.preventDefault();
-        inputRef.current?.focus();
-        inputRef.current?.select();
+        router.push("/explorar?buscar=1");
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [pathname, router]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +87,7 @@ export function GlobalSearchBar({ className = "" }: { className?: string }) {
       role="search"
       className={`group relative flex items-center ${className}`}
     >
-      <label htmlFor="global-search-input" className="sr-only">
+      <label htmlFor={inputId} className="sr-only">
         Buscar por título, autor, ISBN ou gênero
       </label>
 
@@ -72,7 +112,8 @@ export function GlobalSearchBar({ className = "" }: { className?: string }) {
 
       <input
         ref={inputRef}
-        id="global-search-input"
+        id={inputId}
+        data-rf-global-search-input="true"
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
