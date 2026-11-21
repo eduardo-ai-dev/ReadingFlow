@@ -46,11 +46,20 @@ export function middleware(request: NextRequest) {
   const hasSupabaseSession = hasSupabaseAuthCookie(request);
 
   if (isDemoSession || hasAppSession || hasSupabaseSession) {
-    return NextResponse.next();
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-rf-pathname", `${pathname}${request.nextUrl.search}`);
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
   }
 
-  const signInUrl = request.nextUrl.clone();
-  signInUrl.pathname = "/entrar";
+  const signInUrl = new URL("/entrar", request.url);
+  const originPath = `${pathname}${request.nextUrl.search}`;
+  if (originPath && originPath !== "/onboarding") {
+    signInUrl.searchParams.set("next", originPath);
+  }
   return NextResponse.redirect(signInUrl);
 }
 

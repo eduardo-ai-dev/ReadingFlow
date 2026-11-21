@@ -1,5 +1,7 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentProfile, getUndoBannerInfo } from "@/features/auth/queries";
+import { resolveSafeRedirectTarget } from "@/features/auth/rules";
 import { AppShell } from "@/components/AppShell";
 
 export default async function AuthenticatedAppLayout({
@@ -9,7 +11,12 @@ export default async function AuthenticatedAppLayout({
 }) {
   const profile = await getCurrentProfile();
   if (!profile) {
-    redirect("/entrar");
+    const hdrs = await headers();
+    const rawOrigin = hdrs.get("x-rf-pathname");
+    const safeOrigin = resolveSafeRedirectTarget(rawOrigin, "");
+    redirect(
+      safeOrigin ? `/entrar?next=${encodeURIComponent(safeOrigin)}` : "/entrar"
+    );
   }
   if (!profile.onboardingCompleted) {
     redirect("/onboarding");

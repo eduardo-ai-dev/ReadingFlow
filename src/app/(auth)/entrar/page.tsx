@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { signInWithEmailAction } from "@/features/auth/actions";
+import { resolveSafeRedirectTarget } from "@/features/auth/rules";
 import { DemoLoginButton } from "@/components/DemoLoginButton";
 import { ExLibrisEmblem } from "@/components/ExLibrisEmblem";
 
-export default function SignInPage() {
+function SignInPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextTarget = resolveSafeRedirectTarget(searchParams.get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -40,7 +43,7 @@ export default function SignInPage() {
           variant="secondary"
           label="Explorar Biblioteca Demonstrativa"
           loadingLabel="Abrindo acervo demo..."
-          redirectTo="/painel"
+          redirectTo={nextTarget}
           disabled={isBusy}
           onBeforeStart={() => {
             setEmailError(null);
@@ -71,7 +74,11 @@ export default function SignInPage() {
           const cleanEmail = email.trim();
           let hasFieldError = false;
 
-          if (!cleanEmail || !cleanEmail.includes("@") || !cleanEmail.includes(".")) {
+          if (
+            !cleanEmail ||
+            !cleanEmail.includes("@") ||
+            !cleanEmail.includes(".")
+          ) {
             setEmailError("Informe um endereço de e-mail válido.");
             hasFieldError = true;
           }
@@ -95,8 +102,12 @@ export default function SignInPage() {
                 setFormError(res.error);
                 return;
               }
-              router.push(res.needsOnboarding ? "/onboarding" : "/painel");
+              router.push(res.needsOnboarding ? "/onboarding" : nextTarget);
               router.refresh();
+            } catch {
+              setFormError(
+                "Não foi possível conectar agora. Verifique sua conexão e tente novamente."
+              );
             } finally {
               setIsSubmitting(false);
             }
@@ -147,7 +158,10 @@ export default function SignInPage() {
                 role="alert"
                 className="flex items-center gap-1 font-sans text-xs font-medium text-[#9E2A2B]"
               >
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <AlertCircle
+                  className="h-3.5 w-3.5 shrink-0"
+                  aria-hidden="true"
+                />
                 <span>{emailError}</span>
               </p>
             ) : null}
@@ -178,7 +192,9 @@ export default function SignInPage() {
               required
               disabled={isBusy}
               aria-invalid={Boolean(passwordError)}
-              aria-describedby={passwordError ? "login-password-error" : undefined}
+              aria-describedby={
+                passwordError ? "login-password-error" : undefined
+              }
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
@@ -219,7 +235,10 @@ export default function SignInPage() {
                 role="alert"
                 className="flex items-center gap-1 font-sans text-xs font-medium text-[#9E2A2B]"
               >
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <AlertCircle
+                  className="h-3.5 w-3.5 shrink-0"
+                  aria-hidden="true"
+                />
                 <span>{passwordError}</span>
               </p>
             ) : null}
@@ -252,7 +271,10 @@ export default function SignInPage() {
               role="alert"
               className="flex items-center gap-1.5 font-sans text-xs font-medium text-[#9E2A2B]"
             >
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <AlertCircle
+                className="h-3.5 w-3.5 shrink-0"
+                aria-hidden="true"
+              />
               <span>{formError}</span>
             </p>
           ) : null}
@@ -294,5 +316,13 @@ export default function SignInPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignInPageContent />
+    </Suspense>
   );
 }

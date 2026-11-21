@@ -1,3 +1,42 @@
+const AUTH_LOOP_PREFIXES = ["/entrar", "/criar-conta", "/recuperar-senha"];
+
+/**
+ * Valida o parâmetro `?next=` contra Open Redirect e loops de autenticação.
+ * Aceita apenas caminhos internos relativos (`/estante-3d`, `/livros/123?tab=notas`).
+ */
+export function resolveSafeRedirectTarget(
+  rawNext: string | null | undefined,
+  fallback = "/painel"
+): string {
+  if (!rawNext) return fallback;
+  const trimmed = rawNext.trim();
+  if (
+    !trimmed.startsWith("/") ||
+    trimmed.startsWith("//") ||
+    trimmed.startsWith("/\\") ||
+    /[\r\n\0\\]/.test(trimmed)
+  ) {
+    return fallback;
+  }
+
+  try {
+    const parsed = new URL(trimmed, "https://readingflow.local");
+    if (parsed.origin !== "https://readingflow.local") {
+      return fallback;
+    }
+    const isAuthLoop = AUTH_LOOP_PREFIXES.some(
+      (prefix) =>
+        parsed.pathname === prefix || parsed.pathname.startsWith(`${prefix}/`)
+    );
+    if (isAuthLoop) {
+      return fallback;
+    }
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
 export const CURRENT_TERMS_VERSION = "1.0";
 
 export function hasAcceptedCurrentTerms(acceptedVersion?: string): boolean {
@@ -14,19 +53,11 @@ export function isValidIanaTimezone(timezone: string): boolean {
 }
 
 export type PasswordStrengthLevel =
-  | "empty"
-  | "weak"
-  | "fair"
-  | "good"
-  | "strong";
+  "empty" | "weak" | "fair" | "good" | "strong";
 
 export interface PasswordCriterionStatus {
   key:
-    | "minLength"
-    | "hasUppercase"
-    | "hasLowercase"
-    | "hasNumber"
-    | "hasSpecial";
+    "minLength" | "hasUppercase" | "hasLowercase" | "hasNumber" | "hasSpecial";
   label: string;
   met: boolean;
 }
