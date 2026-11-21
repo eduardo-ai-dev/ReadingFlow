@@ -21,9 +21,9 @@ import { updateReadingProgressAction } from "@/features/reading/actions";
 import { formatFocusSessionSummaryPtBr } from "@/features/reading/rules";
 import {
   FOCUS_POMODORO_SECONDS,
-  FOCUS_SESSION_STORAGE_KEY,
   clearPersistedFocusSession,
   computeElapsedFocusSeconds,
+  getFocusSessionStorageKey,
   parsePersistedFocusSession,
   readPersistedFocusSession,
   writePersistedFocusSession,
@@ -316,10 +316,12 @@ const POMODORO_SECONDS = FOCUS_POMODORO_SECONDS;
 const SESSION_TARGET_PAGES = 50;
 
 export function FocusReadingSessionClient({
+  userId,
   activeBooks,
   initialReadingId,
   initialAmbientPreferences,
 }: {
+  userId?: string;
   activeBooks: ActiveBookItem[];
   initialReadingId?: string;
   initialAmbientPreferences?: AmbientPreferences | null;
@@ -369,9 +371,9 @@ export function FocusReadingSessionClient({
 
   const selectedBook = booksState.find((b) => b.readingId === selectedBookId);
 
-  // Restaura sessão em andamento após recarregamento sem erro de hidratação SSR
+  // Restaura sessão em andamento após recarregamento sem erro de hidratação SSR (isolado por userId)
   useEffect(() => {
-    const saved = readPersistedFocusSession();
+    const saved = readPersistedFocusSession(userId);
     hydratedStorageRef.current = true;
     if (!saved) return;
 
@@ -409,7 +411,7 @@ export function FocusReadingSessionClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persiste estado da sessão no localStorage (sobrevive a F5 e sincroniza entre abas)
+  // Persiste estado da sessão no localStorage escopado por usuário (sobrevive a F5 e sincroniza entre abas)
   useEffect(() => {
     if (!hydratedStorageRef.current || !selectedBookId) return;
     if (
@@ -418,20 +420,24 @@ export function FocusReadingSessionClient({
       !isRunning &&
       !sessionNotes.trim()
     ) {
-      clearPersistedFocusSession();
+      clearPersistedFocusSession(userId);
       return;
     }
-    writePersistedFocusSession({
-      readingId: selectedBookId,
-      focusMode,
-      accumulatedSeconds,
-      startedAtMs,
-      isRunning,
-      hasStarted,
-      sessionNotes,
-      updatedAtMs: Date.now(),
-    });
+    writePersistedFocusSession(
+      {
+        readingId: selectedBookId,
+        focusMode,
+        accumulatedSeconds,
+        startedAtMs,
+        isRunning,
+        hasStarted,
+        sessionNotes,
+        updatedAtMs: Date.now(),
+      },
+      userId
+    );
   }, [
+    userId,
     selectedBookId,
     focusMode,
     accumulatedSeconds,
@@ -441,10 +447,11 @@ export function FocusReadingSessionClient({
     sessionNotes,
   ]);
 
-  // Sincroniza múltiplas abas abertas do Canto de Foco via evento `storage`
+  // Sincroniza múltiplas abas abertas do Canto de Foco via evento `storage` (somente da mesma conta)
   useEffect(() => {
+    const expectedKey = getFocusSessionStorageKey(userId);
     const onStorage = (e: StorageEvent) => {
-      if (e.key !== FOCUS_SESSION_STORAGE_KEY) return;
+      if (e.key !== expectedKey) return;
       if (!e.newValue) {
         setIsRunning(false);
         setAccumulatedSeconds(0);
@@ -471,7 +478,7 @@ export function FocusReadingSessionClient({
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [activeBooks]);
+  }, [activeBooks, userId]);
 
   // Alerta antes de fechar ou recarregar durante sessão ativa
   useEffect(() => {
@@ -601,7 +608,7 @@ export function FocusReadingSessionClient({
     setSaveSuccess(false);
     setSavedNotesIncluded(false);
     setSaveError(null);
-    clearPersistedFocusSession();
+    clearPersistedFocusSession(userId);
   };
 
   const trimmedRawInput = rawSessionInput.trim();
@@ -693,7 +700,7 @@ export function FocusReadingSessionClient({
       setAccumulatedSeconds(0);
       setStartedAtMs(null);
       setHasStarted(false);
-      clearPersistedFocusSession();
+      clearPersistedFocusSession(userId);
       router.refresh();
     } catch {
       setSaveError(
@@ -1136,6 +1143,7 @@ export function FocusReadingSessionClient({
           </div>
 
           <AmbientSoundMixer
+            userId={userId}
             initialPreferences={initialAmbientPreferences}
             stopSignal={stopAudioSignal}
           />

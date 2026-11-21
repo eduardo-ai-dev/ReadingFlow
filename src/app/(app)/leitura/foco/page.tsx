@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getCurrentProfile } from "@/features/auth/queries";
 import { getReadingsOverview } from "@/features/reading/queries";
+import { getUserSettings } from "@/features/settings/queries";
 import {
   FocusReadingSessionClient,
   type ActiveBookItem,
@@ -15,10 +16,11 @@ export default async function FocusSessionPage({
 }: {
   searchParams: Promise<{ readingId?: string }>;
 }) {
-  const [{ readingId }, overview, profile] = await Promise.all([
+  const [{ readingId }, overview, profile, userSettings] = await Promise.all([
     searchParams,
     getReadingsOverview(),
     getCurrentProfile(),
+    getUserSettings(),
   ]);
 
   const activeBooks: ActiveBookItem[] = [
@@ -42,9 +44,12 @@ export default async function FocusSessionPage({
   return (
     <div className="py-2 sm:py-4">
       <FocusReadingSessionClient
+        userId={profile?.id}
         activeBooks={activeBooks}
         initialReadingId={readingId}
-        initialAmbientPreferences={profile?.focusAmbientPreferences}
+        initialAmbientPreferences={
+          userSettings.ambientPreferences ?? profile?.focusAmbientPreferences
+        }
       />
     </div>
   );

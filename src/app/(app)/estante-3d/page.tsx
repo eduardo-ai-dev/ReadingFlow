@@ -5,6 +5,7 @@ import { ArrowLeft, Plus, BookOpen } from "lucide-react";
 
 import { getAllEnrichedItems } from "@/features/shelves/queries";
 import { getWishlistOverview } from "@/features/wishlist/queries";
+import { getUserSettings } from "@/features/settings/queries";
 import {
   mapEnrichedItemToVirtualBook,
   mapWishlistEntryToVirtualBook,
@@ -46,9 +47,10 @@ export default async function Estante3DPage({
 }: Estante3DPageProps) {
   const { tipo, seed } = await searchParams;
 
-  const [allItems, wishlistOverview] = await Promise.all([
+  const [allItems, wishlistOverview, userSettings] = await Promise.all([
     getAllEnrichedItems(),
     getWishlistOverview(),
+    getUserSettings(),
   ]);
 
   const sortedItems = [...allItems].sort(
@@ -164,6 +166,7 @@ export default async function Estante3DPage({
             key={`${initialQuickFilter}-${virtualBooks.length}`}
             books={virtualBooks}
             wishlistBooks={wishlistVirtualBooks}
+            initialShelfLayout={userSettings.shelfLayout}
             enableQuickFilters
             initialQuickFilter={initialQuickFilter}
           />

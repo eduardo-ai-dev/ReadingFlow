@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { getAllEnrichedItems } from "@/features/shelves/queries";
+import { getUserSettings } from "@/features/settings/queries";
 import {
   mapEnrichedItemToVirtualBook,
   type VirtualBookItem,
@@ -29,7 +30,10 @@ export const metadata: Metadata = {
 };
 
 export default async function ArrumarEstantePage() {
-  const allItems = await getAllEnrichedItems();
+  const [allItems, userSettings] = await Promise.all([
+    getAllEnrichedItems(),
+    getUserSettings(),
+  ]);
   const sortedItems = [...allItems].sort(
     (a, b) => a.item.shelfPosition - b.item.shelfPosition
   );
@@ -40,7 +44,11 @@ export default async function ArrumarEstantePage() {
 
   return (
     <div className="w-full py-1 sm:py-2">
-      <ArrangeShelfStudio initialBooks={virtualBooks} backHref="/estante-3d" />
+      <ArrangeShelfStudio
+        initialBooks={virtualBooks}
+        initialShelfLayout={userSettings.shelfLayout}
+        backHref="/estante-3d"
+      />
     </div>
   );
 }

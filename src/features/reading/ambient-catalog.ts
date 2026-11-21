@@ -365,10 +365,17 @@ export function applyAmbientPreset(
   };
 }
 
-export function readPersistedAmbientPreferences(): AmbientPreferences | null {
+export function getAmbientStorageKey(userId?: string | null): string {
+  const clean = userId?.trim();
+  return clean ? `${AMBIENT_STORAGE_KEY}:${clean}` : AMBIENT_STORAGE_KEY;
+}
+
+export function readPersistedAmbientPreferences(
+  userId?: string | null
+): AmbientPreferences | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(AMBIENT_STORAGE_KEY);
+    const raw = window.localStorage.getItem(getAmbientStorageKey(userId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<AmbientPreferences>;
     return normalizeAmbientPreferences(parsed);
@@ -378,12 +385,13 @@ export function readPersistedAmbientPreferences(): AmbientPreferences | null {
 }
 
 export function writePersistedAmbientPreferences(
-  prefs: AmbientPreferences
+  prefs: AmbientPreferences,
+  userId?: string | null
 ): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(
-      AMBIENT_STORAGE_KEY,
+      getAmbientStorageKey(userId),
       JSON.stringify(normalizeAmbientPreferences(prefs))
     );
   } catch {

@@ -9,8 +9,11 @@ import {
   DEMO_USER_ID,
   SESSION_COOKIE_NAME,
   createDefaultShelves,
+  createDefaultUserSettings,
+  ensureWorkspaceSettings,
   getAuthenticatedWorkspace,
   getMemoryStore,
+  invalidateUserWorkspaceCache,
   requireAuthenticatedWorkspace,
 } from "@/server/store/memory-repository";
 import {
@@ -142,13 +145,15 @@ async function createSessionCookie(
     cookieStore.delete(DEMO_SESSION_COOKIE_NAME);
   }
 
-  // Sincroniza o cookie com as preferências salvas no perfil do usuário (valendo entre dispositivos)
+  // Sincroniza os cookies com as preferências salvas no perfil do usuário (valendo entre dispositivos)
   const ws = store.usersById.get(userId);
   if (ws) {
+    const settings = ensureWorkspaceSettings(ws);
     await writeThemePreferenceCookies({
-      theme: ws.profile.theme,
-      density: ws.profile.density ?? "comfortable",
-      motion: ws.profile.motion ?? "system",
+      theme: ws.profile.theme ?? settings.theme,
+      density: ws.profile.density ?? settings.density,
+      motion: ws.profile.motion ?? settings.motion,
+      fx: ws.profile.fx ?? settings.fx,
     });
   }
 }
@@ -281,24 +286,27 @@ export async function signUpAction(rawInput: {
 
   const passwordHash = hashPassword(parsed.data.password);
   const defaultShelves = createDefaultShelves(userId);
+  const newProfile = {
+    id: userId,
+    email: emailKey,
+    displayName: cleanName,
+    locale: "pt-BR" as const,
+    timezone: "America/Sao_Paulo",
+    defaultCurrency: "BRL" as const,
+    theme: "light" as const,
+    threeD: "auto" as const,
+    goalsCountRereads: false,
+    maxSimultaneousReadings: 5,
+    telemetryOptOut: false,
+    onboardingCompleted: false,
+    preferredFormats: ["physical", "digital", "audio"] as Array<
+      "physical" | "digital" | "audio"
+    >,
+    acceptedTermsVersion: CURRENT_TERMS_VERSION,
+    acceptedTermsAt: nowIso,
+  };
   store.usersById.set(userId, {
-    profile: {
-      id: userId,
-      email: emailKey,
-      displayName: cleanName,
-      locale: "pt-BR",
-      timezone: "America/Sao_Paulo",
-      defaultCurrency: "BRL",
-      theme: "light",
-      threeD: "auto",
-      goalsCountRereads: false,
-      maxSimultaneousReadings: 5,
-      telemetryOptOut: false,
-      onboardingCompleted: false,
-      preferredFormats: ["physical", "digital", "audio"],
-      acceptedTermsVersion: CURRENT_TERMS_VERSION,
-      acceptedTermsAt: nowIso,
-    },
+    profile: newProfile,
     passwordHashSim: passwordHash,
     works: [],
     editions: [],
@@ -309,6 +317,8 @@ export async function signUpAction(rawInput: {
     reviews: [],
     goals: [],
     importJobs: [],
+    settings: createDefaultUserSettings(newProfile),
+    uploadedCovers: {},
   });
   store.userIdByEmail.set(emailKey, userId);
 
@@ -554,7 +564,7 @@ export async function updateThemePreferencesAction(rawInput: {
     fx: nextFx,
   });
 
-  // Se houver usuário autenticado, persiste também no perfil (sincronizado entre dispositivos)
+  // Se houver usuário autenticado, persiste também no perfil e em user_settings (sincronizado entre dispositivos)
   const ws = await getAuthenticatedWorkspace();
   if (ws) {
     ws.profile = {
@@ -564,6 +574,13 @@ export async function updateThemePreferencesAction(rawInput: {
       ...(nextMotion ? { motion: nextMotion } : {}),
       ...(nextFx ? { fx: nextFx } : {}),
     };
+    const settings = ensureWorkspaceSettings(ws);
+    if (nextTheme) settings.theme = nextTheme;
+    if (nextDensity) settings.density = nextDensity;
+    if (nextMotion) settings.motion = nextMotion;
+    if (nextFx) settings.fx = nextFx;
+    settings.updatedAt = new Date().toISOString();
+    invalidateUserWorkspaceCache(ws.profile.id);
 
     await ormUpdateUser(ws.profile.id, {
       ...(nextTheme ? { theme: nextTheme } : {}),
@@ -604,6 +621,10 @@ export async function updateAmbientPreferencesAction(
       ...ws.profile,
       focusAmbientPreferences: normalized,
     };
+    const settings = ensureWorkspaceSettings(ws);
+    settings.ambientPreferences = normalized;
+    settings.updatedAt = new Date().toISOString();
+    invalidateUserWorkspaceCache(ws.profile.id);
   }
   return { ok: true, persistedToProfile: Boolean(ws) };
 }
@@ -678,6 +699,13 @@ export async function updateProfileAction(rawInput: {
     normalizedMotion ||
     normalizedFx
   ) {
+    const settings = ensureWorkspaceSettings(ws);
+    if (normalizedTheme) settings.theme = normalizedTheme;
+    if (normalizedDensity) settings.density = normalizedDensity;
+    if (normalizedMotion) settings.motion = normalizedMotion;
+    if (normalizedFx) settings.fx = normalizedFx;
+    settings.updatedAt = new Date().toISOString();
+
     await writeThemePreferenceCookies({
       theme: normalizedTheme,
       density: normalizedDensity,
@@ -685,6 +713,8 @@ export async function updateProfileAction(rawInput: {
       fx: normalizedFx,
     });
   }
+
+  invalidateUserWorkspaceCache(ws.profile.id);
 
   await ormUpdateUser(ws.profile.id, {
     displayName: ws.profile.displayName,
@@ -734,6 +764,12 @@ export async function deleteMyAccountAction(rawInput: {
 
   await ormDeleteUser(ws.profile.id).catch(() => {});
 
+  // Apaga capas privadas enviadas pela conta e invalida o cache do usuário
+  if (ws.uploadedCovers) {
+    ws.uploadedCovers = {};
+  }
+  invalidateUserWorkspaceCache(ws.profile.id);
+
   const store = getMemoryStore();
   store.userIdByEmail.delete(ws.profile.email.toLowerCase());
   store.usersById.delete(ws.profile.id);
@@ -778,6 +814,7 @@ export async function undoLastAction(): Promise<
   ws.goals = snap.goals;
   ws.importJobs = snap.importJobs;
   ws.lastUndoAction = undefined;
+  invalidateUserWorkspaceCache(ws.profile.id);
 
   revalidatePath("/", "layout");
   return { ok: true, message: `Desfeito: ${label}` };

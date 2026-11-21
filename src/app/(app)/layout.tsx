@@ -4,6 +4,8 @@ import { getCurrentProfile, getUndoBannerInfo } from "@/features/auth/queries";
 import { resolveSafeRedirectTarget } from "@/features/auth/rules";
 import { AppShell } from "@/components/AppShell";
 
+export const dynamic = "force-dynamic";
+
 export default async function AuthenticatedAppLayout({
   children,
 }: {

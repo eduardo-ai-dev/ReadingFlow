@@ -1,7 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { getAuthenticatedWorkspace } from "@/server/store/memory-repository";
-import { checkSlidingRateLimit, sanitizePlainText } from "@/server/security/sanitize";
+import {
+  getAuthenticatedWorkspace,
+  invalidateUserWorkspaceCache,
+} from "@/server/store/memory-repository";
+import {
+  checkSlidingRateLimit,
+  sanitizePlainText,
+} from "@/server/security/sanitize";
 import { hydrateBookCoverMetadata } from "@/server/catalog/hydrate";
 import { extractSpinePaletteFromCover } from "@/server/catalog/spine-color";
 import {
@@ -54,19 +60,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     signal: request.signal,
   });
 
-  // Persiste no acervo do servidor quando há editionId válido (sobrevive a recarregamentos)
+  // Persiste no acervo do servidor quando há editionId válido (sobrevive a recarregamentos),
+  // mas NUNCA sobrescreve uma capa travada manualmente pelo usuário (`coverLocked = true`).
   let spineColor: string | null = null;
   let spineAccent: string | null = null;
+  let mutated = false;
   if (parsed.data.editionId && result.coverUrl) {
     const edition = ws.editions.find((e) => e.id === parsed.data.editionId);
     if (edition) {
-      if (!edition.coverUrl) {
+      if (!edition.coverLocked && !edition.coverUrl) {
         edition.coverUrl = result.coverUrl;
+        mutated = true;
       }
       if ((!edition.pages || edition.pages <= 0) && result.pages) {
         edition.pages = result.pages;
+        mutated = true;
       }
-      if ((!edition.coverColor || !edition.coverAccentColor) && edition.coverUrl) {
+      if (
+        (!edition.coverColor || !edition.coverAccentColor) &&
+        edition.coverUrl
+      ) {
         const palette = await extractSpinePaletteFromCover(
           edition.coverUrl,
           AbortSignal.timeout(3500)
@@ -74,9 +87,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (palette) {
           if (!edition.coverColor) {
             edition.coverColor = clampPaperHsl(palette.spineColor);
+            mutated = true;
           }
           if (!edition.coverAccentColor) {
             edition.coverAccentColor = clampPaperHsl(palette.spineAccent);
+            mutated = true;
           }
         }
       }
@@ -85,14 +100,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           edition.coverColor,
           edition.id
         );
+        mutated = true;
       }
       spineColor = edition.coverColor ?? null;
       spineAccent = edition.coverAccentColor ?? null;
     }
   }
 
+  if (mutated) {
+    invalidateUserWorkspaceCache(ws.profile.id);
+  }
+
   return NextResponse.json(
     { ...result, spineColor, spineAccent },
-    { headers: { "Cache-Control": "private, max-age=300" } }
+    { headers: { "Cache-Control": "private, no-store" } }
   );
 }

@@ -2,13 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-  useTransition,
-} from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   ArrowLeftRight,
   BookOpen,
@@ -33,13 +27,16 @@ import {
   BOOK_DISPLAY_MODE_OPTIONS,
   buildCustomShelfRows,
   DEFAULT_SHELF_THEME_CONFIG,
+  EMPTY_PERSISTED_SHELF_LAYOUT,
   extractPredominantDotColors,
   normalizeShelfKey,
+  parsePersistedShelfLayout,
   patchShelfThemeConfig,
   SHELF_BACKDROP_OPTIONS,
   SHELF_BRACKET_OPTIONS,
   SHELF_DECOR_OPTIONS,
   SHELF_DENSITY_OPTIONS,
+  SHELF_LAYOUT_STORAGE_KEY,
   SHELF_MATERIAL_V2_OPTIONS,
   SHELF_PRESETS,
   sortBooksByColorHue,
@@ -55,15 +52,9 @@ import {
   type ShelfThemeConfig,
 } from "@/features/shelves/arrange-shelves";
 import {
-  getClientShelfLayoutSnapshot,
-  getServerShelfLayoutSnapshot,
-  subscribeShelfLayout,
-  writeShelfLayout,
-} from "@/features/shelves/shelf-layout-store";
-import {
-  reorderShelfBooksAction,
-  updateBookSpineColorAction,
-} from "@/features/shelves/actions";
+  importLegacyLocalSettingsAction,
+  saveShelfCustomizationAction,
+} from "@/features/settings/actions";
 import {
   ShelfView,
   type MoveBookParams,
@@ -208,14 +199,36 @@ function nextDecorId(decorType: DecorItemType): string {
   return `decor-${decorType}-${Date.now().toString(36)}-${decorIdCounter.toString(36)}`;
 }
 
+function hasCustomShelfLayout(layout: PersistedShelfLayout): boolean {
+  return (
+    layout.shelfOrder.length > 0 ||
+    layout.customShelves.length > 0 ||
+    Object.keys(layout.bookShelfMap).length > 0 ||
+    Object.keys(layout.shelfMeta).length > 0 ||
+    Object.keys(layout.customOrderByShelf).length > 0 ||
+    Object.keys(layout.bookColorOverrides ?? {}).length > 0 ||
+    Object.keys(layout.bookDisplayModes ?? {}).length > 0 ||
+    Object.keys(layout.shelfDecorByRow ?? {}).length > 0 ||
+    (layout.themeConfig?.presetId !== undefined &&
+      layout.themeConfig.presetId !== DEFAULT_SHELF_THEME_CONFIG.presetId) ||
+    (layout.themeConfig?.material !== undefined &&
+      layout.themeConfig.material !== DEFAULT_SHELF_THEME_CONFIG.material) ||
+    (layout.themeConfig?.nicheBackdrop !== undefined &&
+      layout.themeConfig.nicheBackdrop !==
+        DEFAULT_SHELF_THEME_CONFIG.nicheBackdrop)
+  );
+}
+
 export interface ArrangeShelfStudioProps {
   initialBooks: readonly VirtualBookItem[];
+  initialShelfLayout?: PersistedShelfLayout;
   backHref?: string;
   onSaved?: () => void;
 }
 
 export function ArrangeShelfStudio({
   initialBooks,
+  initialShelfLayout,
   backHref = "/estante-3d",
   onSaved,
 }: ArrangeShelfStudioProps) {
@@ -225,11 +238,35 @@ export function ArrangeShelfStudio({
   const [booksPool, setBooksPool] = useState<VirtualBookItem[]>(() => [
     ...initialBooks,
   ]);
-  const savedLayout = useSyncExternalStore(
-    subscribeShelfLayout,
-    getClientShelfLayoutSnapshot,
-    getServerShelfLayoutSnapshot
+  const [savedLayout, setSavedLayout] = useState<PersistedShelfLayout>(
+    () => initialShelfLayout ?? EMPTY_PERSISTED_SHELF_LAYOUT
   );
+  const [legacyLayoutRaw, setLegacyLayoutRaw] = useState<string | null>(null);
+  const [noticeKind, setNoticeKind] = useState<"ok" | "error">("ok");
+
+  // Detecta uma única vez se existe arrumação antiga presa no localStorage do navegador quando a conta ainda não tem layout salvo
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(SHELF_LAYOUT_STORAGE_KEY);
+      if (!raw) return;
+      if (hasCustomShelfLayout(savedLayout)) {
+        // A conta já tem layout sincronizado no servidor — limpa resíduo legado local
+        window.localStorage.removeItem(SHELF_LAYOUT_STORAGE_KEY);
+        return;
+      }
+      const parsed = parsePersistedShelfLayout(raw);
+      if (hasCustomShelfLayout(parsed)) {
+        const frameId = window.requestAnimationFrame(() => {
+          setLegacyLayoutRaw(raw);
+        });
+        return () => window.cancelAnimationFrame(frameId);
+      }
+      window.localStorage.removeItem(SHELF_LAYOUT_STORAGE_KEY);
+    } catch {
+      // Ignora indisponibilidade de localStorage
+    }
+  }, [savedLayout]);
 
   // Rascunhos locais (null = espelha exatamente o layout salvo)
   const [draft, setDraft] = useState<StudioShelf[] | null>(null);
@@ -338,11 +375,12 @@ export function ArrangeShelfStudio({
     return shelves[0]?.key ?? "";
   }, [targetDecorShelfKey, selected, shelves]);
 
-  const showNotice = (msg: string) => {
+  const showNotice = (msg: string, kind: "ok" | "error" = "ok") => {
+    setNoticeKind(kind);
     setNotice(msg);
     window.setTimeout(
       () => setNotice((cur) => (cur === msg ? null : cur)),
-      3200
+      kind === "error" ? 5000 : 3200
     );
   };
 
@@ -776,7 +814,7 @@ export function ArrangeShelfStudio({
     showNotice(`“${newBook.title}” adicionado à prateleira.`);
   };
 
-  /* ---------- Salvar / Restaurar ---------- */
+  /* ---------- Salvar / Restaurar / Importação única legada ---------- */
   const handleSave = () => {
     const bookShelfMap: Record<string, string> = {};
     const customOrderByShelf: Record<string, string[]> = {};
@@ -808,7 +846,7 @@ export function ArrangeShelfStudio({
       shelfDecorByRow: decorToSave,
     });
 
-    writeShelfLayout({
+    const nextLayout: PersistedShelfLayout = {
       shelfOrder: shelves.map((s) => s.key),
       bookShelfMap,
       customShelves: shelves.map((s) => ({ key: s.key, title: s.title })),
@@ -825,8 +863,27 @@ export function ArrangeShelfStudio({
       bookTiltDirections: tiltDirectionsToSave,
       shelfDecorByRow: decorToSave,
       customRows,
-    });
+    };
 
+    const colorOverridesByItemId: Record<string, string> = {};
+    for (const [bookId, hex] of Object.entries(colorOverridesToSave)) {
+      const itemId = bookById.get(bookId)?.libraryItemId;
+      if (itemId) {
+        colorOverridesByItemId[itemId] = hex;
+      }
+    }
+
+    // Snapshot anterior para rollback imediato caso a gravação no servidor falhe
+    const previousLayout = savedLayout;
+    const prevDraft = draft;
+    const prevThemeConfig = draftThemeConfig;
+    const prevColorOverrides = draftColorOverrides;
+    const prevDisplayModes = draftDisplayModes;
+    const prevTiltDirections = draftTiltDirections;
+    const prevDecorByRow = draftDecorByRow;
+
+    // Atualização otimista
+    setSavedLayout(nextLayout);
     setDraft(null);
     setDraftThemeConfig(null);
     setDraftColorOverrides(null);
@@ -835,47 +892,64 @@ export function ArrangeShelfStudio({
     setDraftDecorByRow(null);
 
     startSave(async () => {
-      let syncWarning: string | null = null;
       try {
-        if (libraryItemIds.length >= 1) {
-          const reorderRes = await reorderShelfBooksAction({
-            itemIds: libraryItemIds,
-          });
-          if (!reorderRes.ok) {
-            syncWarning = reorderRes.error;
-          }
-        }
-        for (const [bookId, hex] of Object.entries(colorOverridesToSave)) {
-          const itemId = bookById.get(bookId)?.libraryItemId;
-          if (itemId) {
-            const colorRes = await updateBookSpineColorAction({
-              itemId,
-              spineColor: hex,
-            });
-            if (!colorRes.ok && !syncWarning) {
-              syncWarning = colorRes.error;
-            }
-          }
-        }
-        router.refresh();
-        if (syncWarning) {
+        const res = await saveShelfCustomizationAction({
+          layout: nextLayout,
+          orderedItemIds: libraryItemIds,
+          colorOverridesByItemId,
+        });
+        if (!res.ok) {
+          setSavedLayout(previousLayout);
+          setDraft(prevDraft);
+          setDraftThemeConfig(prevThemeConfig);
+          setDraftColorOverrides(prevColorOverrides);
+          setDraftDisplayModes(prevDisplayModes);
+          setDraftTiltDirections(prevTiltDirections);
+          setDraftDecorByRow(prevDecorByRow);
           showNotice(
-            `Layout salvo neste navegador, mas houve falha na sincronização: ${syncWarning}`
+            `Não foi possível salvar na sua conta. Alterações revertidas: ${res.error}`,
+            "error"
           );
           return;
         }
-        showNotice("Personalização salva e sincronizada com a Estante 3D!");
+        setSavedLayout(res.layout);
+        setLegacyLayoutRaw(null);
+        try {
+          window.localStorage.removeItem(SHELF_LAYOUT_STORAGE_KEY);
+        } catch {
+          // Ignora indisponibilidade de localStorage
+        }
+        router.refresh();
+        showNotice(
+          "Personalização salva na sua conta e sincronizada com a Estante 3D!"
+        );
         onSaved?.();
       } catch {
+        setSavedLayout(previousLayout);
+        setDraft(prevDraft);
+        setDraftThemeConfig(prevThemeConfig);
+        setDraftColorOverrides(prevColorOverrides);
+        setDraftDisplayModes(prevDisplayModes);
+        setDraftTiltDirections(prevTiltDirections);
+        setDraftDecorByRow(prevDecorByRow);
         showNotice(
-          "Layout salvo neste navegador, mas não foi possível sincronizar ordem/cores com o servidor. Tente novamente."
+          "Falha de conexão ao salvar na sua conta. As alterações foram revertidas — tente novamente.",
+          "error"
         );
       }
     });
   };
 
   const handleReset = () => {
-    writeShelfLayout(null);
+    const previousLayout = savedLayout;
+    const prevDraft = draft;
+    const prevThemeConfig = draftThemeConfig;
+    const prevColorOverrides = draftColorOverrides;
+    const prevDisplayModes = draftDisplayModes;
+    const prevTiltDirections = draftTiltDirections;
+    const prevDecorByRow = draftDecorByRow;
+
+    setSavedLayout(EMPTY_PERSISTED_SHELF_LAYOUT);
     setDraft(null);
     setDraftThemeConfig(null);
     setDraftColorOverrides(null);
@@ -884,7 +958,86 @@ export function ArrangeShelfStudio({
     setDraftDecorByRow(null);
     setSelected(null);
     setEditingShelfKey(null);
-    showNotice("Configuração padrão restaurada.");
+
+    startSave(async () => {
+      try {
+        const res = await saveShelfCustomizationAction({ layout: null });
+        if (!res.ok) {
+          setSavedLayout(previousLayout);
+          setDraft(prevDraft);
+          setDraftThemeConfig(prevThemeConfig);
+          setDraftColorOverrides(prevColorOverrides);
+          setDraftDisplayModes(prevDisplayModes);
+          setDraftTiltDirections(prevTiltDirections);
+          setDraftDecorByRow(prevDecorByRow);
+          showNotice(
+            `Não foi possível restaurar o padrão: ${res.error}`,
+            "error"
+          );
+          return;
+        }
+        setSavedLayout(res.layout);
+        setLegacyLayoutRaw(null);
+        try {
+          window.localStorage.removeItem(SHELF_LAYOUT_STORAGE_KEY);
+        } catch {
+          // Ignora indisponibilidade de localStorage
+        }
+        router.refresh();
+        showNotice("Configuração padrão restaurada na sua conta.");
+      } catch {
+        setSavedLayout(previousLayout);
+        setDraft(prevDraft);
+        setDraftThemeConfig(prevThemeConfig);
+        setDraftColorOverrides(prevColorOverrides);
+        setDraftDisplayModes(prevDisplayModes);
+        setDraftTiltDirections(prevTiltDirections);
+        setDraftDecorByRow(prevDecorByRow);
+        showNotice(
+          "Falha de conexão ao restaurar o padrão. Tente novamente.",
+          "error"
+        );
+      }
+    });
+  };
+
+  const handleImportLegacyLocal = () => {
+    if (!legacyLayoutRaw) return;
+    const rawToImport = legacyLayoutRaw;
+    startSave(async () => {
+      try {
+        const res = await importLegacyLocalSettingsAction({
+          shelfLayoutRaw: rawToImport,
+        });
+        if (!res.ok) {
+          showNotice(`Não foi possível importar: ${res.error}`, "error");
+          return;
+        }
+        setSavedLayout(res.settings.shelfLayout);
+        setLegacyLayoutRaw(null);
+        try {
+          window.localStorage.removeItem(SHELF_LAYOUT_STORAGE_KEY);
+        } catch {
+          // Ignora indisponibilidade de localStorage
+        }
+        router.refresh();
+        showNotice("Arrumação antiga importada para sua conta!");
+      } catch {
+        showNotice(
+          "Erro ao importar arrumação antiga. Tente novamente.",
+          "error"
+        );
+      }
+    });
+  };
+
+  const handleDismissLegacyLocal = () => {
+    setLegacyLayoutRaw(null);
+    try {
+      window.localStorage.removeItem(SHELF_LAYOUT_STORAGE_KEY);
+    } catch {
+      // Ignora indisponibilidade de localStorage
+    }
   };
 
   const activeDecorList = resolvedDecorShelfKey
@@ -982,11 +1135,54 @@ export function ArrangeShelfStudio({
         </div>
       </header>
 
+      {legacyLayoutRaw ? (
+        <div
+          role="region"
+          aria-label="Importar arrumação antiga deste navegador"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--rf-border-accent-soft)] bg-[var(--rf-surface-card)] px-4 py-3 font-sans text-xs text-[var(--rf-text-primary)] shadow-xs"
+        >
+          <p className="min-w-0 flex-1">
+            Encontramos uma arrumação antiga salva neste navegador. Deseja
+            importá-la para sua conta?
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={handleImportLegacyLocal}
+              className={rfButtonClassName({
+                variant: "primary",
+                size: "sm",
+                pill: true,
+              })}
+            >
+              Importar para minha conta
+            </button>
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={handleDismissLegacyLocal}
+              className={rfButtonClassName({
+                variant: "subtle",
+                size: "sm",
+                pill: true,
+              })}
+            >
+              Descartar
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {notice ? (
         <div
-          role="status"
-          aria-live="polite"
-          className="mb-4 flex items-center gap-2 rounded-xl border border-[var(--rf-border-accent-soft)] bg-[var(--rf-surface-card)] px-4 py-2.5 font-sans text-xs font-semibold text-[var(--rf-text-heading)] shadow-xs"
+          role={noticeKind === "error" ? "alert" : "status"}
+          aria-live={noticeKind === "error" ? "assertive" : "polite"}
+          className={`mb-4 flex items-center gap-2 rounded-xl border px-4 py-2.5 font-sans text-xs font-semibold shadow-xs ${
+            noticeKind === "error"
+              ? "border-[var(--status-error)]/40 bg-[var(--status-error)]/10 text-[var(--status-error)]"
+              : "border-[var(--rf-border-accent-soft)] bg-[var(--rf-surface-card)] text-[var(--rf-text-heading)]"
+          }`}
         >
           <Check
             className="h-4 w-4 shrink-0 text-[var(--rf-accent-primary)]"

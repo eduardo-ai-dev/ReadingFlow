@@ -4,6 +4,7 @@ import {
   getAllEnrichedItems,
   getShelvesOverview,
 } from "@/features/shelves/queries";
+import { getUserSettings } from "@/features/settings/queries";
 import {
   filterAndSortShelfItems,
   type EnrichedShelfItem,
@@ -51,7 +52,7 @@ export default async function ShelvesPage({
   const sortMode = (sp.ordem ?? undefined) as Shelf["sortMode"] | undefined;
   const query = sp.q ?? "";
 
-  const [overview, allItems] = await Promise.all([
+  const [overview, allItems, userSettings] = await Promise.all([
     getShelvesOverview(activeKind, {
       query,
       readingStatus,
@@ -59,6 +60,7 @@ export default async function ShelvesPage({
       sortMode,
     }),
     getAllEnrichedItems(),
+    getUserSettings(),
   ]);
 
   const countsBySlug: Record<string, number> = {};
@@ -109,7 +111,11 @@ export default async function ShelvesPage({
   const seenMissingEditions = new Set<string>();
   const booksWithoutCover: BackfillBookTarget[] = [];
   for (const entry of allItems) {
-    if (entry.edition.coverUrl || seenMissingEditions.has(entry.edition.id)) {
+    if (
+      entry.edition.coverLocked ||
+      entry.edition.coverUrl ||
+      seenMissingEditions.has(entry.edition.id)
+    ) {
       continue;
     }
     seenMissingEditions.add(entry.edition.id);
@@ -148,7 +154,10 @@ export default async function ShelvesPage({
       </header>
 
       {/* Móvel único com prateleiras horizontais em largura total por gênero */}
-      <VirtualBookshelf books={virtualBooks} />
+      <VirtualBookshelf
+        books={virtualBooks}
+        initialShelfLayout={userSettings.shelfLayout}
+      />
 
       {/* Índice rápido de Alas Literárias em 3D */}
       <VirtualGenreShelf countsBySlug={countsBySlug} />

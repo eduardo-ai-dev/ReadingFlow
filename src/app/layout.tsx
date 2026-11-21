@@ -105,18 +105,28 @@ export default async function RootLayout({
     cookies(),
   ]);
 
-  // Prioridade: cookie local (última troca imediata) -> perfil do usuário (sincronizado entre dispositivos) -> padrão
+  // Prioridade: para usuário autenticado, o perfil salvo na conta prevalece (evita vazamento de cookie entre contas e garante sincronização entre dispositivos);
+  // para visitantes, usa os cookies locais ou padrão.
+  const isAuthenticated = Boolean(profile);
   const themePref = normalizeThemePreference(
-    cookieStore.get(THEME_COOKIE_NAME)?.value ?? profile?.theme
+    isAuthenticated
+      ? (profile?.theme ?? cookieStore.get(THEME_COOKIE_NAME)?.value)
+      : cookieStore.get(THEME_COOKIE_NAME)?.value
   );
   const densityPref = normalizeDensityPreference(
-    cookieStore.get(DENSITY_COOKIE_NAME)?.value ?? profile?.density
+    isAuthenticated
+      ? (profile?.density ?? cookieStore.get(DENSITY_COOKIE_NAME)?.value)
+      : cookieStore.get(DENSITY_COOKIE_NAME)?.value
   );
   const motionPref = normalizeMotionPreference(
-    cookieStore.get(MOTION_COOKIE_NAME)?.value ?? profile?.motion
+    isAuthenticated
+      ? (profile?.motion ?? cookieStore.get(MOTION_COOKIE_NAME)?.value)
+      : cookieStore.get(MOTION_COOKIE_NAME)?.value
   );
   const fxPref = normalizeFxPreference(
-    cookieStore.get(FX_COOKIE_NAME)?.value ?? profile?.fx
+    isAuthenticated
+      ? (profile?.fx ?? cookieStore.get(FX_COOKIE_NAME)?.value)
+      : cookieStore.get(FX_COOKIE_NAME)?.value
   );
   const initialResolvedTheme = resolveThemeId(themePref, false);
   const initScript = buildThemeInitScript();
@@ -148,6 +158,7 @@ export default async function RootLayout({
           initialDensity={densityPref}
           initialMotion={motionPref}
           initialFx={fxPref}
+          isAuthenticated={isAuthenticated}
         >
           {children}
         </ThemeProvider>

@@ -85,11 +85,20 @@ export function parsePersistedFocusSession(
   }
 }
 
-export function readPersistedFocusSession(): PersistedFocusSession | null {
+export function getFocusSessionStorageKey(userId?: string | null): string {
+  const clean = userId?.trim();
+  return clean
+    ? `${FOCUS_SESSION_STORAGE_KEY}:${clean}`
+    : FOCUS_SESSION_STORAGE_KEY;
+}
+
+export function readPersistedFocusSession(
+  userId?: string | null
+): PersistedFocusSession | null {
   if (typeof window === "undefined") return null;
   try {
     return parsePersistedFocusSession(
-      window.localStorage.getItem(FOCUS_SESSION_STORAGE_KEY)
+      window.localStorage.getItem(getFocusSessionStorageKey(userId))
     );
   } catch {
     return null;
@@ -97,12 +106,13 @@ export function readPersistedFocusSession(): PersistedFocusSession | null {
 }
 
 export function writePersistedFocusSession(
-  session: PersistedFocusSession
+  session: PersistedFocusSession,
+  userId?: string | null
 ): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(
-      FOCUS_SESSION_STORAGE_KEY,
+      getFocusSessionStorageKey(userId),
       JSON.stringify(session)
     );
   } catch {
@@ -110,10 +120,10 @@ export function writePersistedFocusSession(
   }
 }
 
-export function clearPersistedFocusSession(): void {
+export function clearPersistedFocusSession(userId?: string | null): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.removeItem(FOCUS_SESSION_STORAGE_KEY);
+    window.localStorage.removeItem(getFocusSessionStorageKey(userId));
   } catch {
     // Armazenamento local indisponível
   }

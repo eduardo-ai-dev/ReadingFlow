@@ -74,9 +74,11 @@ function formatCountdown(seconds: number): string {
 }
 
 export function AmbientSoundMixer({
+  userId,
   initialPreferences,
   stopSignal = 0,
 }: {
+  userId?: string;
   initialPreferences?: AmbientPreferences | null;
   /** Incrementado quando a sessão de leitura é encerrada para silenciar o áudio (salvo continueAcrossPages). */
   stopSignal?: number;
@@ -84,7 +86,7 @@ export function AmbientSoundMixer({
   const [prefs, setPrefs] = useState<AmbientPreferences>(() => {
     const initial = normalizeAmbientPreferences(initialPreferences);
     if (initial.selectedIds.length > 0) return initial;
-    return readPersistedAmbientPreferences() ?? initial;
+    return readPersistedAmbientPreferences(userId) ?? initial;
   });
   // Camadas efetivamente em reprodução agora (sempre vazio ao abrir: ZERO autoplay!)
   const [playingIds, setPlayingIds] = useState<AmbientSoundId[]>(() =>
@@ -105,15 +107,18 @@ export function AmbientSoundMixer({
     continueAcrossRef.current = prefs.continueAcrossPages;
   }, [prefs.continueAcrossPages]);
 
-  const persistPreferences = useCallback((next: AmbientPreferences) => {
-    writePersistedAmbientPreferences(next);
-    if (saveTimerRef.current !== null) {
-      window.clearTimeout(saveTimerRef.current);
-    }
-    saveTimerRef.current = window.setTimeout(() => {
-      void updateAmbientPreferencesAction(next).catch(() => {});
-    }, 450);
-  }, []);
+  const persistPreferences = useCallback(
+    (next: AmbientPreferences) => {
+      writePersistedAmbientPreferences(next, userId);
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+      }
+      saveTimerRef.current = window.setTimeout(() => {
+        void updateAmbientPreferencesAction(next).catch(() => {});
+      }, 450);
+    },
+    [userId]
+  );
 
   // Sincroniza volume mestre inicial no motor sem iniciar reprodução (ZERO autoplay)
   useEffect(() => {

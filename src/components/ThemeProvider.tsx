@@ -105,35 +105,74 @@ export function ThemeProvider({
   initialDensity = DEFAULT_DENSITY,
   initialMotion = DEFAULT_MOTION,
   initialFx = DEFAULT_FX,
+  isAuthenticated = false,
   children,
 }: {
   initialTheme?: ThemePreference;
   initialDensity?: DensityPreference;
   initialMotion?: MotionPreference;
   initialFx?: FxPreference;
+  isAuthenticated?: boolean;
   children: ReactNode;
 }) {
+  const normalizedInitialTheme = normalizeThemePreference(initialTheme);
+  const normalizedInitialDensity = normalizeDensityPreference(initialDensity);
+  const normalizedInitialMotion = normalizeMotionPreference(initialMotion);
+  const normalizedInitialFx = normalizeFxPreference(initialFx);
+
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(
-    () => normalizeThemePreference(initialTheme)
+    () => normalizedInitialTheme
   );
-  const [density, setDensityState] = useState<DensityPreference>(() =>
-    normalizeDensityPreference(initialDensity)
+  const [density, setDensityState] = useState<DensityPreference>(
+    () => normalizedInitialDensity
   );
-  const [motion, setMotionState] = useState<MotionPreference>(() =>
-    normalizeMotionPreference(initialMotion)
+  const [motion, setMotionState] = useState<MotionPreference>(
+    () => normalizedInitialMotion
   );
-  const [fx, setFxState] = useState<FxPreference>(() =>
-    normalizeFxPreference(initialFx)
-  );
+  const [fx, setFxState] = useState<FxPreference>(() => normalizedInitialFx);
   const [systemPrefersDark, setSystemPrefersDark] = useState(false);
 
-  // Sincroniza após a montagem com o cookie/media query caso a rota tenha sido prerenderizada estaticamente
+  // Quando o servidor entrega preferências atualizadas da conta (ex.: login/troca de conta), sincroniza estado e cookies
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const frameId = window.requestAnimationFrame(() => {
+      setThemePreferenceState(normalizedInitialTheme);
+      setDensityState(normalizedInitialDensity);
+      setMotionState(normalizedInitialMotion);
+      const perfParam = new URLSearchParams(window.location.search).get("perf");
+      setFxState(
+        perfParam === "min" || perfParam === "full"
+          ? perfParam
+          : normalizedInitialFx
+      );
+      writeClientCookie(THEME_COOKIE_NAME, normalizedInitialTheme);
+      writeClientCookie(DENSITY_COOKIE_NAME, normalizedInitialDensity);
+      writeClientCookie(MOTION_COOKIE_NAME, normalizedInitialMotion);
+      writeClientCookie(FX_COOKIE_NAME, normalizedInitialFx);
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [
+    isAuthenticated,
+    normalizedInitialTheme,
+    normalizedInitialDensity,
+    normalizedInitialMotion,
+    normalizedInitialFx,
+  ]);
+
+  // Sincroniza após a montagem com o cookie/media query caso a rota tenha sido prerenderizada estaticamente (visitantes)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
     const frameId = window.requestAnimationFrame(() => {
       setSystemPrefersDark(mql.matches);
+      const perfParam = new URLSearchParams(window.location.search).get("perf");
+      if (perfParam === "min" || perfParam === "full") {
+        setFxState(perfParam);
+      }
+      if (isAuthenticated) {
+        return;
+      }
       const cookieTheme = readClientCookie(THEME_COOKIE_NAME);
       if (cookieTheme) {
         setThemePreferenceState(normalizeThemePreference(cookieTheme));
@@ -146,10 +185,7 @@ export function ThemeProvider({
       if (cookieMotion) {
         setMotionState(normalizeMotionPreference(cookieMotion));
       }
-      const perfParam = new URLSearchParams(window.location.search).get("perf");
-      if (perfParam === "min" || perfParam === "full") {
-        setFxState(perfParam);
-      } else {
+      if (perfParam !== "min" && perfParam !== "full") {
         const cookieFx = readClientCookie(FX_COOKIE_NAME);
         if (cookieFx) {
           setFxState(normalizeFxPreference(cookieFx));
@@ -166,7 +202,7 @@ export function ThemeProvider({
       window.cancelAnimationFrame(frameId);
       mql.removeEventListener("change", handleChange);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   const resolvedTheme = useMemo(
     () => resolveThemeId(themePreference, systemPrefersDark),
