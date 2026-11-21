@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ArrowLeft, Plus, BookOpen } from "lucide-react";
 
@@ -12,11 +13,14 @@ import {
 } from "@/features/shelves/virtual-bookshelf";
 import { VirtualBookshelf } from "@/components/VirtualBookshelf";
 import { EmptyState } from "@/components/EmptyState";
-import {
-  BackfillCoversModal,
-  type BackfillBookTarget,
-} from "@/components/BackfillCoversModal";
+import type { BackfillBookTarget } from "@/components/BackfillCoversModal";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
+
+const BackfillCoversModal = dynamic(() =>
+  import("@/components/BackfillCoversModal").then(
+    (mod) => mod.BackfillCoversModal
+  )
+);
 
 export const metadata: Metadata = {
   title: "Minha Estante 3D — ReadingFlow",
@@ -108,7 +112,10 @@ export default async function Estante3DPage({
 
           <div>
             <div className="mb-1 flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-[var(--rf-text-accent-secondary)]" aria-hidden="true" />
+              <BookOpen
+                className="h-4 w-4 text-[var(--rf-text-accent-secondary)]"
+                aria-hidden="true"
+              />
               <span className="rf-type-label text-[var(--rf-text-secondary)]">
                 Acervo pessoal · Arquitetura de Biblioteca
               </span>
@@ -121,7 +128,8 @@ export default async function Estante3DPage({
             <p className="mt-1 font-serif text-[13px] italic text-[var(--rf-text-secondary)] sm:text-sm">
               Passe o cursor sobre uma lombada para revelar a capa frontal real.{" "}
               <span className="not-italic tabular-nums">
-                {totalVolumes} {totalVolumes === 1 ? "volume" : "volumes"} catalogados.
+                {totalVolumes} {totalVolumes === 1 ? "volume" : "volumes"}{" "}
+                catalogados.
               </span>
             </p>
           </div>

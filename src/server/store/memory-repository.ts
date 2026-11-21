@@ -975,6 +975,77 @@ export async function requireAuthenticatedWorkspace(): Promise<UserWorkspaceData
   return ws;
 }
 
+interface WorkspaceQueryCacheEntry {
+  fingerprint: string;
+  expiresAtMs: number;
+  value: unknown;
+}
+
+const workspaceQueryCache = new Map<string, WorkspaceQueryCacheEntry>();
+
+function buildWorkspaceFingerprint(ws: UserWorkspaceData): string {
+  const lastReadingTs =
+    ws.readings.reduce(
+      (max, r) => (r.updatedAt > max ? r.updatedAt : max),
+      ""
+    ) || "0";
+  const lastReviewTs =
+    ws.reviews.reduce(
+      (max, r) => (r.updatedAt > max ? r.updatedAt : max),
+      ""
+    ) || "0";
+  const lastItemId = ws.items[ws.items.length - 1]?.id ?? "0";
+  const lastShelfPos = ws.items[ws.items.length - 1]?.shelfPosition ?? 0;
+  return [
+    ws.profile.id,
+    ws.profile.timezone,
+    ws.profile.goalsCountRereads ? "1" : "0",
+    ws.works.length,
+    ws.editions.length,
+    ws.items.length,
+    ws.readings.length,
+    ws.reviews.length,
+    ws.wishlist.length,
+    ws.goals.length,
+    ws.lastUndoAction?.id ?? "0",
+    lastReadingTs,
+    lastReviewTs,
+    lastItemId,
+    lastShelfPos,
+  ].join("|");
+}
+
+/**
+ * Cache de leitura leve por usuário com invalidação estrutural automática
+ * (fingerprint do workspace + TTL curto), acelerando trocas de aba sem servir dado obsoleto.
+ */
+export function cachedWorkspaceQuery<T>(
+  ws: UserWorkspaceData,
+  queryKey: string,
+  compute: () => T,
+  ttlMs = 15_000
+): T {
+  const cacheKey = `${ws.profile.id}::${queryKey}`;
+  const fingerprint = buildWorkspaceFingerprint(ws);
+  const now = Date.now();
+  const existing = workspaceQueryCache.get(cacheKey);
+  if (
+    existing &&
+    existing.fingerprint === fingerprint &&
+    existing.expiresAtMs > now
+  ) {
+    return existing.value as T;
+  }
+
+  const value = compute();
+  workspaceQueryCache.set(cacheKey, {
+    fingerprint,
+    expiresAtMs: now + ttlMs,
+    value,
+  });
+  return value;
+}
+
 export function saveUndoSnapshot(ws: UserWorkspaceData, label: string): void {
   const { lastUndoAction: _ignored, ...rest } = ws;
   void _ignored;

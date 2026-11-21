@@ -71,6 +71,7 @@ export function MastheadNav() {
           <Link
             key={href}
             href={href}
+            prefetch={true}
             aria-current={active ? "page" : undefined}
             className={`relative shrink-0 whitespace-nowrap rounded-[var(--rf-radius-full)] px-3 xl:px-3.5 py-1.5 font-sans text-xs xl:text-[13px] font-semibold tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
               active

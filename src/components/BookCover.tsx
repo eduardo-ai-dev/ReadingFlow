@@ -1,89 +1,34 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { memo, useEffect, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import type { ReadingStatus } from "@/lib/domain";
 import { extractAuthorSurname } from "@/lib/cover-color";
 import {
   getDevCoverDiagnostic,
-  recordDevCoverDiagnostic,
   resolveBookCoverFallbackPalette,
   subscribeDevCoverDiagnostics,
 } from "@/features/catalog/cover-search-rules";
 
 const IS_DEV = process.env.NODE_ENV !== "production";
 const loggedDevCoverDiagnostics = new Set<string>();
-const inFlightDevDiagnosticKeys = new Set<string>();
-const devDiagnosticQueue: Array<{
-  key: string;
-  title: string;
-  author?: string;
-  seed?: string;
-}> = [];
-let isProcessingDevQueue = false;
 
-async function drainDevDiagnosticQueue(): Promise<void> {
-  if (isProcessingDevQueue) return;
-  isProcessingDevQueue = true;
-  try {
-    while (devDiagnosticQueue.length > 0) {
-      const next = devDiagnosticQueue.shift();
-      if (!next) break;
-      const existing = getDevCoverDiagnostic({
-        editionId: next.seed,
-        title: next.title,
-      });
-      if (existing) {
-        inFlightDevDiagnosticKeys.delete(next.key);
-        continue;
-      }
-      try {
-        const params = new URLSearchParams({ title: next.title });
-        if (next.author?.trim()) params.set("author", next.author.trim());
-        const res = await fetch(`/api/covers/search?${params.toString()}`);
-        if (res.ok) {
-          const payload = (await res.json()) as {
-            diagnostic?: { badgePtBr?: string; reasonPtBr?: string };
-          };
-          const badge =
-            payload.diagnostic?.badgePtBr?.trim() ||
-            payload.diagnostic?.reasonPtBr?.trim();
-          if (badge) {
-            recordDevCoverDiagnostic(
-              { editionId: next.seed, title: next.title },
-              badge
-            );
-          }
-        }
-      } catch {
-        // Silencioso em dev
-      } finally {
-        inFlightDevDiagnosticKeys.delete(next.key);
-      }
-    }
-  } finally {
-    isProcessingDevQueue = false;
+/**
+ * Reduz o peso de rede em miniaturas (<= 200px) baixando a variante `-M.jpg`
+ * do Open Library em vez de `-L.jpg` para cartões compactos.
+ */
+function resolveThumbnailUrl(
+  url: string,
+  size: NonNullable<BookCoverProps["size"]>,
+  fillContainer: boolean
+): string {
+  const isThumb =
+    fillContainer || size === "xs" || size === "sm" || size === "md";
+  if (!isThumb) return url;
+  if (url.includes("covers.openlibrary.org/") && /-L\.jpg(\?.*)?$/i.test(url)) {
+    return url.replace(/-L\.jpg(\?.*)?$/i, "-M.jpg$1");
   }
-}
-
-function enqueueDevDiagnosticLookup(params: {
-  title: string;
-  author?: string;
-  seed?: string;
-}): void {
-  if (!IS_DEV || typeof window === "undefined") return;
-  const cleanTitle = params.title.trim();
-  if (cleanTitle.length < 2) return;
-  const key = `${params.seed ?? ""}::${cleanTitle.toLowerCase()}`;
-  if (inFlightDevDiagnosticKeys.has(key)) return;
-  inFlightDevDiagnosticKeys.add(key);
-  devDiagnosticQueue.push({
-    key,
-    title: cleanTitle,
-    author: params.author,
-    seed: params.seed,
-  });
-  void drainDevDiagnosticQueue();
+  return url;
 }
 
 export type BookSemanticStatus =
@@ -139,11 +84,11 @@ const DEFAULT_SIZES_BY_VARIANT: Record<
   NonNullable<BookCoverProps["size"]>,
   string
 > = {
-  xs: "96px",
-  sm: "128px",
-  md: "160px",
-  lg: "220px",
-  xl: "(max-width: 640px) 180px, 256px",
+  xs: "48px",
+  sm: "72px",
+  md: "112px",
+  lg: "160px",
+  xl: "(max-width: 640px) 160px, 200px",
 };
 
 function getTitleScale(title: string): "short" | "medium" | "long" {
@@ -153,7 +98,7 @@ function getTitleScale(title: string): "short" | "medium" | "long" {
   return "long";
 }
 
-export function BookCover({
+function BookCoverBase({
   title,
   author,
   coverUrl,
@@ -182,14 +127,15 @@ export function BookCover({
   } | null>(null);
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
 
-  const normalizedCoverUrl = coverUrl?.trim() || undefined;
+  const rawCoverUrl = coverUrl?.trim() || undefined;
+  const normalizedCoverUrl = rawCoverUrl
+    ? resolveThumbnailUrl(rawCoverUrl, size, fillContainer)
+    : undefined;
   const imgFailed = Boolean(
     normalizedCoverUrl && failedState?.url === normalizedCoverUrl
   );
   const showImage = Boolean(normalizedCoverUrl && !imgFailed);
-  const isImageLoaded = Boolean(
-    showImage && loadedUrl === normalizedCoverUrl
-  );
+  const isImageLoaded = Boolean(showImage && loadedUrl === normalizedCoverUrl);
   const isDataUrl = Boolean(normalizedCoverUrl?.startsWith("data:"));
 
   const isCompact = !fillContainer && size === "xs";
@@ -201,35 +147,6 @@ export function BookCover({
         : null,
     () => null
   );
-
-  useEffect(() => {
-    if (
-      !IS_DEV ||
-      disableDevDiagnostics ||
-      showImage ||
-      isCompact ||
-      fillContainer ||
-      diagnosticReason?.trim() ||
-      sharedDevDiag
-    ) {
-      return;
-    }
-    enqueueDevDiagnosticLookup({
-      title,
-      author,
-      seed,
-    });
-  }, [
-    disableDevDiagnostics,
-    showImage,
-    isCompact,
-    fillContainer,
-    diagnosticReason,
-    sharedDevDiag,
-    title,
-    author,
-    seed,
-  ]);
 
   const devDiagReason: string | null =
     IS_DEV && !disableDevDiagnostics && !showImage
@@ -269,8 +186,8 @@ export function BookCover({
 
   const computedProgress =
     typeof currentPage === "number" &&
-      typeof totalPages === "number" &&
-      totalPages > 0
+    typeof totalPages === "number" &&
+    totalPages > 0
       ? Math.round((currentPage / totalPages) * 100)
       : (progressPercent ?? 0);
   const safeProgress = Math.max(0, Math.min(100, Math.round(computedProgress)));
@@ -344,16 +261,18 @@ export function BookCover({
 
         <div
           aria-hidden="true"
-          className={`rf-book-cover-inner relative z-[1] flex h-full w-full flex-col items-center justify-between text-center ${isCompact
-            ? "px-1 py-1.5 pl-1.5"
-            : "px-[14%] pt-[18%] pb-[13%] pl-[16%]"
-            }`}
+          className={`rf-book-cover-inner relative z-[1] flex h-full w-full flex-col items-center justify-between text-center ${
+            isCompact
+              ? "px-1 py-1.5 pl-1.5"
+              : "px-[14%] pt-[18%] pb-[13%] pl-[16%]"
+          }`}
         >
           <p
             data-title-scale={getTitleScale(title)}
             style={{ color: palette.inkHex }}
-            className={`rf-book-cover-title my-auto font-serif font-bold tracking-tight ${isCompact ? "text-[7px] leading-[1.08]" : ""
-              }`}
+            className={`rf-book-cover-title my-auto font-serif font-bold tracking-tight ${
+              isCompact ? "text-[7px] leading-[1.08]" : ""
+            }`}
           >
             {title}
           </p>
@@ -382,6 +301,7 @@ export function BookCover({
               width={imageWidth}
               height={imageHeight}
               sizes={resolvedSizes}
+              quality={75}
               priority={priority}
               loading={priority ? undefined : "lazy"}
               unoptimized={isDataUrl}
@@ -390,7 +310,10 @@ export function BookCover({
                 const img = event.currentTarget;
                 const minValidWidth = isCompact || size === "sm" ? 32 : 80;
                 if (img.naturalWidth < minValidWidth) {
-                  setFailedState({ url: normalizedCoverUrl, reason: "quality" });
+                  setFailedState({
+                    url: normalizedCoverUrl,
+                    reason: "quality",
+                  });
                 } else {
                   setLoadedUrl(normalizedCoverUrl);
                 }
@@ -398,8 +321,9 @@ export function BookCover({
               onError={() =>
                 setFailedState({ url: normalizedCoverUrl, reason: "error" })
               }
-              className={`h-full w-full object-cover transition-opacity duration-300 ease-out ${isImageLoaded ? "opacity-100" : "opacity-0"
-                }`}
+              className={`h-full w-full object-cover transition-opacity duration-300 ease-out ${
+                isImageLoaded ? "opacity-100" : "opacity-0"
+              }`}
             />
           ) : (
             <Image
@@ -407,6 +331,7 @@ export function BookCover({
               alt={`Capa de ${title}`}
               fill
               sizes={resolvedSizes}
+              quality={75}
               priority={priority}
               loading={priority ? undefined : "lazy"}
               unoptimized={isDataUrl}
@@ -415,7 +340,10 @@ export function BookCover({
                 const img = event.currentTarget;
                 const minValidWidth = isCompact || size === "sm" ? 32 : 80;
                 if (img.naturalWidth < minValidWidth) {
-                  setFailedState({ url: normalizedCoverUrl, reason: "quality" });
+                  setFailedState({
+                    url: normalizedCoverUrl,
+                    reason: "quality",
+                  });
                 } else {
                   setLoadedUrl(normalizedCoverUrl);
                 }
@@ -423,8 +351,9 @@ export function BookCover({
               onError={() =>
                 setFailedState({ url: normalizedCoverUrl, reason: "error" })
               }
-              className={`object-cover transition-opacity duration-300 ease-out ${isImageLoaded ? "opacity-100" : "opacity-0"
-                }`}
+              className={`object-cover transition-opacity duration-300 ease-out ${
+                isImageLoaded ? "opacity-100" : "opacity-0"
+              }`}
             />
           )}
         </div>
@@ -521,3 +450,5 @@ export function BookCover({
     </div>
   );
 }
+
+export const BookCover = memo(BookCoverBase);

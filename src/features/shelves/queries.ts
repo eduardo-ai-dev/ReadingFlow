@@ -1,54 +1,70 @@
 import "server-only";
-import { requireAuthenticatedWorkspace } from "@/server/store/memory-repository";
+import {
+  cachedWorkspaceQuery,
+  requireAuthenticatedWorkspace,
+} from "@/server/store/memory-repository";
 import {
   filterAndSortShelfItems,
   type EnrichedShelfItem,
   type ShelfFilterParams,
 } from "@/features/shelves/rules";
-import type { Shelf, ShelfKind } from "@/lib/domain";
+import type { Reading, Shelf, ShelfKind } from "@/lib/domain";
 
 export async function getAllEnrichedItems(): Promise<EnrichedShelfItem[]> {
   const ws = await requireAuthenticatedWorkspace();
-  const editionsById = new Map(ws.editions.map((e) => [e.id, e]));
-  const worksById = new Map(ws.works.map((w) => [w.id, w]));
-  const shelvesById = new Map(ws.shelves.map((s) => [s.id, s]));
-  const reviewsByWorkId = new Map(ws.reviews.map((r) => [r.workId, r]));
 
-  const entries: EnrichedShelfItem[] = [];
-  for (const item of ws.items) {
-    const edition = editionsById.get(item.editionId);
-    const shelf = shelvesById.get(item.shelfId);
-    if (!edition || !shelf) continue;
-    const work = worksById.get(edition.workId);
-    if (!work) continue;
+  return cachedWorkspaceQuery(ws, "shelves:all-enriched-items", () => {
+    const editionsById = new Map(ws.editions.map((e) => [e.id, e]));
+    const worksById = new Map(ws.works.map((w) => [w.id, w]));
+    const shelvesById = new Map(ws.shelves.map((s) => [s.id, s]));
+    const reviewsByWorkId = new Map(ws.reviews.map((r) => [r.workId, r]));
 
-    const workReadings = ws.readings
-      .filter((r) => r.workId === work.id)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    // Agrupa leituras por obra em O(M) em vez de filtrar+ordenar O(N*M) por livro
+    const readingsByWorkId = new Map<string, Reading[]>();
+    for (const r of ws.readings) {
+      const list = readingsByWorkId.get(r.workId);
+      if (list) list.push(r);
+      else readingsByWorkId.set(r.workId, [r]);
+    }
+    for (const list of readingsByWorkId.values()) {
+      if (list.length > 1) {
+        list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      }
+    }
 
-    const activeReading = workReadings.find(
-      (r) => r.status === "reading" || r.status === "paused"
-    );
-    const latestReading = activeReading ?? workReadings[0];
-    const effectiveReadingStatus = latestReading?.status ?? "not_started";
-    const primaryAuthor =
-      work.contributors.find((c) => c.role === "author")?.name ??
-      edition.contributors.find((c) => c.role === "author")?.name ??
-      "Autor desconhecido";
+    const entries: EnrichedShelfItem[] = [];
+    for (const item of ws.items) {
+      const edition = editionsById.get(item.editionId);
+      const shelf = shelvesById.get(item.shelfId);
+      if (!edition || !shelf) continue;
+      const work = worksById.get(edition.workId);
+      if (!work) continue;
 
-    entries.push({
-      item,
-      edition,
-      work,
-      shelf,
-      latestReading,
-      effectiveReadingStatus,
-      review: reviewsByWorkId.get(work.id),
-      primaryAuthor,
-    });
-  }
+      const workReadings = readingsByWorkId.get(work.id) ?? [];
+      const activeReading = workReadings.find(
+        (r) => r.status === "reading" || r.status === "paused"
+      );
+      const latestReading = activeReading ?? workReadings[0];
+      const effectiveReadingStatus = latestReading?.status ?? "not_started";
+      const primaryAuthor =
+        work.contributors.find((c) => c.role === "author")?.name ??
+        edition.contributors.find((c) => c.role === "author")?.name ??
+        "Autor desconhecido";
 
-  return entries;
+      entries.push({
+        item,
+        edition,
+        work,
+        shelf,
+        latestReading,
+        effectiveReadingStatus,
+        review: reviewsByWorkId.get(work.id),
+        primaryAuthor,
+      });
+    }
+
+    return entries;
+  });
 }
 
 export async function getShelvesOverview(

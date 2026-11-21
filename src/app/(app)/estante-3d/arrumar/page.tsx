@@ -1,10 +1,26 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import { getAllEnrichedItems } from "@/features/shelves/queries";
 import {
   mapEnrichedItemToVirtualBook,
   type VirtualBookItem,
 } from "@/features/shelves/virtual-bookshelf";
-import { ArrangeShelfStudio } from "@/components/ArrangeShelfStudio";
+
+const ArrangeShelfStudio = dynamic(
+  () =>
+    import("@/components/ArrangeShelfStudio").then(
+      (mod) => mod.ArrangeShelfStudio
+    ),
+  {
+    loading: () => (
+      <div
+        role="status"
+        aria-live="polite"
+        className="rf-card h-96 animate-pulse bg-[var(--rf-surface-subtle)]/60"
+      />
+    ),
+  }
+);
 
 export const metadata: Metadata = {
   title: "Arrumar estante — ReadingFlow",

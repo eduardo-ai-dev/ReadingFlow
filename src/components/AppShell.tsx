@@ -349,6 +349,7 @@ export function AppShell({
               <li key={item.href} className="min-w-0">
                 <Link
                   href={item.href}
+                  prefetch={true}
                   aria-current={active ? "page" : undefined}
                   className={`flex min-h-[48px] flex-col items-center justify-center rounded-[var(--rf-radius-md)] px-1 text-center font-sans text-[11px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
                     active

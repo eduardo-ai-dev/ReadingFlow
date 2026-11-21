@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRef, useState, useTransition } from "react";
 import { UNIFIED_GENRE_NAMES } from "@/features/shelves/genres";
 import { useRouter } from "next/navigation";
@@ -9,12 +10,19 @@ import {
   lookupBookByIsbnAction,
 } from "@/features/catalog/actions";
 import type { BookCoverSource, BookFormat } from "@/lib/domain";
-import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 import { BookSearchAutocomplete } from "@/components/BookSearchAutocomplete";
 import { CoverUploader, type CoverSource } from "@/components/CoverUploader";
 import { CoverEditionPicker } from "@/components/CoverEditionPicker";
 import { resolveBestCover } from "@/features/catalog/search-client";
 import type { BookSearchResult } from "@/features/catalog/search-types";
+
+const BarcodeScannerModal = dynamic(
+  () =>
+    import("@/components/BarcodeScannerModal").then(
+      (mod) => mod.BarcodeScannerModal
+    ),
+  { ssr: false }
+);
 
 type AutofillField = "title" | "author" | "pages" | "isbn" | "genre";
 
