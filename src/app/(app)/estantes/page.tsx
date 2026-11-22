@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   getAllEnrichedItems,
@@ -20,13 +21,42 @@ import {
 import type { ReadingStatus, Shelf, ShelfKind } from "@/lib/domain";
 import { ptBR } from "@/lib/i18n/pt-BR";
 import { ShelfItemsClient } from "@/components/ShelfItemsClient";
-import { VirtualBookshelf } from "@/components/VirtualBookshelf";
-import { VirtualGenreShelf } from "@/components/VirtualGenreShelf";
-import {
-  BackfillCoversModal,
-  type BackfillBookTarget,
-} from "@/components/BackfillCoversModal";
+import type { BackfillBookTarget } from "@/components/BackfillCoversModal";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
+
+const VirtualBookshelf = dynamic(
+  () =>
+    import("@/components/VirtualBookshelf").then((mod) => mod.VirtualBookshelf),
+  {
+    loading: () => (
+      <div
+        aria-hidden="true"
+        className="rf-card h-64 w-full animate-pulse bg-[var(--rf-surface-subtle)]/50"
+      />
+    ),
+  }
+);
+
+const VirtualGenreShelf = dynamic(
+  () =>
+    import("@/components/VirtualGenreShelf").then(
+      (mod) => mod.VirtualGenreShelf
+    ),
+  {
+    loading: () => (
+      <div
+        aria-hidden="true"
+        className="rf-card h-44 w-full animate-pulse bg-[var(--rf-surface-subtle)]/50"
+      />
+    ),
+  }
+);
+
+const BackfillCoversModal = dynamic(() =>
+  import("@/components/BackfillCoversModal").then(
+    (mod) => mod.BackfillCoversModal
+  )
+);
 
 export const metadata: Metadata = {
   title: "Estantes",

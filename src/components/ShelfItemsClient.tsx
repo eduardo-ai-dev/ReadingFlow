@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import type { EnrichedShelfItem } from "@/features/shelves/rules";
 import type { ShelfKind } from "@/lib/domain";
 import { ptBR } from "@/lib/i18n/pt-BR";
@@ -12,7 +12,116 @@ import { StarRatingDisplay } from "@/components/StarRating";
 import { coverColor } from "@/lib/cover-color";
 import { FilterChip, rfButtonClassName } from "@/components/ui/ActionControls";
 
-const PAGE_WINDOW_SIZE = 60;
+const PAGE_WINDOW_SIZE = 24;
+
+const ShelfGridCard = memo(function ShelfGridCard({
+  entry,
+  neighborColor,
+}: {
+  entry: EnrichedShelfItem;
+  neighborColor: string | null | undefined;
+}) {
+  return (
+    <Link
+      href={`/livros/${entry.work.id}`}
+      className="interactive-card flex gap-4 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 [content-visibility:auto] [contain-intrinsic-size:auto_152px]"
+    >
+      <BookCover
+        title={entry.work.title}
+        author={entry.primaryAuthor}
+        coverUrl={entry.edition.coverUrl}
+        spineColor={entry.edition.coverColor}
+        spineAccent={entry.edition.coverAccentColor}
+        seed={entry.edition.isbn13 ?? entry.work.id}
+        avoidNeighborHex={neighborColor}
+        readingStatus={entry.effectiveReadingStatus}
+        currentPage={entry.latestReading?.progressValue}
+        totalPages={entry.latestReading?.progressTotal ?? entry.edition.pages}
+        size="md"
+      />
+      <div className="flex min-w-0 flex-1 flex-col justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <FormatBadge format={entry.edition.format} />
+            <ReadingStatusBadge status={entry.effectiveReadingStatus} />
+          </div>
+          <h2 className="mt-2 line-clamp-2 font-serif text-base font-semibold text-[var(--text-heading)]">
+            {entry.work.title}
+          </h2>
+          <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
+            {entry.primaryAuthor}
+          </p>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between text-xs tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--text-muted)]">
+          <span>
+            {entry.edition.pages
+              ? `${entry.edition.pages} pág.`
+              : entry.edition.durationSeconds
+                ? `${Math.round(entry.edition.durationSeconds / 3600)} h`
+                : (entry.edition.publisher ?? "Acervo")}
+          </span>
+          {entry.review ? (
+            <StarRatingDisplay rating={entry.review.rating} />
+          ) : null}
+        </div>
+      </div>
+    </Link>
+  );
+});
+
+const ShelfListRow = memo(function ShelfListRow({
+  entry,
+  neighborColor,
+}: {
+  entry: EnrichedShelfItem;
+  neighborColor: string | null | undefined;
+}) {
+  return (
+    <li className="[content-visibility:auto] [contain-intrinsic-size:auto_88px]">
+      <Link
+        href={`/livros/${entry.work.id}`}
+        className="flex flex-wrap items-center justify-between gap-4 p-4 transition-colors hover:bg-[var(--bg-elevated)]"
+      >
+        <div className="flex min-w-0 items-center gap-3.5">
+          <BookCover
+            title={entry.work.title}
+            author={entry.primaryAuthor}
+            coverUrl={entry.edition.coverUrl}
+            spineColor={entry.edition.coverColor}
+            spineAccent={entry.edition.coverAccentColor}
+            seed={entry.edition.isbn13 ?? entry.work.id}
+            avoidNeighborHex={neighborColor}
+            readingStatus={entry.effectiveReadingStatus}
+            currentPage={entry.latestReading?.progressValue}
+            totalPages={
+              entry.latestReading?.progressTotal ?? entry.edition.pages
+            }
+            size="sm"
+          />
+          <div className="min-w-0">
+            <h2 className="truncate font-serif text-base font-semibold text-[var(--text-heading)]">
+              {entry.work.title}
+            </h2>
+            <p className="truncate text-xs tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--text-muted)]">
+              {entry.primaryAuthor}
+              {entry.edition.publisher ? ` · ${entry.edition.publisher}` : ""}
+              {entry.edition.isbn13 ? ` · ISBN ${entry.edition.isbn13}` : ""}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <FormatBadge format={entry.edition.format} />
+          <ReadingStatusBadge status={entry.effectiveReadingStatus} />
+          {entry.review ? (
+            <StarRatingDisplay rating={entry.review.rating} />
+          ) : null}
+        </div>
+      </Link>
+    </li>
+  );
+});
 
 export interface ShelfTabItem {
   kind: ShelfKind;
@@ -243,112 +352,22 @@ export function ShelfItemsClient({
             {view === "grid" ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {windowedItems.map((entry, idx) => (
-                  <Link
+                  <ShelfGridCard
                     key={entry.item.id}
-                    href={`/livros/${entry.work.id}`}
-                    className="interactive-card flex gap-4 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4"
-                  >
-                    <BookCover
-                      title={entry.work.title}
-                      author={entry.primaryAuthor}
-                      coverUrl={entry.edition.coverUrl}
-                      spineColor={entry.edition.coverColor}
-                      spineAccent={entry.edition.coverAccentColor}
-                      seed={entry.edition.isbn13 ?? entry.work.id}
-                      avoidNeighborHex={neighborColors[idx]}
-                      readingStatus={entry.effectiveReadingStatus}
-                      currentPage={entry.latestReading?.progressValue}
-                      totalPages={
-                        entry.latestReading?.progressTotal ??
-                        entry.edition.pages
-                      }
-                      size="md"
-                    />
-                    <div className="flex min-w-0 flex-1 flex-col justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <FormatBadge format={entry.edition.format} />
-                          <ReadingStatusBadge
-                            status={entry.effectiveReadingStatus}
-                          />
-                        </div>
-                        <h2 className="mt-2 line-clamp-2 font-serif text-base font-semibold text-[var(--text-heading)]">
-                          {entry.work.title}
-                        </h2>
-                        <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
-                          {entry.primaryAuthor}
-                        </p>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between text-xs tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--text-muted)]">
-                        <span>
-                          {entry.edition.pages
-                            ? `${entry.edition.pages} pág.`
-                            : entry.edition.durationSeconds
-                              ? `${Math.round(entry.edition.durationSeconds / 3600)} h`
-                              : (entry.edition.publisher ?? "Acervo")}
-                        </span>
-                        {entry.review ? (
-                          <StarRatingDisplay rating={entry.review.rating} />
-                        ) : null}
-                      </div>
-                    </div>
-                  </Link>
+                    entry={entry}
+                    neighborColor={neighborColors[idx]}
+                  />
                 ))}
               </div>
             ) : (
               <div className="overflow-hidden rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
                 <ul className="divide-y divide-[var(--border-subtle)]">
                   {windowedItems.map((entry, idx) => (
-                    <li key={entry.item.id}>
-                      <Link
-                        href={`/livros/${entry.work.id}`}
-                        className="flex flex-wrap items-center justify-between gap-4 p-4 transition-colors hover:bg-[var(--bg-elevated)]"
-                      >
-                        <div className="flex min-w-0 items-center gap-3.5">
-                          <BookCover
-                            title={entry.work.title}
-                            author={entry.primaryAuthor}
-                            coverUrl={entry.edition.coverUrl}
-                            spineColor={entry.edition.coverColor}
-                            spineAccent={entry.edition.coverAccentColor}
-                            seed={entry.edition.isbn13 ?? entry.work.id}
-                            avoidNeighborHex={neighborColors[idx]}
-                            readingStatus={entry.effectiveReadingStatus}
-                            currentPage={entry.latestReading?.progressValue}
-                            totalPages={
-                              entry.latestReading?.progressTotal ??
-                              entry.edition.pages
-                            }
-                            size="sm"
-                          />
-                          <div className="min-w-0">
-                            <h2 className="truncate font-serif text-base font-semibold text-[var(--text-heading)]">
-                              {entry.work.title}
-                            </h2>
-                            <p className="truncate text-xs tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--text-muted)]">
-                              {entry.primaryAuthor}
-                              {entry.edition.publisher
-                                ? ` · ${entry.edition.publisher}`
-                                : ""}
-                              {entry.edition.isbn13
-                                ? ` · ISBN ${entry.edition.isbn13}`
-                                : ""}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <FormatBadge format={entry.edition.format} />
-                          <ReadingStatusBadge
-                            status={entry.effectiveReadingStatus}
-                          />
-                          {entry.review ? (
-                            <StarRatingDisplay rating={entry.review.rating} />
-                          ) : null}
-                        </div>
-                      </Link>
-                    </li>
+                    <ShelfListRow
+                      key={entry.item.id}
+                      entry={entry}
+                      neighborColor={neighborColors[idx]}
+                    />
                   ))}
                 </ul>
               </div>

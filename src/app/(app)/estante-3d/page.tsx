@@ -12,10 +12,25 @@ import {
   type ShelfQuickFilter,
   type VirtualBookItem,
 } from "@/features/shelves/virtual-bookshelf";
-import { VirtualBookshelf } from "@/components/VirtualBookshelf";
 import { EmptyState } from "@/components/EmptyState";
 import type { BackfillBookTarget } from "@/components/BackfillCoversModal";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
+
+const VirtualBookshelf = dynamic(
+  () =>
+    import("@/components/VirtualBookshelf").then((mod) => mod.VirtualBookshelf),
+  {
+    loading: () => (
+      <div
+        aria-hidden="true"
+        className="grid gap-6 lg:grid-cols-[minmax(0,640px)_minmax(280px,1fr)]"
+      >
+        <div className="rf-card h-96 animate-pulse bg-[var(--rf-surface-subtle)]/50" />
+        <div className="rf-card hidden h-80 animate-pulse bg-[var(--rf-surface-subtle)]/50 lg:block" />
+      </div>
+    ),
+  }
+);
 
 const BackfillCoversModal = dynamic(() =>
   import("@/components/BackfillCoversModal").then(
