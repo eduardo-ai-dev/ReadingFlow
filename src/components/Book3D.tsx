@@ -106,6 +106,8 @@ export interface Book3DProps {
   as?: "li" | "div";
   /** Vão horizontal aplicado apenas no primeiro livro de um novo grupo (3–7 livros). */
   groupGapPx?: number;
+  /** Último livro de um grupo inclinado discretamente junto ao vão (28–56px). */
+  autoTilted?: boolean;
   className?: string;
 }
 
@@ -603,6 +605,7 @@ function Book3DBase({
   onDragEnd,
   as = "li",
   groupGapPx = 0,
+  autoTilted = false,
   className = "",
 }: Book3DProps) {
   const itemTitle = book?.title ?? title ?? "Título";
@@ -1022,6 +1025,7 @@ function Book3DBase({
       data-spine-template={resolvedTemplate}
       data-spine-color={spinePalette.spineBg}
       data-group-start={groupGapPx > 0 ? "true" : undefined}
+      data-auto-tilted={autoTilted ? "true" : undefined}
       draggable={draggable}
       onDragStart={stableDragStart}
       onDragOver={stableDragOver}

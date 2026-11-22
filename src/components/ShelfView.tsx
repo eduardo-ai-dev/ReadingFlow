@@ -31,9 +31,11 @@ import {
   measureBookRenderLayout,
   packShelfBooksByWidth,
   pickSpineTemplate,
+  resolveGroupTiltIndices,
   resolveShelfGroupGapPx,
   resolveSpinePalette,
   SHELF_BOOKEND_WIDTH_PX,
+  UNIFORM_COMPARTMENT_ROW_HEIGHT_PX,
   type GenreShelfGroup,
   type NormalizedVirtualBook,
   type RealisticBookFormat,
@@ -838,7 +840,27 @@ const PackedShelfRow = memo(function PackedShelfRow({
     focusedIdx,
     Math.max(0, row.books.length - 1)
   );
-  const rowHeightPx = row.maxBookHeightPx + 14;
+  const rowHeightPx = Math.max(
+    UNIFORM_COMPARTMENT_ROW_HEIGHT_PX,
+    row.maxBookHeightPx + 14
+  );
+  const autoTiltIndices = useMemo(
+    () =>
+      !isEdit && view3dMode === "spines"
+        ? resolveGroupTiltIndices(
+            row.books.length,
+            row.groupBreakIndices,
+            row.groupGapPx
+          )
+        : new Set<number>(),
+    [
+      isEdit,
+      view3dMode,
+      row.books.length,
+      row.groupBreakIndices,
+      row.groupGapPx,
+    ]
+  );
   const rowVisuals = useMemo(
     () => (showRowBooks ? resolveRowSpineVisuals(row.books) : []),
     [showRowBooks, row.books]
@@ -1227,6 +1249,10 @@ const PackedShelfRow = memo(function PackedShelfRow({
                             ) : (
                               <Book3D
                                 groupGapPx={bookGroupGapPx}
+                                autoTilted={
+                                  displayMode === "lombada" &&
+                                  autoTiltIndices.has(idx)
+                                }
                                 className={
                                   displayMode === "inclinado"
                                     ? `${styles.bookTiltedWrap} ${
@@ -1234,7 +1260,10 @@ const PackedShelfRow = memo(function PackedShelfRow({
                                           ? styles.bookTiltedLeft
                                           : styles.bookTiltedRight
                                       }`
-                                    : undefined
+                                    : displayMode === "lombada" &&
+                                        autoTiltIndices.has(idx)
+                                      ? styles.bookAutoTilted
+                                      : undefined
                                 }
                                 pages={book.pages}
                                 format={book.realisticFormat}
@@ -1973,6 +2002,15 @@ export const ShelfView = memo(function ShelfView({
     []
   );
 
+  const readingArchBook = useMemo<NormalizedVirtualBook | null>(() => {
+    if (isEdit) return null;
+    for (const shelf of shelves) {
+      const found = shelf.books.find((b) => b.readingStatus === "reading");
+      if (found) return found;
+    }
+    return null;
+  }, [isEdit, shelves]);
+
   const bookcaseElement = (
     <div
       ref={bookcaseRef}
@@ -1997,11 +2035,63 @@ export const ShelfView = memo(function ShelfView({
         } as CSSProperties
       }
     >
+      {/* Cornija superior do móvel de biblioteca */}
+      <div
+        className={styles.cornice}
+        data-cabinet-cornice="true"
+        aria-hidden="true"
+      />
       <div className={styles.topSpotlightsLayer} aria-hidden="true" />
       <div className={styles.topSpotFixtures} aria-hidden="true">
         <span className={styles.topSpotDot} />
         <span className={styles.topSpotDot} />
       </div>
+
+      {/* Nicho em arco com o livro em andamento exposto de frente (capa real ou fallback) */}
+      {readingArchBook ? (
+        <div className={styles.archNicheSection} data-reading-arch-niche="true">
+          <div className={styles.archNicheFrame}>
+            <span className={styles.archNicheBadge}>Lendo agora</span>
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewBookId(String(readingArchBook.id));
+                onSelectBook(readingArchBook);
+              }}
+              onMouseEnter={() => setPreviewBookId(String(readingArchBook.id))}
+              onFocus={() => setPreviewBookId(String(readingArchBook.id))}
+              aria-label={`Livro em andamento no nicho: ${readingArchBook.title}`}
+              className={styles.archNicheBookBtn}
+            >
+              <BookCover
+                title={readingArchBook.title}
+                author={readingArchBook.author}
+                coverUrl={readingArchBook.coverUrl}
+                spineColor={readingArchBook.spineBg}
+                spineAccent={readingArchBook.spineAccentHex}
+                seed={readingArchBook.resolvedSeed}
+                readingStatus="reading"
+                progressPercent={readingArchBook.progressPercent ?? 0}
+                size="sm"
+              />
+            </button>
+            <div className={styles.archNicheMeta}>
+              <p className={styles.archNicheTitle}>{readingArchBook.title}</p>
+              <p className={styles.archNicheAuthor}>
+                {readingArchBook.author}
+                {typeof readingArchBook.progressPercent === "number"
+                  ? ` · ${Math.round(readingArchBook.progressPercent)}% lido`
+                  : ""}
+              </p>
+            </div>
+          </div>
+          <div
+            className={`rf-shelf-plank ${styles.shelfPlank}`}
+            aria-hidden="true"
+          />
+        </div>
+      ) : null}
+
       <div className={styles.shelvesColumn}>
         {packedRows.map((row, rowIndex) => {
           const { sourceShelf: shelf } = row;
@@ -2068,6 +2158,12 @@ export const ShelfView = memo(function ShelfView({
           );
         })}
       </div>
+      {/* Rodapé / plinto estrutural do móvel */}
+      <div
+        className={styles.baseboard}
+        data-cabinet-baseboard="true"
+        aria-hidden="true"
+      />
     </div>
   );
 

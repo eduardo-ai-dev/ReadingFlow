@@ -818,7 +818,10 @@ export const SHELF_BOOKEND_WIDTH_PX = 38;
 export const SHELF_COVERS_MODE_EXTRA_PX = 54;
 export const SHELF_TILTED_EXTRA_PX = 26;
 export const SHELF_FRONT_COVER_MARGIN_INLINE_PX = 6;
-export const DEFAULT_GROUP_GAP_PX = 12;
+/** Vão padrão entre grupos de 3–7 livros (faixa editorial: 28 a 56px). */
+export const DEFAULT_GROUP_GAP_PX = 36;
+/** Altura uniforme dos compartimentos da estante (comporta livros de 150 a 215px com folga consistente). */
+export const UNIFORM_COMPARTMENT_ROW_HEIGHT_PX = 228;
 
 export type ShelfBookLayoutDisplayMode =
   "lombada" | "capa_frente" | "inclinado";
@@ -901,7 +904,7 @@ export function measureBookRenderLayout(
 
 /**
  * Converte a configuração de densidade da estante no vão horizontal aplicado
- * SOMENTE entre grupos de 3–7 livros (nunca entre cada livro individualmente).
+ * SOMENTE entre grupos de 3–7 livros (faixa 28 a 56px; nunca entre livros individuais).
  */
 export function resolveShelfGroupGapPx(
   density:
@@ -915,15 +918,35 @@ export function resolveShelfGroupGapPx(
   switch (density) {
     case "compact":
     case "compacta":
-      return 8;
+      return 28;
     case "spacious":
     case "vitrine":
-      return 16;
+      return 48;
     case "normal":
     case "padrao":
     default:
       return DEFAULT_GROUP_GAP_PX;
   }
+}
+
+/**
+ * Seleciona o último livro de cada grupo antes de um vão (28–56px) para receber
+ * inclinação orgânica discreta (~5.5°), sem invadir o próximo grupo nem a borda da tábua.
+ */
+export function resolveGroupTiltIndices(
+  bookCount: number,
+  groupBreakIndices: readonly number[],
+  groupGapPx: number
+): Set<number> {
+  const tilted = new Set<number>();
+  if (bookCount < 3 || groupGapPx < 28) return tilted;
+  for (const breakIdx of groupBreakIndices) {
+    const lastOfPrevGroup = breakIdx - 1;
+    if (lastOfPrevGroup >= 2 && lastOfPrevGroup < bookCount - 1) {
+      tilted.add(lastOfPrevGroup);
+    }
+  }
+  return tilted;
 }
 
 /**

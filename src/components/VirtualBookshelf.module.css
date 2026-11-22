@@ -122,15 +122,22 @@
   --wood-front-light: var(--rf-plank-light);
   --wood-front-mid: var(--rf-plank);
   --wood-front-deep: var(--rf-plank-deep);
+  --cabinet-frame: var(--rf-plank);
+  --cabinet-frame-light: var(--rf-plank-top);
+  --cabinet-frame-deep: var(--rf-plank-deep);
+  --cabinet-trim: var(--rf-border-accent-soft);
   --mm: clamp(1.04px, 0.038vw + 0.94px, 1.35px);
   position: relative;
   width: 100%;
   max-width: 640px;
   min-width: 0;
   margin-inline: 0;
-  padding: 20px 14px 24px;
-  border-radius: var(--rf-card-radius);
-  border: 1px solid var(--rf-line);
+  padding: 0 12px;
+  border-radius: var(--rf-radius-lg);
+  border-left: 10px solid var(--cabinet-frame);
+  border-right: 10px solid var(--cabinet-frame);
+  border-top: 1px solid var(--cabinet-frame-deep);
+  border-bottom: 1px solid var(--cabinet-frame-deep);
   background-color: var(--rf-back);
   background-image: radial-gradient(
     ellipse 68% 24% at 50% 0%,
@@ -138,13 +145,31 @@
     transparent 72%
   );
   box-shadow:
-    inset 0 0 0 1px var(--rf-border-subtle),
+    inset 0 0 0 1px var(--cabinet-trim),
+    inset 6px 0 14px -8px rgba(20, 12, 8, 0.24),
+    inset -6px 0 14px -8px rgba(20, 12, 8, 0.24),
     var(--rf-shadow-card);
   overflow: visible;
   transform-style: flat;
-  transition: transform 240ms ease-out;
+  transition: transform var(--motion-base, 200ms) var(--motion-ease, ease-out);
   box-sizing: border-box;
   touch-action: pan-y;
+}
+
+.bookcase[data-shelf-material="minimal-modern"] {
+  --cabinet-frame: var(--rf-surface-contrast);
+  --cabinet-frame-light: var(--rf-surface-contrast-elevated);
+  --cabinet-frame-deep: var(--rf-surface-contrast);
+  --cabinet-trim: var(--rf-border-default);
+  border-left-width: 7px;
+  border-right-width: 7px;
+}
+
+.bookcase[data-shelf-material="editorial-bordeaux"] {
+  --cabinet-frame: var(--rf-accent-secondary);
+  --cabinet-frame-light: var(--rf-accent-secondary-on-dark-hover);
+  --cabinet-frame-deep: var(--rf-accent-secondary-hover);
+  --cabinet-trim: var(--rf-border-accent);
 }
 
 :global([data-fx="min"]) .bookcase {
@@ -160,7 +185,7 @@
 
 @media (min-width: 640px) {
   .bookcase {
-    padding: 22px 18px 26px;
+    padding: 0 16px;
   }
 }
 
@@ -192,15 +217,172 @@
   border-top: 1px solid var(--rf-line);
 }
 
+/* Cornija superior do móvel de biblioteca (acompanha os 3 materiais via variáveis) */
 .cornice {
-  display: none;
+  position: relative;
+  height: 18px;
+  margin: -1px -22px 14px;
+  border-radius: var(--rf-radius-md) var(--rf-radius-md) 3px 3px;
+  background-color: var(--cabinet-frame);
+  background-image: linear-gradient(
+    180deg,
+    var(--cabinet-frame-light) 0%,
+    var(--cabinet-frame) 48%,
+    var(--cabinet-frame-deep) 100%
+  );
+  border-bottom: 1px solid var(--cabinet-trim);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 248, 236, 0.22),
+    0 5px 12px -4px rgba(20, 12, 8, 0.26);
 }
 
-/* Coluna de prateleiras empilhadas com ~20px de espaçamento vertical */
+.bookcase[data-shelf-material="minimal-modern"] .cornice {
+  height: 10px;
+  margin: -1px -19px 14px;
+  border-radius: 3px 3px 1px 1px;
+}
+
+/* Rodapé / plinto estrutural do móvel */
+.baseboard {
+  position: relative;
+  height: 20px;
+  margin: 14px -22px -1px;
+  border-radius: 2px 2px var(--rf-radius-md) var(--rf-radius-md);
+  background-color: var(--cabinet-frame-deep);
+  background-image: linear-gradient(
+    180deg,
+    var(--cabinet-frame-light) 0px,
+    var(--cabinet-frame) 4px,
+    var(--cabinet-frame-deep) 100%
+  );
+  border-top: 1px solid var(--cabinet-trim);
+  box-shadow: inset 0 2px 4px rgba(20, 12, 8, 0.2);
+}
+
+.bookcase[data-shelf-material="minimal-modern"] .baseboard {
+  height: 12px;
+  margin: 14px -19px -1px;
+}
+
+@media (min-width: 640px) {
+  .cornice {
+    margin: -1px -26px 16px;
+  }
+
+  .baseboard {
+    margin: 16px -26px -1px;
+  }
+
+  .bookcase[data-shelf-material="minimal-modern"] .cornice {
+    margin: -1px -23px 16px;
+  }
+
+  .bookcase[data-shelf-material="minimal-modern"] .baseboard {
+    margin: 16px -23px -1px;
+  }
+}
+
+/* Nicho em arco editorial exibindo o livro em andamento de frente */
+.archNicheSection {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.archNicheFrame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 260px;
+  width: 100%;
+  margin: 4px auto 0;
+  padding: 18px 20px 14px;
+  border-radius: 130px 130px 4px 4px;
+  border: 1px solid var(--cabinet-trim);
+  border-bottom: none;
+  background-color: var(--rf-surface-subtle);
+  background-image: radial-gradient(
+    ellipse 80% 55% at 50% 18%,
+    var(--rf-accent-primary-subtle),
+    transparent 74%
+  );
+  box-shadow:
+    inset 0 10px 18px -10px rgba(20, 12, 8, 0.24),
+    inset 0 0 0 1px var(--rf-border-subtle);
+}
+
+.archNicheBadge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--rf-radius-full);
+  border: 1px solid var(--rf-border-accent-soft);
+  background-color: var(--rf-surface-card-solid);
+  padding: 2px 10px;
+  font-family: var(--rf-font-body);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--rf-text-accent-secondary);
+}
+
+.archNicheBookBtn {
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: transform var(--motion-base, 200ms) var(--motion-ease, ease);
+}
+
+.archNicheBookBtn:focus-visible {
+  outline: 2px solid var(--rf-focus-ring-color);
+  outline-offset: 4px;
+}
+
+@media (hover: hover) {
+  .archNicheBookBtn:hover {
+    transform: translateY(-3px) scale(1.03);
+  }
+}
+
+.archNicheMeta {
+  text-align: center;
+  max-width: 210px;
+}
+
+.archNicheTitle {
+  margin: 0;
+  font-family: var(--rf-font-heading);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--rf-text-heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archNicheAuthor {
+  margin: 2px 0 0;
+  font-family: var(--rf-font-body);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--rf-text-secondary);
+  font-variant-numeric: lining-nums tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Coluna de prateleiras empilhadas com espaçamento vertical uniforme */
 .shelvesColumn {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   width: 100%;
   background: transparent;
   border: none;
@@ -212,21 +394,42 @@
   flex-direction: column;
   width: 100%;
   min-width: 0;
-  padding-bottom: 12px;
+  padding-bottom: 6px;
   overflow: visible;
   content-visibility: auto;
-  contain-intrinsic-size: auto 252px;
+  contain-intrinsic-size: auto 286px;
 }
 
-/* Fileira aberta sobre o fundo creme (sem nicho escuro) */
+/* Compartimento de mesma altura com profundidade interna sutil (sem sombra por livro) */
 .shelfTier {
   position: relative;
   width: 100%;
   min-width: 0;
   display: flex;
   align-items: flex-end;
-  background: transparent;
-  box-shadow: none;
+  border-radius: 4px 4px 2px 2px;
+  background-color: var(--rf-surface-subtle);
+  background-image: linear-gradient(
+    180deg,
+    rgba(20, 12, 8, 0.08) 0%,
+    transparent 24%,
+    transparent 86%,
+    rgba(20, 12, 8, 0.06) 100%
+  );
+  box-shadow: inset 0 6px 14px -8px rgba(20, 12, 8, 0.22);
+}
+
+/* Último livro do grupo inclinado discretamente junto ao vão (28–56px) — apenas transform */
+.bookAutoTilted {
+  transform-origin: bottom left;
+  transform: rotate(-5.5deg);
+  transition: transform var(--motion-base, 200ms) var(--motion-ease, ease);
+}
+
+@media (hover: hover) {
+  .bookAutoTilted:hover {
+    transform: rotate(0deg);
+  }
 }
 
 .shelfScroller {
