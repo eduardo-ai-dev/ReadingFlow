@@ -1714,7 +1714,37 @@ export const ShelfView = memo(function ShelfView({
       const pointerId = e.pointerId;
       const startX = e.clientX;
       const startY = e.clientY;
+      let lastClientY = e.clientY;
       let dragActivated = false;
+      let autoScrollRaf = 0;
+
+      const stopAutoScroll = () => {
+        if (autoScrollRaf) {
+          window.cancelAnimationFrame(autoScrollRaf);
+          autoScrollRaf = 0;
+        }
+      };
+
+      const stepAutoScroll = () => {
+        if (!dragActivated) {
+          autoScrollRaf = 0;
+          return;
+        }
+        const topZone = 76;
+        const bottomZone = 92;
+        const vh = window.innerHeight;
+        if (lastClientY < topZone) {
+          const speed = Math.min(14, Math.ceil((topZone - lastClientY) / 6));
+          window.scrollBy(0, -speed);
+        } else if (lastClientY > vh - bottomZone) {
+          const speed = Math.min(
+            14,
+            Math.ceil((lastClientY - (vh - bottomZone)) / 6)
+          );
+          window.scrollBy(0, speed);
+        }
+        autoScrollRaf = window.requestAnimationFrame(stepAutoScroll);
+      };
 
       const blockTouchMoveScroll = (ev: TouchEvent) => {
         if (dragActivated) {
@@ -1724,6 +1754,7 @@ export const ShelfView = memo(function ShelfView({
 
       const finish = (ev?: PointerEvent) => {
         window.clearTimeout(holdTimer);
+        stopAutoScroll();
         window.removeEventListener("pointermove", onPointerMove);
         window.removeEventListener("pointerup", onPointerUp);
         window.removeEventListener("pointercancel", onPointerCancel);
@@ -1806,6 +1837,7 @@ export const ShelfView = memo(function ShelfView({
 
       const onPointerMove = (mv: PointerEvent) => {
         if (mv.pointerId !== pointerId) return;
+        lastClientY = mv.clientY;
         if (!dragActivated) {
           if (Math.hypot(mv.clientX - startX, mv.clientY - startY) > 8) {
             finish();
@@ -1888,6 +1920,7 @@ export const ShelfView = memo(function ShelfView({
         const payload = { shelfKey, bookId };
         draggingBookRef.current = payload;
         setDraggingBook(payload);
+        autoScrollRaf = window.requestAnimationFrame(stepAutoScroll);
         if (typeof navigator !== "undefined" && "vibrate" in navigator) {
           try {
             navigator.vibrate(14);
@@ -1908,6 +1941,7 @@ export const ShelfView = memo(function ShelfView({
 
       touchCleanupRef.current = () => {
         window.clearTimeout(holdTimer);
+        stopAutoScroll();
         window.removeEventListener("pointermove", onPointerMove);
         window.removeEventListener("pointerup", onPointerUp);
         window.removeEventListener("pointercancel", onPointerCancel);

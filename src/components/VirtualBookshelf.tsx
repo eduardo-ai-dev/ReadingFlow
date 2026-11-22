@@ -70,6 +70,9 @@ export function VirtualBookshelf({
 }: VirtualBookshelfProps) {
   const [, startTransition] = useTransition();
   const [activeId, setActiveId] = useState<string | number | null>(null);
+  const [drawerBookId, setDrawerBookId] = useState<string | number | null>(
+    null
+  );
   const [view3dMode, setView3dMode] = useState<"spines" | "covers">("spines");
   const [activeFilter, setActiveFilter] =
     useState<ShelfQuickFilter>(initialQuickFilter);
@@ -80,6 +83,7 @@ export function VirtualBookshelf({
   const handleSelectQuickFilter = useCallback(
     (nextFilter: ShelfQuickFilter) => {
       setActiveId(null);
+      setDrawerBookId(null);
       setActiveFilter(nextFilter);
       if (filterRafRef.current !== null && typeof window !== "undefined") {
         window.cancelAnimationFrame(filterRafRef.current);
@@ -311,45 +315,57 @@ export function VirtualBookshelf({
     return null;
   }, [shelves, activeId]);
 
+  const drawerSourceBook = useMemo(() => {
+    if (drawerBookId === null) return null;
+    for (const shelf of shelves) {
+      const found = shelf.books.find(
+        (b) => String(b.id) === String(drawerBookId)
+      );
+      if (found) return found;
+    }
+    return null;
+  }, [shelves, drawerBookId]);
+
   const drawerBook = useMemo<BookDrawerData | null>(
     () =>
-      activeBook
+      drawerSourceBook
         ? {
-            id: String(activeBook.id),
-            workId: activeBook.workId,
-            editionId: activeBook.editionId,
-            libraryItemId: activeBook.libraryItemId,
-            readingId: activeBook.readingId,
-            title: activeBook.title,
+            id: String(drawerSourceBook.id),
+            workId: drawerSourceBook.workId,
+            editionId: drawerSourceBook.editionId,
+            libraryItemId: drawerSourceBook.libraryItemId,
+            readingId: drawerSourceBook.readingId,
+            title: drawerSourceBook.title,
             author:
-              activeBook.author ??
-              activeBook.authorSurname ??
+              drawerSourceBook.author ??
+              drawerSourceBook.authorSurname ??
               "Autor do acervo",
-            genre: activeBook.displayGenre,
-            publisher: activeBook.publisher,
-            pages: activeBook.pages,
-            coverUrl: activeBook.coverUrl,
-            spineColor: activeBook.spineBg,
-            spineAccent: activeBook.spineAccentHex,
-            seed: activeBook.resolvedSeed,
-            format: activeBook.format ?? activeBook.realisticFormat,
-            readingStatus: activeBook.readingStatus,
-            statusLabel: activeBook.statusLabel,
-            progressUnit: activeBook.progressUnit,
-            progressValue: activeBook.progressValue,
-            progressTotal: activeBook.progressTotal,
-            progressPercent: activeBook.progressPercent ?? 0,
-            rating: activeBook.rating,
-            href: activeBook.href,
-            isWishlist: activeBook.isWishlist,
-            wishlistPriority: activeBook.wishlistPriority,
-            targetPrice: activeBook.targetPrice,
+            genre: drawerSourceBook.displayGenre,
+            publisher: drawerSourceBook.publisher,
+            pages: drawerSourceBook.pages,
+            coverUrl: drawerSourceBook.coverUrl,
+            spineColor: drawerSourceBook.spineBg,
+            spineAccent: drawerSourceBook.spineAccentHex,
+            seed: drawerSourceBook.resolvedSeed,
+            format: drawerSourceBook.format ?? drawerSourceBook.realisticFormat,
+            readingStatus: drawerSourceBook.readingStatus,
+            statusLabel: drawerSourceBook.statusLabel,
+            progressUnit: drawerSourceBook.progressUnit,
+            progressValue: drawerSourceBook.progressValue,
+            progressTotal: drawerSourceBook.progressTotal,
+            progressPercent: drawerSourceBook.progressPercent ?? 0,
+            rating: drawerSourceBook.rating,
+            href: drawerSourceBook.href,
+            isWishlist: drawerSourceBook.isWishlist,
+            wishlistPriority: drawerSourceBook.wishlistPriority,
+            targetPrice: drawerSourceBook.targetPrice,
           }
         : null,
-    [activeBook]
+    [drawerSourceBook]
   );
 
   const handleCloseDrawer = useCallback(() => {
+    setDrawerBookId(null);
     setActiveId(null);
   }, []);
 
@@ -492,9 +508,31 @@ export function VirtualBookshelf({
   const handleSelectBook = useCallback(
     (book: NormalizedVirtualBook) => {
       onBookSelect?.(book);
-      setActiveId((curr) => (curr === book.id ? null : book.id));
+      const isTouchPrimary =
+        typeof window !== "undefined" &&
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(hover: none)").matches;
+
+      if (isTouchPrimary) {
+        // Em dispositivos de toque: 1º toque seleciona e exibe na ficha rápida; 2º toque no mesmo livro abre o drawer.
+        if (activeId !== null && String(activeId) === String(book.id)) {
+          setDrawerBookId(book.id);
+        } else {
+          setActiveId(book.id);
+          setDrawerBookId(null);
+        }
+        return;
+      }
+
+      if (activeId !== null && String(activeId) === String(book.id)) {
+        setActiveId(null);
+        setDrawerBookId(null);
+      } else {
+        setActiveId(book.id);
+        setDrawerBookId(book.id);
+      }
     },
-    [onBookSelect]
+    [activeId, onBookSelect]
   );
 
   if (books.length === 0 && wishlistBooks.length === 0) {
@@ -514,8 +552,8 @@ export function VirtualBookshelf({
             Estante 3D por Gênero Literário
           </h2>
           <p className={styles.subtitle}>
-            Passe o cursor sobre uma lombada para revelar a capa frontal real em
-            3D, arraste para organizar ou clique para abrir a ficha rápida.
+            Passe o cursor ou toque sobre uma lombada para revelar a capa e a
+            ficha rápida; toque novamente para abrir os detalhes.
           </p>
         </div>
 
@@ -636,7 +674,10 @@ export function VirtualBookshelf({
             ) : null}
             <button
               type="button"
-              onClick={() => setActiveId(null)}
+              onClick={() => {
+                setActiveId(null);
+                setDrawerBookId(null);
+              }}
               className={rfButtonClassName({
                 variant: "subtle",
                 size: "sm",
