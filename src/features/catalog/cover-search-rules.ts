@@ -28,18 +28,10 @@ const EDITORIAL_SPINE_PALETTE: readonly string[] = [
  */
 
 export type CoverProviderSource =
-  | "brasilapi"
-  | "google"
-  | "openlibrary"
-  | "hardcover"
-  | "apple"
-  | "upload";
+  "brasilapi" | "google" | "openlibrary" | "hardcover" | "apple" | "upload";
 
 export type CoverDiagnosticReason =
-  | "ok"
-  | "no_results"
-  | "api_error"
-  | "quality_filter";
+  "ok" | "no_results" | "api_error" | "quality_filter";
 
 export type CoverProviderAttemptStatus =
   | "ok"
@@ -190,11 +182,11 @@ export function stripBookTitleSubtitle(rawTitle: string): string {
     .trim();
 
   const mainPart =
-    withoutFormatParens
-      .split(/\s*[:—–]\s*|\s+-\s+/)[0]
-      ?.trim() ?? "";
+    withoutFormatParens.split(/\s*[:—–]\s*|\s+-\s+/)[0]?.trim() ?? "";
 
-  return mainPart.length >= 2 ? mainPart : withoutFormatParens || rawTitle.trim();
+  return mainPart.length >= 2
+    ? mainPart
+    : withoutFormatParens || rawTitle.trim();
 }
 
 /**
@@ -255,9 +247,10 @@ export function buildGoogleBooksQueryPlan(input: {
   title: string;
   author?: string | null;
 }): GoogleBooksQueryPlan[] {
-  const mainTitle = stripAccentsForQuery(
-    stripBookTitleSubtitle(input.title)
-  ).replace(/-/g, " ").replace(/\s+/g, " ").trim();
+  const mainTitle = stripAccentsForQuery(stripBookTitleSubtitle(input.title))
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!mainTitle) return [];
 
   const fullAuthor = stripAccentsForQuery(input.author ?? "")
@@ -444,8 +437,7 @@ export function evaluateAuthorMatch(
 
     // Todos os tokens da candidata existem no autor guardado (ex.: candidata tem só "Lispector" ou "Maquiavel")
     const allCandTokensInReq =
-      candTokens.length > 0 &&
-      candTokens.every((t) => reqTokens.includes(t));
+      candTokens.length > 0 && candTokens.every((t) => reqTokens.includes(t));
     if (allCandTokensInReq) {
       bestStatus = "partial";
       continue;
@@ -590,9 +582,13 @@ export function scoreCoverCandidate(
   // Avaliação de título (comparando tanto título completo quanto título principal sem subtítulo)
   const rawQueryTitle = query.title?.trim() ?? "";
   const normQueryFull = normalizeCoverText(rawQueryTitle);
-  const normQueryMain = normalizeCoverText(stripBookTitleSubtitle(rawQueryTitle));
+  const normQueryMain = normalizeCoverText(
+    stripBookTitleSubtitle(rawQueryTitle)
+  );
   const normCandFull = normalizeCoverText(candidate.title);
-  const normCandMain = normalizeCoverText(stripBookTitleSubtitle(candidate.title));
+  const normCandMain = normalizeCoverText(
+    stripBookTitleSubtitle(candidate.title)
+  );
 
   let titleMatchedStrongly = false;
   if (!normQueryMain) {
@@ -606,15 +602,12 @@ export function scoreCoverCandidate(
     score += 35;
     titleMatchedStrongly = true;
   } else {
-    const queryTokens = normQueryMain
-      .split(" ")
-      .filter((t) => t.length >= 2);
+    const queryTokens = normQueryMain.split(" ").filter((t) => t.length >= 2);
     const candTokens = new Set(
       normCandFull.split(" ").filter((t) => t.length >= 2)
     );
     const sharedCount = queryTokens.filter((t) => candTokens.has(t)).length;
-    const ratio =
-      queryTokens.length > 0 ? sharedCount / queryTokens.length : 0;
+    const ratio = queryTokens.length > 0 ? sharedCount / queryTokens.length : 0;
 
     if (ratio >= 0.8) {
       score += 22;
@@ -841,7 +834,8 @@ export function formatDiagnosticDevBadge(
 
     rejAuthor += att.rejectedByAuthor ?? 0;
     rejSummary += att.rejectedBySummary ?? 0;
-    rejDimension += (att.rejectedByDimension ?? 0) + (att.rejectedByQuality ?? 0);
+    rejDimension +=
+      (att.rejectedByDimension ?? 0) + (att.rejectedByQuality ?? 0);
     rejNoImage += att.rejectedByMissingImageLinks ?? 0;
   }
 
@@ -1143,5 +1137,43 @@ export function resolveBookCoverFallbackPalette(params: {
       ? "rgba(30, 25, 21, 0.24)"
       : "rgba(200, 164, 110, 0.42)",
     isLightBackground,
+  };
+}
+
+export interface CoverCoverageStats {
+  total: number;
+  withRealCover: number;
+  withoutCover: number;
+  coveragePercent: number;
+}
+
+/**
+ * Calcula a cobertura real de capas do acervo (quantos livros possuem `coverUrl` persistida).
+ */
+export function computeCoverCoverageStats(
+  items: readonly { coverUrl?: string | null }[]
+): CoverCoverageStats {
+  const total = items.length;
+  if (total === 0) {
+    return {
+      total: 0,
+      withRealCover: 0,
+      withoutCover: 0,
+      coveragePercent: 0,
+    };
+  }
+  let withRealCover = 0;
+  for (const item of items) {
+    if (item.coverUrl && item.coverUrl.trim().length > 0) {
+      withRealCover += 1;
+    }
+  }
+  const withoutCover = total - withRealCover;
+  const coveragePercent = Math.round((withRealCover / total) * 100);
+  return {
+    total,
+    withRealCover,
+    withoutCover,
+    coveragePercent,
   };
 }

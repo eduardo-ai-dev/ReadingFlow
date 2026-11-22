@@ -290,7 +290,7 @@ function BookCoverBase({
                 color: palette.inkHex,
                 borderColor: palette.borderHex,
               }}
-              className="rf-book-cover-author w-full border-t pt-1 font-sans font-semibold tracking-[0.11em] uppercase opacity-85"
+              className="rf-book-cover-author line-clamp-2 w-full border-t pt-1 font-sans leading-tight font-semibold tracking-[0.08em] uppercase opacity-85 whitespace-normal"
             >
               {footerAuthor}
             </p>
@@ -446,9 +446,9 @@ function BookCoverBase({
           className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-[3px] bg-[#141514]/60"
         >
           <span
-            className="block h-full transition-all duration-300"
+            className="rf-progress-fill block h-full w-full"
             style={{
-              width: `${Math.max(4, safeProgress)}%`,
+              transform: `scaleX(${Math.max(4, safeProgress) / 100})`,
               background: "linear-gradient(90deg, #D4AF37 0%, #F3E5AB 100%)",
               boxShadow: "0 0 8px rgba(212, 175, 55, 0.8)",
             }}

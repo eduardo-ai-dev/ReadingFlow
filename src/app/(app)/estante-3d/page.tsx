@@ -12,6 +12,7 @@ import {
   type ShelfQuickFilter,
   type VirtualBookItem,
 } from "@/features/shelves/virtual-bookshelf";
+import { computeCoverCoverageStats } from "@/features/catalog/cover-search-rules";
 import { EmptyBookshelfIllustration } from "@/components/EmptyBookshelfIllustration";
 import type { BackfillBookTarget } from "@/components/BackfillCoversModal";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
@@ -92,6 +93,7 @@ export default async function Estante3DPage({
         : "all";
 
   const totalVolumes = virtualBooks.length;
+  const coverCoverage = computeCoverCoverageStats(virtualBooks);
 
   // Livros sem cover_url e não travados manualmente (deduplicados por edição) — backfill nunca altera capas travadas
   const seenMissingEditions = new Set<string>();
@@ -150,7 +152,11 @@ export default async function Estante3DPage({
               Passe o cursor sobre uma lombada para revelar a capa frontal real.{" "}
               <span className="not-italic tabular-nums">
                 {totalVolumes} {totalVolumes === 1 ? "volume" : "volumes"}{" "}
-                catalogados.
+                catalogados
+                {totalVolumes > 0
+                  ? ` · ${coverCoverage.withRealCover}/${coverCoverage.total} com capa real (${coverCoverage.coveragePercent}%)`
+                  : ""}
+                .
               </span>
             </p>
           </div>

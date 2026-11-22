@@ -14,10 +14,13 @@ import { BookDetailActionsClient } from "@/components/BookDetailActionsClient";
 
 export default async function BookDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ editarCapa?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const initialOpenCoverPicker = sp.editarCapa === "1";
   const detail = await getBookDetailById(id);
   if (!detail) {
     notFound();
@@ -190,6 +193,7 @@ export default async function BookDetailPage({
         }
         hasFinishedBefore={hasFinishedBefore}
         existingReview={review}
+        initialOpenCoverPicker={initialOpenCoverPicker}
       />
 
       {/* Histórico de leituras e releituras */}

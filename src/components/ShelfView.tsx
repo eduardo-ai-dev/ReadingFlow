@@ -479,6 +479,18 @@ export function BookQuickPanel({
             </button>
           )}
         </div>
+
+        {/* Caminho manual direto quando o livro ainda não tem capa real */}
+        {!book.coverUrl && !book.isWishlist && book.workId ? (
+          <Link
+            href={`/livros/${book.workId}?editarCapa=1`}
+            data-testid="quick-panel-choose-cover"
+            className="mt-2 inline-flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-[var(--rf-radius-md)] border border-[var(--rf-border-default)] bg-[var(--rf-surface-subtle)] px-3 font-sans text-xs font-semibold text-[var(--rf-text-primary)] transition-colors hover:border-[var(--rf-border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+          >
+            <Palette className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Escolher capa (buscar, colar link ou foto)</span>
+          </Link>
+        ) : null}
       </div>
 
       {/* Layout mobile / tablet (< 1024px): barra fixa inferior compacta */}

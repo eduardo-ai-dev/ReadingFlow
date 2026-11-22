@@ -36,6 +36,7 @@ export function BookDetailActionsClient({
   activeReadingStatus,
   hasFinishedBefore,
   existingReview,
+  initialOpenCoverPicker = false,
 }: {
   work: Work;
   edition: Edition;
@@ -44,6 +45,7 @@ export function BookDetailActionsClient({
   activeReadingStatus?: "reading" | "paused";
   hasFinishedBefore: boolean;
   existingReview?: Review;
+  initialOpenCoverPicker?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -65,7 +67,7 @@ export function BookDetailActionsClient({
 
   // Edit metadata state
   const [editing, setEditing] = useState(false);
-  const [changingCover, setChangingCover] = useState(false);
+  const [changingCover, setChangingCover] = useState(initialOpenCoverPicker);
   const [title, setTitle] = useState(work.title);
   const [author, setAuthor] = useState(
     work.contributors.find((c) => c.role === "author")?.name ?? ""
