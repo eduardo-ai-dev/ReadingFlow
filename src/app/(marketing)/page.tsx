@@ -126,7 +126,7 @@ export default async function LandingPage() {
             <Link
               href="/sobre"
               aria-label="Conheça nosso manifesto completo sobre o ReadingFlow"
-              className="inline-flex items-center rounded-[var(--rf-radius-xs)] px-2 py-1 font-sans text-sm font-semibold text-[var(--rf-text-accent-secondary)] hover:text-[var(--rf-text-heading)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+              className="inline-flex min-h-[44px] items-center rounded-[var(--rf-radius-xs)] px-2 py-1 font-sans text-sm font-semibold text-[var(--rf-text-accent-secondary)] hover:text-[var(--rf-text-heading)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-0"
             >
               Conheça nosso manifesto completo ➔
             </Link>
@@ -174,7 +174,7 @@ export default async function LandingPage() {
                   <Link
                     href="/funcionalidades"
                     aria-label="Conhecer a Estante Virtual"
-                    className="inline-flex items-center rounded-[var(--rf-radius-xs)] px-1 py-0.5 font-sans text-[13px] font-semibold text-[var(--rf-text-accent-secondary)] hover:text-[var(--rf-text-heading)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                    className="inline-flex min-h-[44px] items-center rounded-[var(--rf-radius-xs)] px-1 py-0.5 font-sans text-[13px] font-semibold text-[var(--rf-text-accent-secondary)] hover:text-[var(--rf-text-heading)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-0"
                   >
                     Conhecer a Estante ➔
                   </Link>
@@ -202,7 +202,7 @@ export default async function LandingPage() {
                   <Link
                     href="/funcionalidades"
                     aria-label="Conhecer o Canto de Foco"
-                    className="inline-flex items-center rounded-[var(--rf-radius-xs)] px-1 py-0.5 font-sans text-[13px] font-semibold text-[var(--rf-text-accent-secondary)] hover:text-[var(--rf-text-heading)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                    className="inline-flex min-h-[44px] items-center rounded-[var(--rf-radius-xs)] px-1 py-0.5 font-sans text-[13px] font-semibold text-[var(--rf-text-accent-secondary)] hover:text-[var(--rf-text-heading)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-0"
                   >
                     Conhecer o Canto de Foco ➔
                   </Link>
@@ -230,7 +230,7 @@ export default async function LandingPage() {
                   <Link
                     href="/funcionalidades"
                     aria-label="Conhecer a Evolução"
-                    className="inline-flex items-center rounded-[var(--rf-radius-xs)] px-1 py-0.5 font-sans text-[13px] font-semibold text-[var(--rf-text-accent-secondary)] hover:text-[var(--rf-text-heading)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                    className="inline-flex min-h-[44px] items-center rounded-[var(--rf-radius-xs)] px-1 py-0.5 font-sans text-[13px] font-semibold text-[var(--rf-text-accent-secondary)] hover:text-[var(--rf-text-heading)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-0"
                   >
                     Conhecer a Evolução ➔
                   </Link>
@@ -319,7 +319,7 @@ export default async function LandingPage() {
             <Link
               href="/faq"
               aria-label="Ver todas as perguntas na página de FAQ"
-              className="inline-flex items-center rounded-[var(--rf-radius-xs)] px-2 py-1 font-sans text-[13px] font-semibold text-[var(--rf-text-accent-secondary)] hover:text-[var(--rf-text-heading)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+              className="inline-flex min-h-[44px] items-center rounded-[var(--rf-radius-xs)] px-2 py-1 font-sans text-[13px] font-semibold text-[var(--rf-text-accent-secondary)] hover:text-[var(--rf-text-heading)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-0"
             >
               Ver todas as perguntas na página de FAQ ➔
             </Link>

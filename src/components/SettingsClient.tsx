@@ -204,6 +204,7 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
             <input
               id="cfg-max-readings"
               type="number"
+              inputMode="numeric"
               min={1}
               max={20}
               value={maxSimultaneousReadings}
@@ -357,7 +358,7 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
             type="file"
             accept=".json,application/json"
             onChange={handleBackupFile}
-            className="mt-1.5 block text-xs text-[var(--text-muted)]"
+            className="mt-1.5 block min-h-[44px] w-full max-w-md py-2 text-xs text-[var(--text-muted)] file:mr-3 file:min-h-[36px] file:rounded-[6px] file:border file:border-[var(--border-ui)] file:bg-[var(--bg-elevated)] file:px-3 file:text-xs file:font-semibold file:text-[var(--text-primary)]"
           />
         </div>
       </section>

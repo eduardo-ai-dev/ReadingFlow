@@ -157,7 +157,7 @@ export default async function EvolucaoPage() {
           </div>
           <Link
             href="/metas"
-            className="inline-flex items-center gap-1 rounded-[var(--rf-radius-xs)] font-sans text-xs font-semibold text-[var(--rf-text-accent-secondary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+            className="inline-flex min-h-[44px] items-center gap-1 rounded-[var(--rf-radius-xs)] px-1 font-sans text-xs font-semibold text-[var(--rf-text-accent-secondary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-0"
           >
             Gerenciar metas{" "}
             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -175,7 +175,7 @@ export default async function EvolucaoPage() {
             </p>
             <Link
               href="/metas"
-              className="mt-3 inline-flex font-sans text-xs font-semibold text-[var(--rf-text-accent-secondary)] hover:underline"
+              className="mt-3 inline-flex min-h-[44px] items-center font-sans text-xs font-semibold text-[var(--rf-text-accent-secondary)] hover:underline lg:min-h-0"
             >
               Criar sua primeira meta anual ➔
             </Link>

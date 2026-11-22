@@ -446,7 +446,7 @@ export function CoverEditionPicker({
                   type="button"
                   disabled={isBusy}
                   onClick={onRestoreAutomatic}
-                  className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-[#722F3E] underline-offset-2 hover:underline disabled:opacity-50"
+                  className="inline-flex min-h-[44px] cursor-pointer items-center gap-1 text-[11px] font-semibold text-[#722F3E] underline-offset-2 hover:underline disabled:opacity-50 lg:min-h-0"
                 >
                   <RefreshCw className="h-3 w-3" aria-hidden="true" />
                   Restaurar automática
@@ -506,7 +506,7 @@ export function CoverEditionPicker({
                   }
                 }}
                 placeholder="Ex.: As 48 Leis do Poder"
-                className="mt-1 min-h-[36px] w-full rounded-[6px] border border-[#8C7A63]/45 bg-[#FAF7F1] px-2.5 text-[13px] text-[#1A1614] focus:border-[#722F3E] focus:outline-none"
+                className="mt-1 min-h-[44px] w-full rounded-[6px] border border-[#8C7A63]/45 bg-[#FAF7F1] px-2.5 text-[13px] text-[#1A1614] focus:border-[#722F3E] focus:outline-none lg:min-h-[36px]"
               />
             </div>
 
@@ -529,7 +529,7 @@ export function CoverEditionPicker({
                   }
                 }}
                 placeholder="Ex.: Robert Greene"
-                className="mt-1 min-h-[36px] w-full rounded-[6px] border border-[#8C7A63]/45 bg-[#FAF7F1] px-2.5 text-[13px] text-[#1A1614] focus:border-[#722F3E] focus:outline-none"
+                className="mt-1 min-h-[44px] w-full rounded-[6px] border border-[#8C7A63]/45 bg-[#FAF7F1] px-2.5 text-[13px] text-[#1A1614] focus:border-[#722F3E] focus:outline-none lg:min-h-[36px]"
               />
             </div>
 
@@ -543,6 +543,7 @@ export function CoverEditionPicker({
               <input
                 id={isbnInputId}
                 type="text"
+                inputMode="numeric"
                 value={searchIsbn}
                 onChange={(e) => setSearchIsbn(e.target.value)}
                 onKeyDown={(e) => {
@@ -552,7 +553,7 @@ export function CoverEditionPicker({
                   }
                 }}
                 placeholder="Opcional"
-                className="mt-1 min-h-[36px] w-full rounded-[6px] border border-[#8C7A63]/45 bg-[#FAF7F1] px-2.5 text-[13px] text-[#1A1614] focus:border-[#722F3E] focus:outline-none"
+                className="mt-1 min-h-[44px] w-full rounded-[6px] border border-[#8C7A63]/45 bg-[#FAF7F1] px-2.5 text-[13px] text-[#1A1614] focus:border-[#722F3E] focus:outline-none lg:min-h-[36px]"
               />
             </div>
 
@@ -565,7 +566,7 @@ export function CoverEditionPicker({
                 type="button"
                 disabled={isLoading}
                 onClick={() => void runSearch({ bypassCache: true })}
-                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-[8px] border border-[#722F3E] bg-[#722F3E] px-3.5 text-xs font-semibold text-[#FAF7F1] transition-colors hover:bg-[#5B2330] disabled:opacity-50"
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[8px] border border-[#722F3E] bg-[#722F3E] px-3.5 text-xs font-semibold text-[#FAF7F1] transition-colors hover:bg-[#5B2330] disabled:opacity-50 lg:min-h-[36px]"
               >
                 {isLoading ? (
                   <Loader2
@@ -604,7 +605,7 @@ export function CoverEditionPicker({
                     attemptNumber: nextRetry,
                   });
                 }}
-                className="inline-flex min-h-[30px] items-center gap-1.5 rounded-[6px] border border-[#78350F]/40 bg-[#FAF7F1] px-2.5 py-1 text-[11px] font-semibold text-[#78350F] hover:bg-[#FDE68A]"
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[6px] border border-[#78350F]/40 bg-[#FAF7F1] px-2.5 py-1 text-[11px] font-semibold text-[#78350F] hover:bg-[#FDE68A] lg:min-h-[30px]"
               >
                 <RefreshCw className="h-3 w-3" aria-hidden="true" />
                 Tentar de novo
@@ -731,14 +732,14 @@ export function CoverEditionPicker({
                     }
                   }}
                   placeholder="https://exemplo.com/capa-do-livro.jpg"
-                  className="min-h-[38px] flex-1 rounded-[8px] border border-[#8C7A63]/50 bg-[#FAF7F1] px-3 text-xs text-[#1A1614] focus:border-[#722F3E] focus:outline-none"
+                  className="min-h-[44px] flex-1 rounded-[8px] border border-[#8C7A63]/50 bg-[#FAF7F1] px-3 text-xs text-[#1A1614] focus:border-[#722F3E] focus:outline-none lg:min-h-[38px]"
                 />
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     disabled={isImportingUrl || !pastedImageUrl.trim()}
                     onClick={() => void handleImportFromUrl()}
-                    className="inline-flex min-h-[38px] items-center gap-1.5 rounded-[8px] bg-[#722F3E] px-3.5 text-xs font-semibold text-[#FAF7F1] transition-colors hover:bg-[#5B2330] disabled:opacity-50"
+                    className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[8px] bg-[#722F3E] px-3.5 text-xs font-semibold text-[#FAF7F1] transition-colors hover:bg-[#5B2330] disabled:opacity-50 lg:min-h-[38px]"
                   >
                     {isImportingUrl ? (
                       <Loader2
@@ -757,7 +758,7 @@ export function CoverEditionPicker({
                       setShowPasteLink(false);
                       setPasteUrlError(null);
                     }}
-                    className="min-h-[38px] rounded-[8px] border border-[#8C7A63]/40 bg-[#FAF7F1] px-3 text-xs font-semibold text-[#4A4139] hover:bg-[#EFE9DD]"
+                    className="min-h-[44px] rounded-[8px] border border-[#8C7A63]/40 bg-[#FAF7F1] px-3 text-xs font-semibold text-[#4A4139] hover:bg-[#EFE9DD] lg:min-h-[38px]"
                   >
                     Cancelar
                   </button>
@@ -792,7 +793,7 @@ export function CoverEditionPicker({
                   pageCount: selectedCandidate.pageCount ?? resolvedPageCount,
                 });
               }}
-              className="inline-flex min-h-[38px] items-center gap-1.5 rounded-[8px] bg-[#722F3E] px-3.5 text-xs font-semibold text-[#FAF7F1] shadow-xs transition-colors hover:bg-[#5B2330] disabled:cursor-not-allowed disabled:opacity-45"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[8px] bg-[#722F3E] px-3.5 text-xs font-semibold text-[#FAF7F1] shadow-xs transition-colors hover:bg-[#5B2330] disabled:cursor-not-allowed disabled:opacity-45 lg:min-h-[38px]"
             >
               <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
               {isSaving ? "Salvando..." : confirmLabel}
@@ -805,7 +806,7 @@ export function CoverEditionPicker({
                 setShowPasteLink((prev) => !prev);
                 setPasteUrlError(null);
               }}
-              className="inline-flex min-h-[38px] items-center gap-1.5 rounded-[8px] border border-[#8C7A63]/45 bg-[#F4EFE6] px-3 text-xs font-semibold text-[#2A241F] transition-colors hover:border-[#722F3E] hover:bg-[#EFE9DD] disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[8px] border border-[#8C7A63]/45 bg-[#F4EFE6] px-3 text-xs font-semibold text-[#2A241F] transition-colors hover:border-[#722F3E] hover:bg-[#EFE9DD] disabled:opacity-50 lg:min-h-[38px]"
             >
               <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
               Colar link da imagem
@@ -822,7 +823,7 @@ export function CoverEditionPicker({
             />
             <label
               htmlFor={fileInputId}
-              className={`inline-flex min-h-[38px] cursor-pointer items-center gap-1.5 rounded-[8px] border border-[#8C7A63]/45 bg-[#F4EFE6] px-3 text-xs font-semibold text-[#2A241F] transition-colors hover:border-[#722F3E] hover:bg-[#EFE9DD] ${
+              className={`inline-flex min-h-[44px] cursor-pointer items-center gap-1.5 rounded-[8px] border border-[#8C7A63]/45 bg-[#F4EFE6] px-3 text-xs font-semibold text-[#2A241F] transition-colors hover:border-[#722F3E] hover:bg-[#EFE9DD] lg:min-h-[38px] ${
                 isBusy ? "pointer-events-none opacity-60" : ""
               }`}
             >
@@ -840,7 +841,7 @@ export function CoverEditionPicker({
                     coverSource: null,
                   })
                 }
-                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-[8px] border border-[#8C7A63]/35 bg-transparent px-3 text-xs font-semibold text-[#5A5045] transition-colors hover:border-[#9E2A2B] hover:text-[#9E2A2B] disabled:opacity-50"
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[8px] border border-[#8C7A63]/35 bg-transparent px-3 text-xs font-semibold text-[#5A5045] transition-colors hover:border-[#9E2A2B] hover:text-[#9E2A2B] disabled:opacity-50 lg:min-h-[38px]"
               >
                 <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                 Usar capa tipográfica

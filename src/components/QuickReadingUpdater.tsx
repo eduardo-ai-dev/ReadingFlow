@@ -304,6 +304,7 @@ export function QuickReadingUpdater({
               id={`prog-val-${readingId}`}
               name="progressValue"
               type="number"
+              inputMode="numeric"
               min={0}
               disabled={isBusy}
               value={val}
@@ -312,7 +313,7 @@ export function QuickReadingUpdater({
                 if (errorMessage) setErrorMessage(null);
                 if (statusMessage) setStatusMessage(null);
               }}
-              className="min-h-[40px] w-24 rounded-[var(--rf-radius-md)] border border-[var(--rf-border-strong)] bg-[var(--rf-surface-card-solid)] px-3 font-sans text-sm font-semibold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)] shadow-[var(--rf-shadow-xs)] transition-colors focus:border-[var(--rf-focus-ring-color)] focus:outline-none focus:ring-2 focus:ring-[var(--rf-focus-ring-color)] disabled:opacity-60"
+              className="min-h-[44px] w-24 rounded-[var(--rf-radius-md)] border border-[var(--rf-border-strong)] bg-[var(--rf-surface-card-solid)] px-3 font-sans text-sm font-semibold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)] shadow-[var(--rf-shadow-xs)] transition-colors focus:border-[var(--rf-focus-ring-color)] focus:outline-none focus:ring-2 focus:ring-[var(--rf-focus-ring-color)] disabled:opacity-60 lg:min-h-[40px]"
             />
           </div>
 
@@ -329,7 +330,7 @@ export function QuickReadingUpdater({
               disabled={isBusy}
               value={unit}
               onChange={(e) => handleUnitSwitch(e.target.value as ProgressUnit)}
-              className="min-h-[40px] rounded-[var(--rf-radius-md)] border border-[var(--rf-border-strong)] bg-[var(--rf-surface-card-solid)] px-3 font-sans text-[13px] font-semibold text-[var(--rf-text-primary)] shadow-[var(--rf-shadow-xs)] transition-colors focus:border-[var(--rf-focus-ring-color)] focus:outline-none focus:ring-2 focus:ring-[var(--rf-focus-ring-color)] disabled:opacity-60"
+              className="min-h-[44px] rounded-[var(--rf-radius-md)] border border-[var(--rf-border-strong)] bg-[var(--rf-surface-card-solid)] px-3 font-sans text-[13px] font-semibold text-[var(--rf-text-primary)] shadow-[var(--rf-shadow-xs)] transition-colors focus:border-[var(--rf-focus-ring-color)] focus:outline-none focus:ring-2 focus:ring-[var(--rf-focus-ring-color)] disabled:opacity-60 lg:min-h-[40px]"
             >
               <option value="pages">
                 páginas

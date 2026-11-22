@@ -120,7 +120,7 @@ export function LandingProductPreview() {
                 aria-controls={`preview-panel-${key}`}
                 aria-label={`Alternar para estante ${label}`}
                 onClick={() => setTab(key)}
-                className={`relative min-h-[34px] cursor-pointer rounded-[var(--rf-radius-sm)] px-3 font-sans text-xs font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                className={`relative min-h-[44px] cursor-pointer rounded-[var(--rf-radius-sm)] px-3 font-sans text-xs font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-[34px] ${
                   active
                     ? "text-[var(--rf-tab-active-text)]"
                     : "text-[var(--rf-text-heading)] hover:text-[var(--rf-text-accent-secondary)]"
@@ -366,7 +366,7 @@ export function LandingProductPreview() {
                 aria-label="Registrar leitura de hoje adicionando 15 páginas na demonstração"
                 onClick={handleRegisterReading}
                 disabled={isCurrentBookFinished}
-                className="inline-flex min-h-[38px] w-full cursor-pointer items-center justify-center rounded-[var(--rf-radius-md)] border border-[var(--rf-tab-active-bg)] bg-[var(--rf-tab-active-bg)] px-3 py-2 font-sans text-[13px] font-semibold tabular-nums text-[var(--rf-tab-active-text)] shadow-[var(--rf-shadow-xs)] transition-all duration-200 hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-[var(--rf-radius-md)] border border-[var(--rf-tab-active-bg)] bg-[var(--rf-tab-active-bg)] px-3 py-2 font-sans text-[13px] font-semibold tabular-nums text-[var(--rf-tab-active-text)] shadow-[var(--rf-shadow-xs)] transition-all duration-200 hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-[38px]"
               >
                 <span>+ Registrar leitura de hoje (+15 págs)</span>
               </button>
@@ -380,7 +380,7 @@ export function LandingProductPreview() {
                     type="button"
                     aria-label="Restaurar demonstração da estante ao estado inicial"
                     onClick={handleResetDemo}
-                    className="inline-flex cursor-pointer items-center gap-1 rounded-[var(--rf-radius-xs)] px-1 font-sans font-semibold text-[var(--rf-text-accent-secondary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                    className="inline-flex min-h-[44px] cursor-pointer items-center gap-1 rounded-[var(--rf-radius-xs)] px-2 font-sans font-semibold text-[var(--rf-text-accent-secondary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-0 lg:px-1"
                   >
                     <RotateCcw className="h-3 w-3" aria-hidden="true" />
                     Restaurar

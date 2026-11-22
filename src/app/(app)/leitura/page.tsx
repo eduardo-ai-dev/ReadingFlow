@@ -84,7 +84,7 @@ export default async function ReadingPage() {
                     <h3 className="mt-2 font-serif text-lg font-semibold text-[var(--text-heading)]">
                       <Link
                         href={`/livros/${entry.work.id}`}
-                        className="hover:underline"
+                        className="inline-flex min-h-[44px] items-center hover:underline lg:min-h-0"
                       >
                         {entry.work.title}
                       </Link>
@@ -136,7 +136,10 @@ export default async function ReadingPage() {
                 key={u.work.id}
                 className="flex items-center justify-between gap-3 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 [content-visibility:auto] [contain-intrinsic-size:auto_108px]"
               >
-                <div className="flex min-w-0 items-center gap-3">
+                <Link
+                  href={`/livros/${u.work.id}`}
+                  className="group flex min-h-[44px] min-w-0 flex-1 items-center gap-3 rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                >
                   <BookCover
                     title={u.work.title}
                     author={u.primaryAuthor}
@@ -147,17 +150,14 @@ export default async function ReadingPage() {
                     size="sm"
                   />
                   <div className="min-w-0">
-                    <Link
-                      href={`/livros/${u.work.id}`}
-                      className="block truncate font-serif text-base font-semibold text-[var(--text-heading)] hover:underline"
-                    >
+                    <span className="block truncate font-serif text-base font-semibold text-[var(--text-heading)] group-hover:underline">
                       {u.work.title}
-                    </Link>
+                    </span>
                     <p className="truncate text-xs text-[var(--text-muted)]">
                       {u.primaryAuthor}
                     </p>
                   </div>
-                </div>
+                </Link>
                 <StartReadingButtonClient
                   workId={u.work.id}
                   editionId={u.edition.id}
@@ -193,7 +193,10 @@ export default async function ReadingPage() {
                   key={entry.reading.id}
                   className="flex flex-wrap items-center justify-between gap-4 p-4 [content-visibility:auto] [contain-intrinsic-size:auto_108px]"
                 >
-                  <div className="flex min-w-0 items-center gap-3">
+                  <Link
+                    href={`/livros/${entry.work.id}`}
+                    className="group flex min-h-[44px] min-w-0 flex-1 items-center gap-3 rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                  >
                     <BookCover
                       title={entry.work.title}
                       author={entry.primaryAuthor}
@@ -204,12 +207,9 @@ export default async function ReadingPage() {
                       size="sm"
                     />
                     <div className="min-w-0">
-                      <Link
-                        href={`/livros/${entry.work.id}`}
-                        className="block truncate font-serif text-base font-semibold text-[var(--text-heading)] hover:underline"
-                      >
+                      <span className="block truncate font-serif text-base font-semibold text-[var(--text-heading)] group-hover:underline">
                         {entry.work.title}
-                      </Link>
+                      </span>
                       <p className="truncate text-xs text-[var(--text-muted)]">
                         {entry.primaryAuthor}
                         {entry.reading.finishedOn
@@ -217,7 +217,7 @@ export default async function ReadingPage() {
                           : ""}
                       </p>
                     </div>
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-2.5">
                     {entry.review ? (
                       <StarRatingDisplay rating={entry.review.rating} />

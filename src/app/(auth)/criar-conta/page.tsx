@@ -239,7 +239,7 @@ export default function SignUpPage() {
         <div className="space-y-2 pt-0.5 font-sans text-xs text-[#141514]">
           <label
             htmlFor="signup-minimum-age"
-            className="flex min-h-[34px] cursor-pointer items-start gap-2.5 select-none"
+            className="flex min-h-[44px] cursor-pointer items-center gap-2.5 select-none lg:min-h-[34px] lg:items-start"
           >
             <input
               id="signup-minimum-age"
@@ -258,7 +258,7 @@ export default function SignUpPage() {
 
           <label
             htmlFor="signup-accept-terms"
-            className="flex min-h-[34px] cursor-pointer items-start gap-2.5 select-none"
+            className="flex min-h-[44px] cursor-pointer items-center gap-2.5 select-none lg:min-h-[34px] lg:items-start"
           >
             <input
               id="signup-accept-terms"
@@ -276,14 +276,14 @@ export default function SignUpPage() {
               Li e concordo com os{" "}
               <Link
                 href="/termos"
-                className="rounded-sm px-0.5 font-sans font-semibold text-[#722F3E] underline underline-offset-4 hover:text-[#141514] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
+                className="inline-flex min-h-[44px] items-center rounded-sm px-0.5 font-sans font-semibold text-[#722F3E] underline underline-offset-4 hover:text-[#141514] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E] lg:inline lg:min-h-0"
               >
                 Termos de Uso
               </Link>{" "}
               e a{" "}
               <Link
                 href="/privacidade"
-                className="rounded-sm px-0.5 font-sans font-semibold text-[#722F3E] underline underline-offset-4 hover:text-[#141514] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
+                className="inline-flex min-h-[44px] items-center rounded-sm px-0.5 font-sans font-semibold text-[#722F3E] underline underline-offset-4 hover:text-[#141514] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E] lg:inline lg:min-h-0"
               >
                 Política de Privacidade
               </Link>
@@ -346,7 +346,7 @@ export default function SignUpPage() {
         Já tem uma biblioteca?{" "}
         <Link
           href="/entrar"
-          className="rounded-sm px-1 font-sans font-semibold text-[#722F3E] underline underline-offset-4 transition-colors hover:text-[#141514] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
+          className="inline-flex min-h-[44px] items-center rounded-sm px-2 font-sans font-semibold text-[#722F3E] underline underline-offset-4 transition-colors hover:text-[#141514] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E] lg:min-h-0 lg:px-1"
         >
           Entrar
         </Link>

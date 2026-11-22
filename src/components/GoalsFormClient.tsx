@@ -140,7 +140,7 @@ export function CreateGoalFormClient({
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm"
+            className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm lg:min-h-[42px]"
           />
         </div>
 
@@ -152,7 +152,7 @@ export function CreateGoalFormClient({
             id="goal-kind"
             value={kind}
             onChange={(e) => setKind(e.target.value as "books" | "pages")}
-            className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm"
+            className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm lg:min-h-[42px]"
           >
             <option value="books">Livros concluídos</option>
             <option value="pages">Páginas lidas</option>
@@ -166,11 +166,12 @@ export function CreateGoalFormClient({
           <input
             id="goal-target"
             type="number"
+            inputMode="numeric"
             min={1}
             required
             value={targetValue}
             onChange={(e) => setTargetValue(e.target.value)}
-            className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm"
+            className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm lg:min-h-[42px]"
           />
         </div>
 
@@ -182,7 +183,7 @@ export function CreateGoalFormClient({
             id="goal-period"
             value={period}
             onChange={(e) => setPeriod(e.target.value as "year" | "month")}
-            className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm"
+            className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm lg:min-h-[42px]"
           >
             <option value="year">Anual</option>
             <option value="month">Mensal</option>
@@ -196,11 +197,12 @@ export function CreateGoalFormClient({
           <input
             id="goal-year"
             type="number"
+            inputMode="numeric"
             min={2020}
             max={2100}
             value={year}
             onChange={(e) => setYear(e.target.value)}
-            className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm"
+            className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm lg:min-h-[42px]"
           />
         </div>
 
@@ -212,17 +214,18 @@ export function CreateGoalFormClient({
             <input
               id="goal-month"
               type="number"
+              inputMode="numeric"
               min={1}
               max={12}
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm"
+              className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm lg:min-h-[42px]"
             />
           </div>
         ) : null}
       </div>
 
-      <label className="flex min-h-[36px] cursor-pointer items-center gap-2 text-xs">
+      <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-xs lg:min-h-[36px]">
         <input
           type="checkbox"
           checked={countRereads}
@@ -235,7 +238,7 @@ export function CreateGoalFormClient({
       <button
         type="submit"
         disabled={isPending}
-        className="min-h-[42px] rounded-[8px] bg-[var(--accent-primary)] px-5 text-xs font-semibold text-[var(--on-primary)]"
+        className="min-h-[44px] rounded-[8px] bg-[var(--accent-primary)] px-5 text-xs font-semibold text-[var(--on-primary)]"
       >
         Criar meta
       </button>
@@ -272,7 +275,7 @@ export function DeleteGoalButtonClient({ goalId }: { goalId: string }) {
               }
             });
           }}
-          className="min-h-[34px] rounded-[6px] bg-[var(--status-error)] px-2.5 text-xs font-semibold text-white disabled:opacity-60"
+          className="min-h-[44px] rounded-[6px] bg-[var(--status-error)] px-3 text-xs font-semibold text-white disabled:opacity-60 lg:min-h-[34px] lg:px-2.5"
         >
           Confirmar
         </button>
@@ -280,7 +283,7 @@ export function DeleteGoalButtonClient({ goalId }: { goalId: string }) {
           type="button"
           disabled={isPending}
           onClick={() => setConfirming(false)}
-          className="min-h-[34px] rounded-[6px] border border-[var(--border-subtle)] px-2.5 text-xs text-[var(--text-primary)]"
+          className="min-h-[44px] rounded-[6px] border border-[var(--border-subtle)] px-3 text-xs text-[var(--text-primary)] lg:min-h-[34px] lg:px-2.5"
         >
           Cancelar
         </button>
@@ -297,7 +300,7 @@ export function DeleteGoalButtonClient({ goalId }: { goalId: string }) {
           setError(null);
           setConfirming(true);
         }}
-        className="min-h-[36px] rounded-[6px] border border-[var(--border-subtle)] px-2.5 text-xs text-[var(--text-muted)] hover:text-[var(--status-error)]"
+        className="min-h-[44px] rounded-[6px] border border-[var(--border-subtle)] px-3 text-xs text-[var(--text-muted)] hover:text-[var(--status-error)] lg:min-h-[36px] lg:px-2.5"
       >
         Remover
       </button>

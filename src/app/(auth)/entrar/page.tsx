@@ -250,7 +250,7 @@ function SignInPageContent() {
         <div className="flex items-center justify-between pt-0.5">
           <label
             htmlFor="login-remember-me"
-            className="inline-flex cursor-pointer items-center gap-2 font-sans text-xs font-medium text-[#2C221E] select-none"
+            className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 font-sans text-xs font-medium text-[#2C221E] select-none lg:min-h-[32px]"
           >
             <input
               id="login-remember-me"
@@ -312,7 +312,7 @@ function SignInPageContent() {
         Ainda não tem biblioteca?{" "}
         <Link
           href="/criar-conta"
-          className="rounded-sm px-1 font-sans font-semibold text-[#722F3E] underline underline-offset-4 transition-colors hover:text-[#141514] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E]"
+          className="inline-flex min-h-[44px] items-center rounded-sm px-1 font-sans font-semibold text-[#722F3E] underline underline-offset-4 transition-colors hover:text-[#141514] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E] lg:min-h-0"
         >
           Criar conta gratuita
         </Link>

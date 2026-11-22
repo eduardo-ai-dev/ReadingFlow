@@ -271,7 +271,7 @@ export function HeroRotator({
             behavior: prefersReducedMotion ? "auto" : "smooth",
           });
         }}
-        className="rf-icon-btn absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 cursor-pointer flex-col items-center gap-1 rounded-full border border-[#C8A46E]/30 bg-[#141514]/70 px-3 py-2 font-sans text-[#DFBE88] backdrop-blur-sm transition-colors hover:bg-[#141514]/90 hover:text-[#F4EFE6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E] lg:bottom-5"
+        className="rf-icon-btn absolute bottom-4 left-1/2 z-20 flex min-h-[44px] min-w-[44px] -translate-x-1/2 cursor-pointer flex-col items-center justify-center gap-1 rounded-full border border-[#C8A46E]/30 bg-[#141514]/70 px-3 py-2 font-sans text-[#DFBE88] backdrop-blur-sm transition-colors hover:bg-[#141514]/90 hover:text-[#F4EFE6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A46E] lg:bottom-5 lg:min-h-0 lg:min-w-0"
       >
         <ChevronDown className="h-4 w-4 text-[#DFBE88]" aria-hidden="true" />
       </button>

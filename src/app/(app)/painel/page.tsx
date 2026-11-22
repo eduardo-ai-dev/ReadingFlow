@@ -823,7 +823,10 @@ async function DashboardSecondaryBand({
                       key={entry.work.id}
                       className="flex items-center justify-between gap-3 py-3 first:pt-2 last:pb-0"
                     >
-                      <div className="flex min-w-0 items-center gap-3">
+                      <Link
+                        href={`/livros/${entry.work.id}`}
+                        className="group flex min-h-[44px] min-w-0 flex-1 items-center gap-3 rounded-[var(--rf-radius-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                      >
                         <span className="w-6 shrink-0 text-center font-serif text-base font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-accent-secondary)]">
                           {entry.position}º
                         </span>
@@ -839,17 +842,14 @@ async function DashboardSecondaryBand({
                         />
 
                         <div className="min-w-0">
-                          <Link
-                            href={`/livros/${entry.work.id}`}
-                            className="block truncate font-serif text-sm font-bold text-[var(--rf-text-primary)] transition-colors hover:text-[var(--rf-text-accent-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
-                          >
+                          <span className="block truncate font-serif text-sm font-bold text-[var(--rf-text-primary)] transition-colors group-hover:text-[var(--rf-text-accent-secondary)]">
                             {entry.work.title}
-                          </Link>
+                          </span>
                           <p className="rf-type-caption truncate">
                             {entry.primaryAuthor}
                           </p>
                         </div>
-                      </div>
+                      </Link>
 
                       <StarRatingDisplay
                         rating={entry.review.rating}

@@ -39,7 +39,7 @@ export function ThemeCardsPicker({
           type="button"
           aria-pressed={isAuto}
           onClick={() => handleChoose("system")}
-          className={`inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-[var(--rf-radius-full)] border px-3 py-1 font-sans text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+          className={`inline-flex min-h-[44px] cursor-pointer items-center gap-1.5 rounded-[var(--rf-radius-full)] border px-3 py-1 font-sans text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-[36px] ${
             isAuto
               ? "border-[var(--rf-accent-primary)] bg-[var(--rf-accent-primary)] text-[var(--rf-accent-on-primary)]"
               : "border-[var(--rf-border-strong)] bg-[var(--rf-surface-elevated)] text-[var(--rf-text-primary)] hover:border-[var(--rf-border-accent)]"
@@ -137,7 +137,11 @@ export function ThemeCardsPicker({
 
                 {isSelected ? (
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[var(--rf-radius-full)] bg-[var(--rf-accent-primary)] text-[var(--rf-accent-on-primary)]">
-                    <Check className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
+                    <Check
+                      className="h-3 w-3"
+                      strokeWidth={2.5}
+                      aria-hidden="true"
+                    />
                   </span>
                 ) : null}
               </div>

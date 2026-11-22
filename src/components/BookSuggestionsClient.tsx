@@ -314,7 +314,7 @@ export function BookSuggestionsClient({
               setFeedback(null);
               setMode("wishlist");
             }}
-            className={`inline-flex min-h-[38px] cursor-pointer items-center gap-2 rounded-[var(--rf-radius-sm)] px-3.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+            className={`inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-[var(--rf-radius-sm)] px-3.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-[38px] ${
               mode === "wishlist"
                 ? "bg-[var(--rf-tab-active-bg)] text-[var(--rf-tab-active-text)] shadow-[var(--rf-shadow-xs)]"
                 : "text-[var(--rf-text-heading)] hover:text-[var(--rf-text-accent-secondary)]"
@@ -334,7 +334,7 @@ export function BookSuggestionsClient({
             aria-selected={mode === "new_books"}
             aria-controls="suggestions-panel-new-books"
             onClick={() => switchToNewBooks()}
-            className={`inline-flex min-h-[38px] cursor-pointer items-center gap-2 rounded-[var(--rf-radius-sm)] px-3.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+            className={`inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-[var(--rf-radius-sm)] px-3.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-[38px] ${
               mode === "new_books"
                 ? "bg-[var(--rf-tab-active-bg)] text-[var(--rf-tab-active-text)] shadow-[var(--rf-shadow-xs)]"
                 : "text-[var(--rf-text-heading)] hover:text-[var(--rf-text-accent-secondary)]"
@@ -460,7 +460,7 @@ export function BookSuggestionsClient({
 
                   <Link
                     href="/desejos"
-                    className="ml-auto text-xs font-semibold text-[var(--rf-text-accent-secondary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                    className="ml-auto inline-flex min-h-[44px] items-center text-xs font-semibold text-[var(--rf-text-accent-secondary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-0"
                   >
                     Ver lista completa
                   </Link>
@@ -574,7 +574,7 @@ export function BookSuggestionsClient({
                       setGenreFilter(opt.key);
                       void fetchNewBooks(opt.key, 0);
                     }}
-                    className={`min-h-[34px] cursor-pointer rounded-[var(--rf-radius-full)] border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
+                    className={`min-h-[44px] cursor-pointer rounded-[var(--rf-radius-full)] border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] lg:min-h-[34px] ${
                       active
                         ? "border-[var(--rf-tab-active-bg)] bg-[var(--rf-tab-active-bg)] text-[var(--rf-tab-active-text)]"
                         : "border-[var(--rf-border-default)] bg-[var(--rf-surface-canvas)] text-[var(--rf-text-heading)] hover:border-[var(--rf-border-accent)]"
