@@ -97,6 +97,67 @@ export default async function EvolucaoPage() {
         </div>
       </header>
 
+      {/* Estado vazio acolhedor para contas sem livros, sessões ou metas */}
+      {stats.uniqueOwnedWorks === 0 &&
+      stats.finishedReadingsCount === 0 &&
+      stats.pagesRead === 0 &&
+      goalsData.entries.length === 0 ? (
+        <section
+          aria-labelledby="evolucao-vazia-titulo"
+          data-testid="evolucao-empty-state"
+          className="rf-panel flex flex-col items-start justify-between gap-5 border border-[var(--rf-border-accent-soft)] p-6 sm:p-8"
+        >
+          <div className="space-y-1.5">
+            <span className="rf-section-marker">Comece no seu ritmo</span>
+            <h2
+              id="evolucao-vazia-titulo"
+              className="font-serif text-2xl font-semibold text-[var(--rf-text-heading)]"
+            >
+              Sua evolução aparece aqui assim que você registrar suas leituras
+            </h2>
+            <p className="max-w-2xl font-sans text-xs leading-relaxed text-[var(--rf-text-secondary)] sm:text-sm">
+              Nenhum dado de demonstração é misturado à sua conta. Adicione seu
+              primeiro livro, registre páginas ou sessões no Canto de Foco e, se
+              quiser, defina uma meta anual leve para acompanhar sua viabilidade
+              real.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/adicionar"
+              className={rfButtonClassName({
+                variant: "primary",
+                size: "md",
+                pill: true,
+              })}
+            >
+              Adicionar primeiro livro
+            </Link>
+            <Link
+              href="/metas"
+              className={rfButtonClassName({
+                variant: "secondary",
+                secondaryStyle: "outline",
+                size: "md",
+                pill: true,
+              })}
+            >
+              Definir meta anual
+            </Link>
+            <Link
+              href="/leitura/foco"
+              className={rfButtonClassName({
+                variant: "subtle",
+                size: "md",
+                pill: true,
+              })}
+            >
+              Conhecer Canto de Foco
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
       {/* Cartões de Indicadores Gerais do Ano */}
       <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-4">
         <div className="rf-panel p-5 text-center">

@@ -670,6 +670,7 @@ export async function ormUpsertUserSettings(settings: {
   shelfLayoutJson: string;
   ambientPreferencesJson: string;
   focusDefaultMode: string;
+  onboardingGuideJson?: string;
   updatedAt: string;
 }) {
   const db = getOrmDb();
@@ -685,11 +686,17 @@ export async function ormUpsertUserSettings(settings: {
         shelfLayoutJson: settings.shelfLayoutJson,
         ambientPreferencesJson: settings.ambientPreferencesJson,
         focusDefaultMode: settings.focusDefaultMode,
+        ...(settings.onboardingGuideJson !== undefined
+          ? { onboardingGuideJson: settings.onboardingGuideJson }
+          : {}),
         updatedAt: settings.updatedAt,
       })
       .where(eq(userSettingsTable.userId, settings.userId));
   } else {
-    await db.insert(userSettingsTable).values(settings);
+    await db.insert(userSettingsTable).values({
+      ...settings,
+      onboardingGuideJson: settings.onboardingGuideJson ?? "{}",
+    });
   }
 }
 

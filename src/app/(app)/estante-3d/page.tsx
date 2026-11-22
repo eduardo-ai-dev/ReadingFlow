@@ -12,7 +12,7 @@ import {
   type ShelfQuickFilter,
   type VirtualBookItem,
 } from "@/features/shelves/virtual-bookshelf";
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyBookshelfIllustration } from "@/components/EmptyBookshelfIllustration";
 import type { BackfillBookTarget } from "@/components/BackfillCoversModal";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
 
@@ -186,11 +186,13 @@ export default async function Estante3DPage({
             initialQuickFilter={initialQuickFilter}
           />
         ) : (
-          <EmptyState
-            title="Sua estante está vazia"
-            description="Adicione seu primeiro livro e comece a construir sua biblioteca tridimensional."
+          <EmptyBookshelfIllustration
+            title="Sua estante 3D aguarda o primeiro livro"
+            description="Adicione seu primeiro título usando a busca com seletor de edição e capa para começar a preencher suas prateleiras."
             actionHref="/adicionar"
             actionLabel="Adicionar primeiro livro"
+            secondaryHref="/explorar"
+            secondaryLabel="Explorar gêneros"
           />
         )}
       </section>

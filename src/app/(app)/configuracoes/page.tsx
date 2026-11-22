@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/features/auth/queries";
+import { getOnboardingGuideSummary } from "@/features/onboarding/queries";
 import { SettingsClient } from "@/components/SettingsClient";
 
 export const metadata: Metadata = {
@@ -8,7 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default async function SettingsPage() {
-  const profile = await getCurrentProfile();
+  const [profile, onboardingGuide] = await Promise.all([
+    getCurrentProfile(),
+    getOnboardingGuideSummary(),
+  ]);
   if (!profile) {
     redirect("/entrar");
   }
@@ -24,7 +28,7 @@ export default async function SettingsPage() {
         </h1>
       </header>
 
-      <SettingsClient profile={profile} />
+      <SettingsClient profile={profile} onboardingGuide={onboardingGuide} />
     </div>
   );
 }

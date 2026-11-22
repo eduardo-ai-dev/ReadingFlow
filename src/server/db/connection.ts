@@ -180,6 +180,7 @@ function initTables(sqlite: DatabaseSync) {
       shelf_layout_json TEXT NOT NULL DEFAULT '{}',
       ambient_preferences_json TEXT NOT NULL DEFAULT '{}',
       focus_default_mode TEXT NOT NULL DEFAULT 'free',
+      onboarding_guide_json TEXT NOT NULL DEFAULT '{}',
       updated_at TEXT NOT NULL
     );
 
@@ -290,6 +291,16 @@ function initTables(sqlite: DatabaseSync) {
   }
   if (!goalColNames.has("paused_at")) {
     sqlite.exec("ALTER TABLE goals ADD COLUMN paused_at TEXT");
+  }
+
+  const settingsCols = sqlite
+    .prepare("PRAGMA table_info(user_settings)")
+    .all() as Array<{ name?: string }>;
+  const settingsColNames = new Set(settingsCols.map((c) => c.name));
+  if (!settingsColNames.has("onboarding_guide_json")) {
+    sqlite.exec(
+      "ALTER TABLE user_settings ADD COLUMN onboarding_guide_json TEXT NOT NULL DEFAULT '{}'"
+    );
   }
 }
 

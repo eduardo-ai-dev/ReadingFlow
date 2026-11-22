@@ -246,6 +246,16 @@ export interface UserProfile {
   acceptedTermsAt: string;
 }
 
+export type OnboardingStepId = "first_book" | "annual_goal" | "focus_corner";
+
+export interface OnboardingGuideState {
+  dismissed: boolean;
+  reopened?: boolean;
+  completedSteps: OnboardingStepId[];
+  dismissedAt?: string;
+  updatedAt?: string;
+}
+
 /** Preferências persistidas por conta (1 linha por usuário em `user_settings`). */
 export interface UserSettings {
   userId: string;
@@ -256,6 +266,7 @@ export interface UserSettings {
   shelfLayout: PersistedShelfLayout;
   ambientPreferences: AmbientPreferences;
   focusDefaultMode: FocusSessionMode;
+  onboardingGuide?: OnboardingGuideState;
   updatedAt: string;
 }
 

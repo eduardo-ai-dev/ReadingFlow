@@ -1,19 +1,29 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { UserProfile } from "@/lib/domain";
 import {
   deleteMyAccountAction,
   updateProfileAction,
 } from "@/features/auth/actions";
+import { updateOnboardingGuideAction } from "@/features/settings/actions";
+import type { OnboardingGuideEvaluation } from "@/features/onboarding/rules";
 import { restoreBackupJsonAction } from "@/features/portability/actions";
 import { useTheme } from "@/components/ThemeProvider";
 import { ThemeCardsPicker } from "@/components/ThemeCardsPicker";
 
-export function SettingsClient({ profile }: { profile: UserProfile }) {
+export function SettingsClient({
+  profile,
+  onboardingGuide,
+}: {
+  profile: UserProfile;
+  onboardingGuide: OnboardingGuideEvaluation;
+}) {
   const router = useRouter();
   const { themePreference, fx, setFx } = useTheme();
+  const [guideVisible, setGuideVisible] = useState(onboardingGuide.shouldShow);
   const [defaultCurrency, setDefaultCurrency] = useState(
     profile.defaultCurrency
   );
@@ -297,6 +307,110 @@ export function SettingsClient({ profile }: { profile: UserProfile }) {
           </button>
         </div>
       </form>
+
+      {/* Primeiros passos — retomar ou ocultar guia de onboarding */}
+      <section
+        id="primeiros-passos"
+        aria-labelledby="primeiros-passos-cfg-titulo"
+        className="space-y-4 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 sm:p-6"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2
+              id="primeiros-passos-cfg-titulo"
+              className="font-serif text-xl font-semibold text-[var(--text-heading)]"
+            >
+              Primeiros passos
+            </h2>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              Guia rápido com 3 passos para montar sua biblioteca: adicionar seu
+              primeiro livro, definir uma meta anual opcional e conhecer o Canto
+              de Foco ({onboardingGuide.completedCount} de{" "}
+              {onboardingGuide.totalCount} concluídos).
+            </p>
+          </div>
+          <span className="rounded-full border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)]">
+            {guideVisible ? "Visível no Painel" : "Oculto no Painel"}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {guideVisible ? (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => {
+                setFeedback(null);
+                startTransition(async () => {
+                  try {
+                    const res = await updateOnboardingGuideAction({
+                      action: "dismiss",
+                    });
+                    if (!res.ok) {
+                      setFeedback({ tone: "error", text: res.error });
+                      return;
+                    }
+                    setGuideVisible(false);
+                    setFeedback({
+                      tone: "ok",
+                      text: "Guia de primeiros passos ocultado do painel.",
+                    });
+                    router.refresh();
+                  } catch {
+                    setFeedback({
+                      tone: "error",
+                      text: "Não foi possível atualizar o guia agora.",
+                    });
+                  }
+                });
+              }}
+              className="inline-flex min-h-[44px] items-center rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-4 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-60"
+            >
+              Ocultar guia no Painel
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => {
+                setFeedback(null);
+                startTransition(async () => {
+                  try {
+                    const res = await updateOnboardingGuideAction({
+                      action: "reopen",
+                    });
+                    if (!res.ok) {
+                      setFeedback({ tone: "error", text: res.error });
+                      return;
+                    }
+                    setGuideVisible(true);
+                    setFeedback({
+                      tone: "ok",
+                      text: "Guia de primeiros passos reativado no Painel.",
+                    });
+                    router.refresh();
+                  } catch {
+                    setFeedback({
+                      tone: "error",
+                      text: "Não foi possível reativar o guia agora.",
+                    });
+                  }
+                });
+              }}
+              className="inline-flex min-h-[44px] items-center rounded-[8px] bg-[var(--accent-primary)] px-4 text-xs font-semibold text-[var(--on-primary)] hover:bg-[var(--accent-primary-hover)] disabled:opacity-60"
+            >
+              Retomar guia de primeiros passos
+            </button>
+          )}
+
+          <Link
+            href="/painel"
+            className="inline-flex min-h-[44px] items-center rounded-[8px] border border-[var(--border-subtle)] px-3.5 text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--border-ui)]"
+          >
+            Ir para o Painel →
+          </Link>
+        </div>
+      </section>
 
       {/* Portabilidade dos dados */}
       <section

@@ -166,6 +166,54 @@ export default async function ExplorarPage() {
         </div>
       </header>
 
+      {/* Estado vazio acolhedor quando a conta ainda não tem acervo nem lista de desejos */}
+      {allItems.length === 0 && wantedWishes.length === 0 ? (
+        <section
+          aria-labelledby="explorar-vazio-titulo"
+          data-testid="explorar-empty-state"
+          className="rf-panel flex flex-col items-start justify-between gap-4 border border-[var(--rf-border-accent-soft)] p-6 sm:flex-row sm:items-center"
+        >
+          <div className="space-y-1">
+            <span className="rf-section-marker">Biblioteca pronta</span>
+            <h2
+              id="explorar-vazio-titulo"
+              className="font-serif text-xl font-semibold text-[var(--rf-text-heading)]"
+            >
+              Seu acervo ainda está vazio
+            </h2>
+            <p className="max-w-xl font-sans text-xs leading-relaxed text-[var(--rf-text-secondary)] sm:text-sm">
+              Adicione seu primeiro livro usando a busca por título ou ISBN com
+              seletor de edição e capa, ou descubra novos títulos abaixo para
+              salvar na sua Lista de Desejos.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Link
+              href="/adicionar"
+              className={rfButtonClassName({
+                variant: "primary",
+                size: "md",
+                pill: true,
+              })}
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Adicionar primeiro livro
+            </Link>
+            <a
+              href="#generos-literarios"
+              className={rfButtonClassName({
+                variant: "secondary",
+                secondaryStyle: "outline",
+                size: "md",
+                pill: true,
+              })}
+            >
+              Explorar gêneros
+            </a>
+          </div>
+        </section>
+      ) : null}
+
       {/* Busca Global Proeminente */}
       <ExplorarSearchAndDiscoveryClient items={searchItems} />
 
@@ -218,7 +266,7 @@ export default async function ExplorarPage() {
       </div>
 
       {/* Exploração por Gênero Literário (Taxonomia Unificada) */}
-      <section className="space-y-5">
+      <section id="generos-literarios" className="space-y-5">
         <div className="border-b border-[var(--rf-divider)] pb-3">
           <span className="rf-section-marker">03 · Gêneros Literários</span>
           <h2 className="mt-1 font-serif text-2xl font-semibold text-[var(--rf-text-heading)]">

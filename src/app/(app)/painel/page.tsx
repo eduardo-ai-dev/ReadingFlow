@@ -2,16 +2,21 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BookMarked, Flame } from "lucide-react";
-import { requireAuthenticatedWorkspace } from "@/server/store/memory-repository";
+import {
+  DEMO_USER_ID,
+  requireAuthenticatedWorkspace,
+} from "@/server/store/memory-repository";
 import { getReadingsOverview } from "@/features/reading/queries";
 import { getEvaluatedGoals } from "@/features/goals/queries";
 import { getStatisticsView } from "@/features/stats/queries";
 import { getAutomaticRankingView } from "@/features/ratings/queries";
 import { getDashboardEditorialData } from "@/features/dashboard/queries";
+import { getOnboardingGuideSummary } from "@/features/onboarding/queries";
 import { formatFullDatePtBr, formatNumberPtBr } from "@/lib/formatters";
 import { BookCover } from "@/components/BookCover";
 import { GoalPaceBadge } from "@/components/StatusBadge";
 import { GoalCardActionsClient } from "@/components/GoalCardActionsClient";
+import { OnboardingGuideCard } from "@/components/OnboardingGuideCard";
 import { StarRatingDisplay } from "@/components/StarRating";
 import {
   ActiveReadingSpotlight,
@@ -64,11 +69,13 @@ function DashboardSecondarySkeleton() {
 
 async function DashboardPrimaryBand({
   userTimezone,
+  isDemoAccount,
   readingsPromise,
   statsPromise,
   editorialPromise,
 }: {
   userTimezone: string;
+  isDemoAccount: boolean;
   readingsPromise: ReturnType<typeof getReadingsOverview>;
   statsPromise: ReturnType<typeof getStatisticsView>;
   editorialPromise: ReturnType<typeof getDashboardEditorialData>;
@@ -168,7 +175,14 @@ async function DashboardPrimaryBand({
       <section aria-labelledby="mesa-leitura-titulo">
         <header className="border-y border-[var(--rf-divider)] py-4 sm:py-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="rf-section-marker">01 · Mesa de Leitura</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rf-section-marker">01 · Mesa de Leitura</span>
+              {isDemoAccount ? (
+                <span className="rounded-[var(--rf-radius-full)] border border-[var(--rf-border-accent-soft)] bg-[var(--rf-accent-primary-subtle)] px-2.5 py-0.5 font-sans text-[11px] font-semibold text-[var(--rf-text-heading)]">
+                  Modo demonstrativo · conta isolada
+                </span>
+              ) : null}
+            </div>
             <p className="rf-type-label text-[var(--rf-text-secondary)]">
               {todayFormatted}
             </p>
@@ -877,19 +891,27 @@ async function DashboardSecondaryBand({
 export default async function DashboardPage() {
   const ws = await requireAuthenticatedWorkspace();
   const userTimezone = ws.profile.timezone || "America/Sao_Paulo";
+  const isDemoAccount = ws.profile.id === DEMO_USER_ID;
 
   // Dispara todas as consultas em paralelo imediatamente e faz streaming por bloco via Suspense
+  const onboardingGuidePromise = getOnboardingGuideSummary();
   const readingsPromise = getReadingsOverview();
   const goalsPromise = getEvaluatedGoals();
   const statsPromise = getStatisticsView({ preset: "current_year" });
   const rankingPromise = getAutomaticRankingView();
   const editorialPromise = getDashboardEditorialData();
+  const onboardingGuide = await onboardingGuidePromise;
 
   return (
     <div className="rf-dashboard-shell">
+      {onboardingGuide.shouldShow ? (
+        <OnboardingGuideCard guide={onboardingGuide} />
+      ) : null}
+
       <Suspense fallback={<DashboardPrimarySkeleton />}>
         <DashboardPrimaryBand
           userTimezone={userTimezone}
+          isDemoAccount={isDemoAccount}
           readingsPromise={readingsPromise}
           statsPromise={statsPromise}
           editorialPromise={editorialPromise}

@@ -934,6 +934,11 @@ export function createDefaultUserSettings(profile: UserProfile): UserSettings {
       profile.focusAmbientPreferences ?? DEFAULT_AMBIENT_PREFERENCES
     ),
     focusDefaultMode: "free",
+    onboardingGuide: {
+      dismissed: profile.id === DEMO_USER_ID,
+      reopened: false,
+      completedSteps: [],
+    },
     updatedAt: new Date().toISOString(),
   };
 }
@@ -941,6 +946,13 @@ export function createDefaultUserSettings(profile: UserProfile): UserSettings {
 export function ensureWorkspaceSettings(ws: UserWorkspaceData): UserSettings {
   if (!ws.settings) {
     ws.settings = createDefaultUserSettings(ws.profile);
+  }
+  if (!ws.settings.onboardingGuide) {
+    ws.settings.onboardingGuide = {
+      dismissed: ws.profile.id === DEMO_USER_ID,
+      reopened: false,
+      completedSteps: [],
+    };
   }
   if (!ws.uploadedCovers) {
     ws.uploadedCovers = {};

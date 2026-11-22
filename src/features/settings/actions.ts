@@ -21,7 +21,7 @@ import {
   normalizeAmbientPreferences,
   type AmbientPreferences,
 } from "@/features/reading/ambient-catalog";
-import type { UserSettings } from "@/lib/domain";
+import type { OnboardingGuideState, UserSettings } from "@/lib/domain";
 
 const saveShelfCustomizationSchema = z.object({
   layout: z.unknown().nullable(),
@@ -171,4 +171,72 @@ export async function importLegacyLocalSettingsAction(
   }
 
   return { ok: true, settings: structuredClone(settings) };
+}
+
+const updateOnboardingGuideSchema = z.object({
+  action: z.enum(["dismiss", "reopen", "complete_step"]),
+  stepId: z.enum(["first_book", "annual_goal", "focus_corner"]).optional(),
+});
+
+/**
+ * Persiste o estado do guia de primeiros passos em `user_settings` da conta autenticada.
+ */
+export async function updateOnboardingGuideAction(
+  rawInput: unknown
+): Promise<
+  | { ok: true; onboardingGuide: OnboardingGuideState }
+  | { ok: false; error: string }
+> {
+  const ws = await requireAuthenticatedWorkspace();
+  const parsed = updateOnboardingGuideSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Ação de primeiros passos inválida.",
+    };
+  }
+
+  const settings = ensureWorkspaceSettings(ws);
+  const current: OnboardingGuideState = settings.onboardingGuide ?? {
+    dismissed: false,
+    reopened: false,
+    completedSteps: [],
+  };
+  const nowIso = new Date().toISOString();
+
+  if (parsed.data.action === "dismiss") {
+    settings.onboardingGuide = {
+      ...current,
+      dismissed: true,
+      reopened: false,
+      dismissedAt: nowIso,
+      updatedAt: nowIso,
+    };
+  } else if (parsed.data.action === "reopen") {
+    settings.onboardingGuide = {
+      ...current,
+      dismissed: false,
+      reopened: true,
+      updatedAt: nowIso,
+    };
+  } else if (parsed.data.action === "complete_step" && parsed.data.stepId) {
+    const nextSteps = Array.from(
+      new Set([...current.completedSteps, parsed.data.stepId])
+    );
+    settings.onboardingGuide = {
+      ...current,
+      completedSteps: nextSteps,
+      updatedAt: nowIso,
+    };
+  }
+
+  settings.updatedAt = nowIso;
+  invalidateUserWorkspaceCache(ws.profile.id);
+  revalidatePath("/painel");
+  revalidatePath("/configuracoes");
+
+  return {
+    ok: true,
+    onboardingGuide: structuredClone(settings.onboardingGuide!),
+  };
 }

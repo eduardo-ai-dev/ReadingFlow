@@ -21,6 +21,7 @@ import {
 import type { ReadingStatus, Shelf, ShelfKind } from "@/lib/domain";
 import { ptBR } from "@/lib/i18n/pt-BR";
 import { ShelfItemsClient } from "@/components/ShelfItemsClient";
+import { EmptyBookshelfIllustration } from "@/components/EmptyBookshelfIllustration";
 import type { BackfillBookTarget } from "@/components/BackfillCoversModal";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
 
@@ -203,27 +204,40 @@ export default async function ShelvesPage({
         </div>
       </header>
 
-      {/* Móvel único com prateleiras horizontais em largura total por gênero */}
-      <VirtualBookshelf
-        books={virtualBooks}
-        initialShelfLayout={userSettings.shelfLayout}
-      />
+      {virtualBooks.length === 0 ? (
+        <EmptyBookshelfIllustration
+          title="Sua estante aguarda o primeiro livro"
+          description="Adicione livros físicos, e-books ou audiobooks usando a busca, ISBN ou cadastro manual. Sua biblioteca começa limpa e privada."
+          actionHref="/adicionar"
+          actionLabel="Adicionar primeiro livro"
+          secondaryHref="/metas"
+          secondaryLabel="Definir meta anual"
+        />
+      ) : (
+        <>
+          {/* Móvel único com prateleiras horizontais em largura total por gênero */}
+          <VirtualBookshelf
+            books={virtualBooks}
+            initialShelfLayout={userSettings.shelfLayout}
+          />
 
-      {/* Índice rápido de Alas Literárias em 3D */}
-      <VirtualGenreShelf countsBySlug={countsBySlug} />
+          {/* Índice rápido de Alas Literárias em 3D */}
+          <VirtualGenreShelf countsBySlug={countsBySlug} />
 
-      {/* Abas sem reset de scroll, busca/filtros e contêiner com min-height */}
-      <ShelfItemsClient
-        items={itemsByKind[activeKind]}
-        shelfTabs={tabs}
-        initialKind={activeKind}
-        itemsByKind={itemsByKind}
-        filterState={{
-          query,
-          readingStatus,
-          sortMode: effectiveSort,
-        }}
-      />
+          {/* Abas sem reset de scroll, busca/filtros e contêiner com min-height */}
+          <ShelfItemsClient
+            items={itemsByKind[activeKind]}
+            shelfTabs={tabs}
+            initialKind={activeKind}
+            itemsByKind={itemsByKind}
+            filterState={{
+              query,
+              readingStatus,
+              sortMode: effectiveSort,
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

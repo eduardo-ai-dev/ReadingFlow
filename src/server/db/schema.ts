@@ -183,5 +183,6 @@ export const userSettingsTable = sqliteTable("user_settings", {
     .notNull()
     .default("{}"),
   focusDefaultMode: text("focus_default_mode").notNull().default("free"),
+  onboardingGuideJson: text("onboarding_guide_json").notNull().default("{}"),
   updatedAt: text("updated_at").notNull(),
 });
