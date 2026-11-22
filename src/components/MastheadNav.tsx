@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
 
 export const MASTHEAD_NAV_ITEMS = [
   { href: "/painel", label: "Mesa de Leitura" },
@@ -75,18 +74,10 @@ export function MastheadNav() {
             aria-current={active ? "page" : undefined}
             className={`relative shrink-0 whitespace-nowrap rounded-[var(--rf-radius-full)] px-3 xl:px-3.5 py-1.5 font-sans text-xs xl:text-[13px] font-semibold tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] ${
               active
-                ? "bg-[var(--rf-accent-primary)] text-[var(--rf-accent-on-primary)]"
+                ? "bg-[var(--rf-accent-primary)] text-[var(--rf-accent-on-primary)] shadow-[var(--rf-nav-pill-glow)]"
                 : "text-[var(--rf-nav-text-muted)] hover:text-[var(--rf-nav-accent-hover)]"
             }`}
           >
-            {active ? (
-              <motion.span
-                layoutId="nav-pill"
-                aria-hidden="true"
-                className="absolute inset-0 rounded-[var(--rf-radius-full)] bg-[var(--rf-accent-primary)] shadow-[var(--rf-nav-pill-glow)]"
-                transition={{ type: "spring", stiffness: 420, damping: 34 }}
-              />
-            ) : null}
             <span className="relative z-10">{label}</span>
           </Link>
         );
