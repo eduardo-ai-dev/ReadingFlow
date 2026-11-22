@@ -693,6 +693,7 @@ export function AddBookFormClient({
               <input
                 id="book-pages"
                 type="number"
+                inputMode="numeric"
                 min={1}
                 value={pages}
                 onChange={(e) => {
@@ -715,6 +716,7 @@ export function AddBookFormClient({
             <input
               id="book-isbn-field"
               type="text"
+              inputMode="numeric"
               value={isbn}
               onChange={(e) => {
                 setIsbn(e.target.value);
@@ -739,7 +741,7 @@ export function AddBookFormClient({
               type="text"
               value={publisher}
               onChange={(e) => setPublisher(e.target.value)}
-              className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)]"
+              className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)] lg:min-h-[42px]"
             />
           </div>
 
@@ -760,7 +762,7 @@ export function AddBookFormClient({
                 clearAutofill("genre");
               }}
               placeholder="Ex.: Literatura Brasileira"
-              className={`mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)] ${fieldHighlight("genre")}`}
+              className={`mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)] lg:min-h-[42px] ${fieldHighlight("genre")}`}
             />
             <datalist id="readingflow-unified-genres">
               {UNIFIED_GENRE_NAMES.map((g) => (
@@ -785,7 +787,7 @@ export function AddBookFormClient({
                   ? setNarrator(e.target.value)
                   : setTranslator(e.target.value)
               }
-              className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)]"
+              className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)] lg:min-h-[42px]"
             />
           </div>
         </div>
@@ -805,7 +807,7 @@ export function AddBookFormClient({
               value={pricePaid}
               onChange={(e) => setPricePaid(e.target.value)}
               placeholder="Ex.: 49,90"
-              className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)]"
+              className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)] lg:min-h-[42px]"
             />
           </div>
           <div>
@@ -821,7 +823,7 @@ export function AddBookFormClient({
               value={store}
               onChange={(e) => setStore(e.target.value)}
               placeholder="Ex.: Livraria da Travessa, Sebo..."
-              className="mt-1 min-h-[42px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)]"
+              className="mt-1 min-h-[44px] w-full rounded-[8px] border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-primary)] lg:min-h-[42px]"
             />
           </div>
         </div>
@@ -844,7 +846,7 @@ export function AddBookFormClient({
         </div>
 
         <div className="space-y-2 border-t border-[var(--border-subtle)] pt-4 text-sm">
-          <label className="flex min-h-[36px] cursor-pointer items-center gap-2.5">
+          <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 lg:min-h-[36px]">
             <input
               type="checkbox"
               checked={addToWishlistOnly}
@@ -861,7 +863,7 @@ export function AddBookFormClient({
           </label>
 
           {!addToWishlistOnly ? (
-            <label className="flex min-h-[36px] cursor-pointer items-center gap-2.5">
+            <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 lg:min-h-[36px]">
               <input
                 type="checkbox"
                 checked={startReadingImmediately}

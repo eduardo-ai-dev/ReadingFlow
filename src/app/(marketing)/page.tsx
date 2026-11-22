@@ -297,7 +297,7 @@ export default async function LandingPage() {
                 <details className="group rounded-[var(--rf-radius-lg)] border border-[var(--rf-border-default)] bg-[var(--rf-surface-subtle)] p-6 transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--rf-border-accent)] open:border-[var(--rf-border-accent)]">
                   <summary
                     aria-label={faq.q}
-                    className="flex cursor-pointer list-none items-center justify-between rounded-[var(--rf-radius-xs)] font-serif text-lg font-semibold text-[var(--rf-text-heading)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                    className="flex min-h-[44px] cursor-pointer list-none items-center justify-between rounded-[var(--rf-radius-xs)] font-serif text-lg font-semibold text-[var(--rf-text-heading)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
                   >
                     <span>{faq.q}</span>
                     <span

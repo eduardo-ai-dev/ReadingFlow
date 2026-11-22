@@ -36,7 +36,7 @@ export function StartReadingButtonClient({
           router.refresh();
         });
       }}
-      className="min-h-[40px] rounded-[8px] bg-[var(--accent-primary)] px-3.5 text-xs font-semibold text-[var(--on-primary)] hover:bg-[var(--accent-primary-hover)] disabled:opacity-60"
+      className="min-h-[44px] rounded-[8px] bg-[var(--accent-primary)] px-3.5 text-xs font-semibold text-[var(--on-primary)] hover:bg-[var(--accent-primary-hover)] disabled:opacity-60 lg:min-h-[40px]"
     >
       {isPending ? "Iniciando..." : label}
     </button>
