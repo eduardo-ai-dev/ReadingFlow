@@ -216,7 +216,7 @@ const FocusStopwatchDisplay = memo(function FocusStopwatchDisplay({
             cy="128"
             r={ringRadius}
             fill="none"
-            stroke="rgba(140, 122, 99, 0.2)"
+            stroke="var(--rf-border-subtle)"
             strokeWidth="3"
           />
           <circle
@@ -224,12 +224,14 @@ const FocusStopwatchDisplay = memo(function FocusStopwatchDisplay({
             cy="128"
             r={ringRadius}
             fill="none"
-            stroke={isRunning ? "#D4AF37" : "#C4A77D"}
+            stroke={
+              isRunning ? "var(--rf-accent-primary)" : "var(--rf-border-accent)"
+            }
             strokeWidth="4"
             strokeLinecap="round"
             strokeDasharray={ringCircumference}
             strokeDashoffset={ringStrokeDashoffset}
-            className="transition-[stroke-dashoffset] duration-700 ease-out"
+            className="transition-opacity duration-300 ease-out"
           />
         </svg>
 
@@ -1165,10 +1167,12 @@ export function FocusReadingSessionClient({
                         {selectedBook.progressPercent}%
                       </span>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#8C7A63]/20">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--rf-progress-track)]">
                       <div
-                        className="h-full rounded-full bg-[#C4A77D] transition-all duration-300"
-                        style={{ width: `${selectedBook.progressPercent}%` }}
+                        className="h-full w-full origin-left rounded-full bg-[var(--rf-progress-fill)] transition-transform duration-300"
+                        style={{
+                          transform: `scaleX(${Math.max(0, Math.min(1, selectedBook.progressPercent / 100))})`,
+                        }}
                       />
                     </div>
                   </div>
