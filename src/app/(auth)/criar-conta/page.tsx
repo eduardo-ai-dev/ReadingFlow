@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { signUpAction } from "@/features/auth/actions";
 import { evaluatePasswordStrength } from "@/features/auth/rules";
+import { DemoLoginButton } from "@/components/DemoLoginButton";
 import { ExLibrisEmblem } from "@/components/ExLibrisEmblem";
 import { PasswordStrengthIndicator } from "@/components/PasswordStrengthIndicator";
 
@@ -33,10 +34,33 @@ export default function SignUpPage() {
           Criar minha biblioteca
         </h1>
         <p className="mt-1 font-sans text-sm text-[#2C221E]">
-          Sua conta nasce 100% privada, solicitando exclusivamente e-mail e
-          senha.
+          Crie sua conta 100% privada com e-mail e senha ou experimente a conta
+          demonstrativa.
         </p>
       </header>
+
+      {/* Botão Secundário/Editorial "Explorar Biblioteca Demonstrativa" em font-sans */}
+      <div className="mt-5">
+        <DemoLoginButton
+          variant="secondary"
+          label="Explorar Biblioteca Demonstrativa"
+          loadingLabel="Abrindo acervo demo..."
+          disabled={isBusy}
+          onBeforeStart={() => {
+            setEmailError(null);
+            setPasswordError(null);
+            setFormError(null);
+            setFormNotice(null);
+          }}
+          className="w-full"
+        />
+      </div>
+
+      <div className="my-5 flex items-center gap-3 font-sans text-xs text-[#4A433C]">
+        <span className="h-[1px] flex-1 bg-[#2C221E]/20" />
+        <span>ou crie com e-mail e senha</span>
+        <span className="h-[1px] flex-1 bg-[#2C221E]/20" />
+      </div>
 
       <form
         noValidate
@@ -106,7 +130,7 @@ export default function SignUpPage() {
             }
           });
         }}
-        className="mt-5 space-y-2.5"
+        className="space-y-2.5"
       >
         <div>
           <label
