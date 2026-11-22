@@ -3,10 +3,16 @@
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import {
+  invalidateUserWorkspaceCache,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
 } from "@/server/store/memory-repository";
-import { createGoalSchema, deleteGoalSchema } from "@/features/goals/schema";
+import {
+  createGoalSchema,
+  deleteGoalSchema,
+  togglePauseGoalSchema,
+  updateGoalSchema,
+} from "@/features/goals/schema";
 import { sanitizePlainText } from "@/server/security/sanitize";
 
 function lastDayOfMonth(year: number, month1Based: number): number {
@@ -52,11 +58,86 @@ export async function createGoalAction(
     targetValue: data.targetValue,
     tolerancePercent: 5,
     countRereads: data.countRereads,
+    paused: false,
     createdAt: new Date().toISOString(),
   });
 
+  invalidateUserWorkspaceCache(ws.profile.id);
   revalidatePath("/", "layout");
   return { ok: true, goalId };
+}
+
+export async function updateGoalAction(
+  rawInput: unknown
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ws = await requireAuthenticatedWorkspace();
+  const parsed = updateGoalSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Dados de ajuste inválidos.",
+    };
+  }
+
+  const { goalId, title, targetValue, endsOn } = parsed.data;
+  const goal = ws.goals.find(
+    (g) => g.id === goalId && g.userId === ws.profile.id
+  );
+  if (!goal) {
+    return { ok: false, error: "Meta não encontrada nesta conta." };
+  }
+
+  if (endsOn && endsOn < goal.startsOn) {
+    return {
+      ok: false,
+      error: "A data final não pode ser anterior ao início da meta.",
+    };
+  }
+
+  saveUndoSnapshot(ws, `Ajuste da meta "${goal.title}"`);
+  if (title !== undefined) {
+    goal.title = sanitizePlainText(title, 100);
+  }
+  if (targetValue !== undefined) {
+    goal.targetValue = targetValue;
+  }
+  if (endsOn !== undefined) {
+    goal.endsOn = endsOn;
+  }
+
+  invalidateUserWorkspaceCache(ws.profile.id);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function togglePauseGoalAction(
+  rawInput: unknown
+): Promise<{ ok: true; paused: boolean } | { ok: false; error: string }> {
+  const ws = await requireAuthenticatedWorkspace();
+  const parsed = togglePauseGoalSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { ok: false, error: "Meta inválida." };
+  }
+
+  const goal = ws.goals.find(
+    (g) => g.id === parsed.data.goalId && g.userId === ws.profile.id
+  );
+  if (!goal) {
+    return { ok: false, error: "Meta não encontrada nesta conta." };
+  }
+
+  saveUndoSnapshot(
+    ws,
+    parsed.data.paused
+      ? `Pausa da meta "${goal.title}"`
+      : `Retomada da meta "${goal.title}"`
+  );
+  goal.paused = parsed.data.paused;
+  goal.pausedAt = parsed.data.paused ? new Date().toISOString() : undefined;
+
+  invalidateUserWorkspaceCache(ws.profile.id);
+  revalidatePath("/", "layout");
+  return { ok: true, paused: goal.paused };
 }
 
 export async function deleteGoalAction(
@@ -69,8 +150,11 @@ export async function deleteGoalAction(
   }
 
   saveUndoSnapshot(ws, "Remoção de meta de leitura");
-  ws.goals = ws.goals.filter((g) => g.id !== parsed.data.goalId);
+  ws.goals = ws.goals.filter(
+    (g) => !(g.id === parsed.data.goalId && g.userId === ws.profile.id)
+  );
 
+  invalidateUserWorkspaceCache(ws.profile.id);
   revalidatePath("/", "layout");
   return { ok: true };
 }

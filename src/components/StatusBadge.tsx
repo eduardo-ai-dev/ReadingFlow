@@ -1,3 +1,11 @@
+import {
+  CheckCircle2,
+  Clock,
+  Compass,
+  PauseCircle,
+  Target,
+  TrendingUp,
+} from "lucide-react";
 import type { BookFormat, ReadingStatus } from "@/lib/domain";
 import { ptBR } from "@/lib/i18n/pt-BR";
 import type { GoalPaceStatus } from "@/features/goals/rules";
@@ -34,28 +42,61 @@ export function FormatBadge({ format }: { format: BookFormat }) {
 }
 
 export function GoalPaceBadge({ status }: { status: GoalPaceStatus }) {
-  const labels: Record<GoalPaceStatus, string> = {
-    completed: "Cumprida",
-    ahead: "Adiantada",
-    on_track: "No ritmo",
-    behind: "Atrasada",
+  const config: Record<
+    GoalPaceStatus,
+    {
+      label: string;
+      style: string;
+      Icon: typeof Compass;
+    }
+  > = {
+    completed: {
+      label: "Cumprida",
+      style:
+        "border-[var(--rf-status-success)] bg-[var(--rf-status-success-bg)] text-[var(--rf-status-success)]",
+      Icon: CheckCircle2,
+    },
+    on_track: {
+      label: "No ritmo",
+      style:
+        "border-[var(--rf-border-accent)] bg-[var(--rf-accent-primary-subtle)] text-[var(--rf-text-heading)]",
+      Icon: Compass,
+    },
+    achievable: {
+      label: "Dá para alcançar",
+      style:
+        "border-[var(--rf-status-warning)] bg-[var(--rf-status-warning-bg)] text-[var(--rf-status-warning)]",
+      Icon: TrendingUp,
+    },
+    ambitious: {
+      label: "Meta ambiciosa",
+      style:
+        "border-[var(--rf-border-secondary)] bg-[var(--rf-accent-secondary-subtle)] text-[var(--rf-text-accent-secondary)]",
+      Icon: Target,
+    },
+    collecting_data: {
+      label: "Ainda coletando dados",
+      style:
+        "border-[var(--rf-border-default)] bg-[var(--rf-surface-subtle)] text-[var(--rf-text-secondary)]",
+      Icon: Clock,
+    },
+    paused: {
+      label: "Pausada",
+      style:
+        "border-[var(--rf-border-default)] bg-[var(--rf-surface-subtle)] text-[var(--rf-text-secondary)]",
+      Icon: PauseCircle,
+    },
   };
-  const styles: Record<GoalPaceStatus, string> = {
-    completed:
-      "border-[var(--rf-status-success)] bg-[var(--rf-status-success-bg)] text-[var(--rf-status-success)]",
-    ahead:
-      "border-[var(--rf-status-success)] bg-[var(--rf-status-success-bg)] text-[var(--rf-status-success)]",
-    on_track:
-      "border-[var(--rf-status-warning)] bg-[var(--rf-status-warning-bg)] text-[var(--rf-status-warning)]",
-    behind:
-      "border-[var(--rf-status-error)] bg-[var(--rf-status-error-bg)] text-[var(--rf-status-error)]",
-  };
+
+  const { label, style, Icon } = config[status];
 
   return (
     <span
-      className={`inline-flex items-center rounded-[var(--rf-radius-full)] border px-2.5 py-0.5 font-sans text-[13px] font-semibold ${styles[status]}`}
+      data-goal-status={status}
+      className={`inline-flex items-center gap-1.5 rounded-[var(--rf-radius-full)] border px-2.5 py-0.5 font-sans text-[13px] font-semibold ${style}`}
     >
-      {labels[status]}
+      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <span>{label}</span>
     </span>
   );
 }

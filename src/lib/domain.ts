@@ -192,6 +192,8 @@ export interface ReadingGoal {
   tolerancePercent: number;
   countRereads: boolean;
   formats?: BookFormat[];
+  paused?: boolean;
+  pausedAt?: string;
   createdAt: string;
 }
 

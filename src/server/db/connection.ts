@@ -147,6 +147,8 @@ function initTables(sqlite: DatabaseSync) {
       target_value INTEGER NOT NULL,
       tolerance_percent INTEGER NOT NULL DEFAULT 5,
       count_rereads INTEGER NOT NULL DEFAULT 0,
+      paused INTEGER NOT NULL DEFAULT 0,
+      paused_at TEXT,
       created_at TEXT NOT NULL
     );
 
@@ -275,6 +277,19 @@ function initTables(sqlite: DatabaseSync) {
     sqlite.exec(
       "ALTER TABLE users ADD COLUMN motion TEXT NOT NULL DEFAULT 'system'"
     );
+  }
+
+  const goalCols = sqlite.prepare("PRAGMA table_info(goals)").all() as Array<{
+    name?: string;
+  }>;
+  const goalColNames = new Set(goalCols.map((c) => c.name));
+  if (!goalColNames.has("paused")) {
+    sqlite.exec(
+      "ALTER TABLE goals ADD COLUMN paused INTEGER NOT NULL DEFAULT 0"
+    );
+  }
+  if (!goalColNames.has("paused_at")) {
+    sqlite.exec("ALTER TABLE goals ADD COLUMN paused_at TEXT");
   }
 }
 

@@ -49,10 +49,12 @@ export const ptBR = {
     seconds: "Tempo ouvido",
   },
   goals: {
-    ahead: "Ritmo adiantado em relação ao planejado",
-    on_track: "No ritmo planejado",
-    behind: "Ritmo em ajuste — siga no seu tempo",
-    completed: "Meta cumprida",
+    on_track: "No ritmo",
+    achievable: "Dá para alcançar",
+    ambitious: "Meta ambiciosa",
+    collecting_data: "Ainda coletando dados",
+    paused: "Pausada",
+    completed: "Cumprida",
   },
   validation: {
     requiredTitle: "Informe o título da obra.",

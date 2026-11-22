@@ -148,6 +148,8 @@ export const goalsTable = sqliteTable("goals", {
   countRereads: integer("count_rereads", { mode: "boolean" })
     .notNull()
     .default(false),
+  paused: integer("paused", { mode: "boolean" }).notNull().default(false),
+  pausedAt: text("paused_at"),
   createdAt: text("created_at").notNull(),
 });
 

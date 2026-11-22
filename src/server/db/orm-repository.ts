@@ -540,6 +540,8 @@ export async function ormGetGoals(userId: string): Promise<ReadingGoal[]> {
     targetValue: r.targetValue,
     tolerancePercent: r.tolerancePercent,
     countRereads: r.countRereads,
+    paused: r.paused,
+    pausedAt: r.pausedAt ?? undefined,
     createdAt: r.createdAt,
   }));
 }
@@ -557,8 +559,35 @@ export async function ormInsertGoal(goal: ReadingGoal): Promise<void> {
     targetValue: goal.targetValue,
     tolerancePercent: goal.tolerancePercent,
     countRereads: goal.countRereads,
+    paused: Boolean(goal.paused),
+    pausedAt: goal.pausedAt ?? null,
     createdAt: goal.createdAt,
   });
+}
+
+export async function ormUpdateGoal(
+  goalId: string,
+  userId: string,
+  data: Partial<
+    Pick<
+      ReadingGoal,
+      "title" | "targetValue" | "endsOn" | "paused" | "pausedAt"
+    >
+  >
+): Promise<void> {
+  const db = getOrmDb();
+  await db
+    .update(goalsTable)
+    .set({
+      ...(data.title !== undefined ? { title: data.title } : {}),
+      ...(data.targetValue !== undefined
+        ? { targetValue: data.targetValue }
+        : {}),
+      ...(data.endsOn !== undefined ? { endsOn: data.endsOn } : {}),
+      ...(data.paused !== undefined ? { paused: data.paused } : {}),
+      ...(data.pausedAt !== undefined ? { pausedAt: data.pausedAt } : {}),
+    })
+    .where(and(eq(goalsTable.id, goalId), eq(goalsTable.userId, userId)));
 }
 
 export async function ormDeleteGoal(

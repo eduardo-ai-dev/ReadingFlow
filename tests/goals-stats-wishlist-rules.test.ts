@@ -77,7 +77,8 @@ describe("Goals, Statistics, Ratings & Wishlist pure rules (§8.1, §8.3, §8.4,
 
     expect(evaluation.completedValue).toBe(10);
     expect(evaluation.expectedByToday).toBeCloseTo(11.9, 1);
-    expect(evaluation.paceStatus).toBe("behind");
+    // 10 livros em 181 dias (~0,39/sem) vs 14 livros em 184 dias (~0,53/sem, razão 1,38x <= 1,5x)
+    expect(evaluation.paceStatus).toBe("achievable");
     expect(evaluation.requiredPerDay).toBeCloseTo(0.076, 3);
     expect(evaluation.requiredPerWeek).toBeCloseTo(0.53, 2);
     expect(evaluation.projectedFitsBeforeDeadline).toBe(false);
@@ -85,7 +86,11 @@ describe("Goals, Statistics, Ratings & Wishlist pure rules (§8.1, §8.3, §8.4,
     // Projeção de 254 dias ultrapassa os 184 dias restantes: nunca dizer "termina em N dias"
     expect(evaluation.neutralMessagePtBr).not.toContain("termina em");
     expect(evaluation.neutralMessagePtBr).toContain("184 dias");
-    expect(evaluation.neutralMessagePtBr.toLowerCase()).not.toContain("abaixo do ritmo");
+    expect(evaluation.neutralMessagePtBr.toLowerCase()).not.toContain(
+      "atrasada"
+    );
+    expect(evaluation.neutralMessagePtBr.toLowerCase()).not.toContain("falhou");
+    expect(evaluation.neutralMessagePtBr.toLowerCase()).not.toContain("perdeu");
 
     // Enabling rereads counts the 11th finished reading
     const withRereads = evaluateReadingGoal({
