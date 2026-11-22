@@ -1,6 +1,6 @@
 import "server-only";
 import { eq, and, desc, asc } from "drizzle-orm";
-import { getDatabase, getOrmDb } from "./connection";
+import { getOrmDb, getTestSqliteDatabase } from "./connection";
 import {
   usersTable,
   worksTable,
@@ -721,8 +721,10 @@ export async function ormSeedWorkspace(ws: {
     return;
   }
 
-  const sqlite = getDatabase();
-  sqlite.exec("BEGIN IMMEDIATE;");
+  const testSqlite = getTestSqliteDatabase();
+  if (testSqlite) {
+    testSqlite.exec("BEGIN IMMEDIATE;");
+  }
   try {
     await ormCreateUser({
       id: ws.profile.id,
@@ -765,12 +767,16 @@ export async function ormSeedWorkspace(ws: {
     for (const wish of ws.wishlist) {
       await ormInsertWishlistItem(wish);
     }
-    sqlite.exec("COMMIT;");
+    if (testSqlite) {
+      testSqlite.exec("COMMIT;");
+    }
   } catch (err) {
-    try {
-      sqlite.exec("ROLLBACK;");
-    } catch {
-      // ignora se a transação já foi desfeita
+    if (testSqlite) {
+      try {
+        testSqlite.exec("ROLLBACK;");
+      } catch {
+        // ignora se a transação já foi desfeita
+      }
     }
     throw err;
   }

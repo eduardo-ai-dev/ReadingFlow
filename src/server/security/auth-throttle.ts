@@ -1,5 +1,9 @@
 import crypto from "node:crypto";
-import { getDatabase } from "@/server/db/connection";
+import {
+  getCloudflareD1Binding,
+  getD1Database,
+  getTestSqliteDatabase,
+} from "@/server/db/connection";
 import { getAuthSecurityConfig } from "@/server/security/auth-config";
 import {
   computeAccountHmac,
@@ -46,8 +50,23 @@ export interface RecordedFailureResult {
   attackModeActive: boolean;
 }
 
+const memAttempts = new Map<string, AttemptRow>();
+const memAttackEvents: Array<{
+  ip_key: string;
+  account_hmac: string;
+  created_at_ms: number;
+}> = [];
+let memAttackModeUntilMs = 0;
+
+function attemptMapKey(scopeType: ThrottleScopeType, scopeKey: string): string {
+  return `${scopeType}:${scopeKey}`;
+}
+
 function runImmediateTx<T>(fn: () => T): T {
-  const db = getDatabase();
+  const db = getTestSqliteDatabase();
+  if (!db) {
+    return fn();
+  }
   db.exec("BEGIN IMMEDIATE;");
   try {
     const result = fn();
@@ -67,7 +86,10 @@ function readAttemptRow(
   scopeType: ThrottleScopeType,
   scopeKey: string
 ): AttemptRow | null {
-  const db = getDatabase();
+  const db = getTestSqliteDatabase();
+  if (!db) {
+    return memAttempts.get(attemptMapKey(scopeType, scopeKey)) ?? null;
+  }
   const row = db
     .prepare(
       `SELECT scope_type, scope_key, consecutive_failures, window_started_at_ms,
@@ -81,7 +103,45 @@ function readAttemptRow(
 }
 
 function upsertAttemptRow(row: AttemptRow): void {
-  const db = getDatabase();
+  const db = getTestSqliteDatabase();
+  if (!db) {
+    memAttempts.set(attemptMapKey(row.scope_type, row.scope_key), { ...row });
+    const d1 = getCloudflareD1Binding();
+    if (d1) {
+      void d1
+        .prepare(
+          `INSERT INTO auth_login_attempts (
+            scope_type, scope_key, consecutive_failures, window_started_at_ms,
+            locked_until_ms, lockout_level, last_failure_at_ms, last_success_at_ms,
+            alert_sent_at_ms, updated_at_ms
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(scope_type, scope_key) DO UPDATE SET
+            consecutive_failures = excluded.consecutive_failures,
+            window_started_at_ms = excluded.window_started_at_ms,
+            locked_until_ms = excluded.locked_until_ms,
+            lockout_level = excluded.lockout_level,
+            last_failure_at_ms = excluded.last_failure_at_ms,
+            last_success_at_ms = excluded.last_success_at_ms,
+            alert_sent_at_ms = excluded.alert_sent_at_ms,
+            updated_at_ms = excluded.updated_at_ms`
+        )
+        .bind(
+          row.scope_type,
+          row.scope_key,
+          row.consecutive_failures,
+          row.window_started_at_ms,
+          row.locked_until_ms,
+          row.lockout_level,
+          row.last_failure_at_ms,
+          row.last_success_at_ms,
+          row.alert_sent_at_ms,
+          row.updated_at_ms
+        )
+        .run()
+        .catch(() => {});
+    }
+    return;
+  }
   db.prepare(
     `INSERT INTO auth_login_attempts (
       scope_type, scope_key, consecutive_failures, window_started_at_ms,
@@ -112,7 +172,10 @@ function upsertAttemptRow(row: AttemptRow): void {
 }
 
 function readAttackModeUntilMs(): number {
-  const db = getDatabase();
+  const db = getTestSqliteDatabase();
+  if (!db) {
+    return memAttackModeUntilMs;
+  }
   const row = db
     .prepare(
       `SELECT value_int FROM auth_security_state WHERE state_key = 'attack_mode_until_ms'`
@@ -122,7 +185,25 @@ function readAttackModeUntilMs(): number {
 }
 
 function writeAttackModeUntilMs(untilMs: number, nowMs: number): void {
-  const db = getDatabase();
+  const db = getTestSqliteDatabase();
+  if (!db) {
+    memAttackModeUntilMs = untilMs;
+    const d1 = getCloudflareD1Binding();
+    if (d1) {
+      void d1
+        .prepare(
+          `INSERT INTO auth_security_state (state_key, value_int, updated_at_ms)
+           VALUES ('attack_mode_until_ms', ?, ?)
+           ON CONFLICT(state_key) DO UPDATE SET
+             value_int = excluded.value_int,
+             updated_at_ms = excluded.updated_at_ms`
+        )
+        .bind(untilMs, nowMs)
+        .run()
+        .catch(() => {});
+    }
+    return;
+  }
   db.prepare(
     `INSERT INTO auth_security_state (state_key, value_int, updated_at_ms)
      VALUES ('attack_mode_until_ms', ?, ?)
@@ -371,7 +452,7 @@ export function recordAuthFailureAtomic(params: {
   const pairWindowMs = cfg.pairWindowSeconds * 1000;
 
   return runImmediateTx(() => {
-    const db = getDatabase();
+    const db = getTestSqliteDatabase();
     let attackUntilMs = readAttackModeUntilMs();
     let attackModeActive = attackUntilMs > nowMs;
     let attackModeTriggeredNow = false;
@@ -436,25 +517,55 @@ export function recordAuthFailureAtomic(params: {
 
     // 4. Detecção de Modo Ataque (muitas contas distintas falhando a partir de poucos IPs)
     const attackWindowCutoff = nowMs - cfg.attackModeWindowSeconds * 1000;
-    db.prepare(`DELETE FROM auth_attack_events WHERE created_at_ms < ?`).run(
-      attackWindowCutoff
-    );
-    db.prepare(
-      `INSERT INTO auth_attack_events (ip_key, account_hmac, created_at_ms) VALUES (?, ?, ?)`
-    ).run(ipKey, params.accountHmac, nowMs);
+    let distinctAccounts = 0;
+    let distinctIps = 0;
 
-    const stats = db
-      .prepare(
-        `SELECT COUNT(DISTINCT account_hmac) AS distinct_accounts,
-                COUNT(DISTINCT ip_key) AS distinct_ips
-         FROM auth_attack_events
-         WHERE created_at_ms >= ?`
-      )
-      .get(attackWindowCutoff) as
-      { distinct_accounts?: number; distinct_ips?: number } | undefined;
+    if (db) {
+      db.prepare(`DELETE FROM auth_attack_events WHERE created_at_ms < ?`).run(
+        attackWindowCutoff
+      );
+      db.prepare(
+        `INSERT INTO auth_attack_events (ip_key, account_hmac, created_at_ms) VALUES (?, ?, ?)`
+      ).run(ipKey, params.accountHmac, nowMs);
 
-    const distinctAccounts = Number(stats?.distinct_accounts ?? 0);
-    const distinctIps = Number(stats?.distinct_ips ?? 0);
+      const stats = db
+        .prepare(
+          `SELECT COUNT(DISTINCT account_hmac) AS distinct_accounts,
+                  COUNT(DISTINCT ip_key) AS distinct_ips
+           FROM auth_attack_events
+           WHERE created_at_ms >= ?`
+        )
+        .get(attackWindowCutoff) as
+        { distinct_accounts?: number; distinct_ips?: number } | undefined;
+
+      distinctAccounts = Number(stats?.distinct_accounts ?? 0);
+      distinctIps = Number(stats?.distinct_ips ?? 0);
+    } else {
+      for (let i = memAttackEvents.length - 1; i >= 0; i--) {
+        if ((memAttackEvents[i]?.created_at_ms ?? 0) < attackWindowCutoff) {
+          memAttackEvents.splice(i, 1);
+        }
+      }
+      memAttackEvents.push({
+        ip_key: ipKey,
+        account_hmac: params.accountHmac,
+        created_at_ms: nowMs,
+      });
+      distinctAccounts = new Set(memAttackEvents.map((e) => e.account_hmac))
+        .size;
+      distinctIps = new Set(memAttackEvents.map((e) => e.ip_key)).size;
+
+      const d1 = getCloudflareD1Binding();
+      if (d1) {
+        void d1
+          .prepare(
+            `INSERT INTO auth_attack_events (ip_key, account_hmac, created_at_ms) VALUES (?, ?, ?)`
+          )
+          .bind(ipKey, params.accountHmac, nowMs)
+          .run()
+          .catch(() => {});
+      }
+    }
 
     // Dispara Modo Ataque se >= N contas distintas falharam em poucos IPs (ou média >= 2 contas por IP com >= N contas)
     if (
@@ -540,7 +651,30 @@ export function unlockAccountManually(emailOrHmac: string): {
     : computeAccountHmac(emailOrHmac);
 
   const rowsCleared = runImmediateTx(() => {
-    const db = getDatabase();
+    const db = getTestSqliteDatabase();
+    if (!db) {
+      let cleared = 0;
+      for (const [k, row] of memAttempts.entries()) {
+        if (
+          row.scope_key === accountHmac ||
+          row.scope_key.endsWith(`:${accountHmac}`)
+        ) {
+          memAttempts.delete(k);
+          cleared += 1;
+        }
+      }
+      const d1 = getCloudflareD1Binding();
+      if (d1) {
+        void d1
+          .prepare(
+            `DELETE FROM auth_login_attempts WHERE scope_key = ? OR scope_key LIKE ?`
+          )
+          .bind(accountHmac, `%:${accountHmac}`)
+          .run()
+          .catch(() => {});
+      }
+      return cleared;
+    }
     const r1 = db
       .prepare(
         `DELETE FROM auth_login_attempts WHERE scope_key = ? OR scope_key LIKE ?`
@@ -592,8 +726,12 @@ export async function withAccountAuthLock<T>(
 }
 
 export function resetAllAuthThrottleStateForTests(): void {
+  memAttempts.clear();
+  memAttackEvents.length = 0;
+  memAttackModeUntilMs = 0;
   runImmediateTx(() => {
-    const db = getDatabase();
+    const db = getTestSqliteDatabase();
+    if (!db) return;
     db.exec(`
       DELETE FROM auth_login_attempts;
       DELETE FROM auth_attack_events;
@@ -605,7 +743,6 @@ export function resetAllAuthThrottleStateForTests(): void {
 
 // =============================================================================
 // Armazenamento de segredos próprios (códigos de recuperação e OTP/link mágico)
-// com Argon2id (sal aleatório por item, m >= 19 MiB, t >= 2, p >= 1)
 // =============================================================================
 
 export type AuthSecretPurpose = "password_reset" | "magic_link_otp";
@@ -622,33 +759,35 @@ export async function issueOneTimeAuthSecret(params: {
   const secretHash = await hashAppSecretArgon2id(rawSecret);
   const id = `${params.purpose}-${crypto.randomUUID()}`;
 
-  runImmediateTx(() => {
-    const db = getDatabase();
-    // Remove expirados e invalida segredos anteriores do mesmo propósito para esta conta
-    db.prepare(`DELETE FROM auth_secrets WHERE expires_at_ms <= ?`).run(nowMs);
-    db.prepare(
-      `DELETE FROM auth_secrets WHERE purpose = ? AND account_hmac = ?`
-    ).run(params.purpose, params.accountHmac);
-    db.prepare(
-      `INSERT INTO auth_secrets (id, purpose, account_hmac, user_id, secret_hash, expires_at_ms, created_at_ms)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      id,
-      params.purpose,
-      params.accountHmac,
-      params.userId,
-      secretHash,
-      nowMs + params.ttlMs,
-      nowMs
-    );
-  });
+  const d1 = getD1Database();
+  await d1.batch([
+    d1.prepare(`DELETE FROM auth_secrets WHERE expires_at_ms <= ?`).bind(nowMs),
+    d1
+      .prepare(
+        `DELETE FROM auth_secrets WHERE purpose = ? AND account_hmac = ?`
+      )
+      .bind(params.purpose, params.accountHmac),
+    d1
+      .prepare(
+        `INSERT INTO auth_secrets (id, purpose, account_hmac, user_id, secret_hash, expires_at_ms, created_at_ms)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        id,
+        params.purpose,
+        params.accountHmac,
+        params.userId,
+        secretHash,
+        nowMs + params.ttlMs,
+        nowMs
+      ),
+  ]);
 
   return { id, rawSecret, secretHash };
 }
 
 /**
- * Valida e consome atomicamente um segredo de uso único (reset ou OTP) via Argon2id
- * em tempo constante.
+ * Valida e consome atomicamente um segredo de uso único (reset ou OTP) em tempo constante.
  */
 export async function consumeOneTimeAuthSecret(params: {
   purpose: AuthSecretPurpose;
@@ -657,23 +796,24 @@ export async function consumeOneTimeAuthSecret(params: {
   nowMs?: number;
 }): Promise<{ valid: boolean; userId?: string }> {
   const nowMs = params.nowMs ?? Date.now();
-  const db = getDatabase();
+  const d1 = getD1Database();
 
-  const candidates = db
+  const { results: candidates } = await d1
     .prepare(
       `SELECT id, user_id, secret_hash, expires_at_ms
        FROM auth_secrets
        WHERE purpose = ? AND account_hmac = ? AND expires_at_ms > ?`
     )
-    .all(params.purpose, params.accountHmac, nowMs) as Array<{
-    id: string;
-    user_id: string;
-    secret_hash: string;
-    expires_at_ms: number;
-  }>;
+    .bind(params.purpose, params.accountHmac, nowMs)
+    .all<{
+      id: string;
+      user_id: string;
+      secret_hash: string;
+      expires_at_ms: number;
+    }>();
 
   if (candidates.length === 0) {
-    // Executa verificação dummy em Argon2id para evitar timing leak quando não há token ativo
+    // Executa verificação dummy para evitar timing leak quando não há token ativo
     await hashAppSecretArgon2id(params.rawSecret.slice(0, 64) || "dummy-token");
     return { valid: false };
   }
@@ -684,12 +824,11 @@ export async function consumeOneTimeAuthSecret(params: {
       row.secret_hash
     );
     if (matches) {
-      const deleted = runImmediateTx(() => {
-        const res = db
-          .prepare(`DELETE FROM auth_secrets WHERE id = ?`)
-          .run(row.id);
-        return Number(res.changes ?? 0);
-      });
+      const res = await d1
+        .prepare(`DELETE FROM auth_secrets WHERE id = ?`)
+        .bind(row.id)
+        .run();
+      const deleted = Number(res.meta?.changes ?? 0);
       if (deleted === 1) {
         return { valid: true, userId: row.user_id };
       }

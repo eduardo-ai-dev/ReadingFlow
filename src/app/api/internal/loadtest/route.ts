@@ -8,7 +8,7 @@ import {
   SESSION_COOKIE_NAME,
   type UserWorkspaceData,
 } from "@/server/store/memory-repository";
-import { getDatabase } from "@/server/db/connection";
+import { getTestSqliteDatabase } from "@/server/db/connection";
 import {
   ormCreateSession,
   ormDeleteSession,
@@ -49,7 +49,14 @@ function verifyLocalLoadtestGuard(request: NextRequest): NextResponse | null {
 }
 
 function collectSqliteDiagnostics(sampleUserId?: string) {
-  const sqlite = getDatabase();
+  const sqlite = getTestSqliteDatabase();
+  if (!sqlite) {
+    return {
+      totalSqliteBytes: 0,
+      tableStats: {},
+      queryPlans: {},
+    };
+  }
   sqlite.exec("ANALYZE;");
 
   const tables = [

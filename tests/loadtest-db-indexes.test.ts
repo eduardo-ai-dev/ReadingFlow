@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { getDatabase } from "@/server/db/connection";
+import { getTestSqliteDatabase } from "@/server/db/connection";
 import { ormSeedWorkspace } from "@/server/db/orm-repository";
 import { generateDeterministicUserWorkspace } from "../loadtest/seed.mjs";
 
@@ -26,7 +26,10 @@ describe("Regressão de Banco de Dados #2 — Índices Compostos, EXPLAIN QUERY 
     await ormSeedWorkspace(user2000.workspace);
     const seed2000Ms = performance.now() - tSeed2000;
 
-    const sqlite = getDatabase();
+    const sqlite = getTestSqliteDatabase();
+    if (!sqlite) {
+      throw new Error("Adaptador SQLite de teste não registrado.");
+    }
     sqlite.exec("ANALYZE;");
 
     const uid = user2000.workspace.profile.id;
