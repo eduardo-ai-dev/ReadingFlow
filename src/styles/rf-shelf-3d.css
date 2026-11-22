@@ -71,8 +71,8 @@
   overflow-wrap: anywhere;
   hyphens: auto;
   display: -webkit-box;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -872,8 +872,8 @@
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 5px 2px;
+  gap: calc(6px * var(--rf-shelf-scale, 1));
+  padding: calc(5px * var(--rf-shelf-scale, 1)) 2px;
   writing-mode: vertical-rl;
   text-orientation: mixed;
   overflow: hidden;
@@ -886,7 +886,7 @@
   justify-content: center;
   gap: 1px;
   font-family: var(--font-serif, "Playfair Display", Georgia, serif);
-  font-size: var(--title-fs, 11px);
+  font-size: calc(var(--title-fs, 11px) * var(--rf-shelf-scale, 1));
   font-weight: 700;
   line-height: 1.08;
   letter-spacing: 0.015em;
@@ -932,19 +932,19 @@
 
 /* Em lombadas largas (>= 42px), mantém orientação vertical limpa com auto-fit de 1 ou 2 linhas (zero reticências) */
 .rf-wide-spine .rf-spine-titles {
-  padding: 10px 4px;
-  gap: 8px;
+  padding: calc(10px * var(--rf-shelf-scale, 1)) 4px;
+  gap: calc(8px * var(--rf-shelf-scale, 1));
 }
 
 .rf-wide-spine .rf-spine-title {
-  font-size: var(--title-fs, 13px);
+  font-size: calc(var(--title-fs, 13px) * var(--rf-shelf-scale, 1));
   line-height: 1.1;
   overflow: hidden;
   text-overflow: clip;
 }
 
 .rf-wide-spine .rf-spine-author {
-  font-size: var(--author-fs, 8px);
+  font-size: calc(var(--author-fs, 8px) * var(--rf-shelf-scale, 1));
   letter-spacing: 0.04em;
   flex-shrink: 0;
 }
@@ -952,7 +952,7 @@
 /* Autor pequeno, em sans, na cor contrastante da lombada (sem foil dourado) */
 .rf-spine-author {
   font-family: var(--font-sans, system-ui, sans-serif);
-  font-size: var(--author-fs, 7.5px);
+  font-size: calc(var(--author-fs, 7.5px) * var(--rf-shelf-scale, 1));
   font-weight: 500;
   letter-spacing: 0.04em;
   line-height: 1.05;
