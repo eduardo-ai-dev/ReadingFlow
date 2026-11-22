@@ -35,12 +35,15 @@ const ITEM = { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } };
 export function Stagger({
   children,
   className,
+  "aria-label": ariaLabel,
 }: {
   children: ReactNode;
   className?: string;
+  "aria-label"?: string;
 }) {
   return (
     <motion.div
+      aria-label={ariaLabel}
       className={className}
       initial="hidden"
       animate="show"
@@ -92,4 +95,3 @@ export function ScrollReveal({
     </motion.div>
   );
 }
-
