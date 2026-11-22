@@ -55,7 +55,7 @@ export default async function StatisticsPage({
                 key={key}
                 href={`/estatisticas?periodo=${key}`}
                 aria-current={active ? "page" : undefined}
-                className={`inline-flex min-h-[38px] items-center rounded-[6px] px-3 text-xs font-semibold ${
+                className={`inline-flex min-h-[44px] lg:min-h-[38px] items-center rounded-[6px] px-3 text-xs font-semibold ${
                   active
                     ? "bg-[var(--accent-primary)] text-[var(--on-primary)]"
                     : "text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
@@ -152,11 +152,11 @@ export default async function StatisticsPage({
         ))}
       </Stagger>
 
-      <div className="grid gap-8 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         {/* Histórico anual */}
         <section
           aria-labelledby="historico-anual-heading"
-          className="space-y-3 lg:col-span-6"
+          className="min-w-0 space-y-3 lg:col-span-6"
         >
           <h2
             id="historico-anual-heading"
@@ -164,7 +164,7 @@ export default async function StatisticsPage({
           >
             Histórico por ano
           </h2>
-          <div className="overflow-hidden rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+          <div className="overflow-x-auto rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
             {stats.yearlyHistory.length === 0 ? (
               <p className="p-5 text-sm text-[var(--text-muted)]">
                 Conclua leituras para visualizar a série anual.
@@ -197,7 +197,7 @@ export default async function StatisticsPage({
         {/* Ranking geral automático */}
         <section
           aria-labelledby="ranking-geral-heading"
-          className="space-y-3 lg:col-span-6"
+          className="min-w-0 space-y-3 lg:col-span-6"
         >
           <h2
             id="ranking-geral-heading"
@@ -212,25 +212,26 @@ export default async function StatisticsPage({
           ) : (
             <ol className="space-y-2.5">
               {ranking.map((entry) => (
-                <li
-                  key={entry.work.id}
-                  className="flex items-center justify-between gap-3 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5"
-                >
-                  <div className="min-w-0">
-                    <Link
-                      href={`/livros/${entry.work.id}`}
-                      className="block truncate font-serif text-base font-semibold text-[var(--text-heading)] hover:underline"
-                    >
-                      #{entry.position} · {entry.work.title}
-                    </Link>
-                    <p className="truncate text-xs text-[var(--text-muted)]">
-                      {entry.primaryAuthor}
-                      {entry.review.narrationRating
-                        ? ` · Narração: ${formatRatingPtBr(entry.review.narrationRating)} ★`
-                        : ""}
-                    </p>
-                  </div>
-                  <StarRatingDisplay rating={entry.review.rating} />
+                <li key={entry.work.id} className="min-w-0">
+                  <Link
+                    href={`/livros/${entry.work.id}`}
+                    className="flex min-h-[56px] items-center justify-between gap-3 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5 transition-colors hover:bg-[var(--bg-elevated)]"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="block truncate font-serif text-base font-semibold text-[var(--text-heading)]">
+                        #{entry.position} · {entry.work.title}
+                      </span>
+                      <span className="block truncate text-xs text-[var(--text-muted)]">
+                        {entry.primaryAuthor}
+                        {entry.review.narrationRating
+                          ? ` · Narração: ${formatRatingPtBr(entry.review.narrationRating)} ★`
+                          : ""}
+                      </span>
+                    </div>
+                    <span className="shrink-0">
+                      <StarRatingDisplay rating={entry.review.rating} />
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ol>
