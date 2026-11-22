@@ -25,6 +25,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@opennextjs/cloudflare": "^1.20.18",
     "@zxing/browser": "^0.2.1",
     "drizzle-orm": "^0.45.4",
     "framer-motion": "^14.10.1",
@@ -54,6 +55,7 @@
     "prettier": "^3.9.10",
     "tailwindcss": "^4.3.5",
     "typescript": "~5.9.3",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "wrangler": "^4.166.0"
   }
 }
