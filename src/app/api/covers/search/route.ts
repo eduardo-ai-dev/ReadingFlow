@@ -20,12 +20,9 @@ const querySchema = z
     format: z.enum(["book", "ebook", "audiobook"]).optional(),
     nocache: z.enum(["0", "1"]).optional(),
   })
-  .refine(
-    (val) => Boolean((val.title && val.title.length >= 2) || val.isbn),
-    {
-      message: "Informe pelo menos o título (mín. 2 caracteres) ou o ISBN.",
-    }
-  );
+  .refine((val) => Boolean((val.title && val.title.length >= 2) || val.isbn), {
+    message: "Informe pelo menos o título (mín. 2 caracteres) ou o ISBN.",
+  });
 
 const importUrlBodySchema = z.object({
   url: z
@@ -47,12 +44,14 @@ const importUrlBodySchema = z.object({
  *   Open Library (`search.json`) -> Hardcover -> [Apple se flag ligada] -> seletor + upload manual.
  * - `GOOGLE_BOOKS_API_KEY` e `HARDCOVER_API_TOKEN` ficam estritamente no servidor.
  */
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" };
+
 export async function GET(request: NextRequest) {
   const ws = await getAuthenticatedWorkspace();
   if (!ws) {
     return NextResponse.json(
       { error: "Sessão não autenticada." },
-      { status: 401 }
+      { status: 401, headers: PRIVATE_NO_STORE }
     );
   }
 
@@ -73,7 +72,7 @@ export async function GET(request: NextRequest) {
       apiUnavailable: false,
       fallbackToManualUpload: true,
     };
-    return NextResponse.json(empty, { status: 400 });
+    return NextResponse.json(empty, { status: 400, headers: PRIVATE_NO_STORE });
   }
 
   const env = getServerEnv();
@@ -93,6 +92,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(rateLimitedPayload, {
       status: 429,
       headers: {
+        ...PRIVATE_NO_STORE,
         "Retry-After": String(limit.retryAfterSeconds),
       },
     });
@@ -121,8 +121,10 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         "Cache-Control":
-          parsed.data.nocache === "1" || result.degraded || result.apiUnavailable
-            ? "no-store"
+          parsed.data.nocache === "1" ||
+          result.degraded ||
+          result.apiUnavailable
+            ? "private, no-store"
             : "private, max-age=120, stale-while-revalidate=600",
       },
     });
@@ -135,7 +137,10 @@ export async function GET(request: NextRequest) {
       fallbackToManualUpload: true,
       notice: "Serviço indisponível, tentar de novo.",
     };
-    return NextResponse.json(fallback, { status: 200 });
+    return NextResponse.json(fallback, {
+      status: 200,
+      headers: PRIVATE_NO_STORE,
+    });
   }
 }
 
@@ -151,7 +156,7 @@ export async function POST(request: NextRequest) {
   if (!ws) {
     return NextResponse.json(
       { ok: false, error: "Sessão não autenticada." },
-      { status: 401 }
+      { status: 401, headers: PRIVATE_NO_STORE }
     );
   }
 
@@ -166,7 +171,7 @@ export async function POST(request: NextRequest) {
         ok: false,
         error: `Muitas requisições. Aguarde ${limit.retryAfterSeconds}s e tente novamente.`,
       },
-      { status: 429 }
+      { status: 429, headers: PRIVATE_NO_STORE }
     );
   }
 
@@ -176,7 +181,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json(
       { ok: false, error: "Payload JSON inválido." },
-      { status: 400 }
+      { status: 400, headers: PRIVATE_NO_STORE }
     );
   }
 
@@ -189,7 +194,7 @@ export async function POST(request: NextRequest) {
           parsed.error.issues[0]?.message ??
           "Informe um link HTTPS válido para a imagem.",
       },
-      { status: 400 }
+      { status: 400, headers: PRIVATE_NO_STORE }
     );
   }
 
@@ -200,8 +205,11 @@ export async function POST(request: NextRequest) {
   });
 
   if (!result.ok) {
-    return NextResponse.json(result, { status: 422 });
+    return NextResponse.json(result, {
+      status: 422,
+      headers: PRIVATE_NO_STORE,
+    });
   }
 
-  return NextResponse.json(result, { status: 200 });
+  return NextResponse.json(result, { status: 200, headers: PRIVATE_NO_STORE });
 }

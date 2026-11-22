@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { getAuthSecurityConfig } from "@/server/security/auth-config";
+import { truncateIpForLog } from "@/server/security/secrets";
 
 export type AuthAuditEventType =
   | "login_failed"
@@ -26,6 +27,7 @@ export interface AuthAuditLogEntry {
   request_id: string;
   account_hash: string | null;
   ip_hash: string | null;
+  ip_truncated: string | null;
   ua_summary: string;
   internal_reason?: string;
   retention_days: number;
@@ -205,6 +207,7 @@ export function logAuthEvent(params: {
     request_id: params.requestId || crypto.randomUUID(),
     account_hash: params.accountHmac ? params.accountHmac.slice(0, 16) : null,
     ip_hash: hashIpForLog(params.clientIp),
+    ip_truncated: truncateIpForLog(params.clientIp),
     ua_summary: summarizeUserAgent(params.userAgent),
     ...(params.internalReason
       ? { internal_reason: sanitizeLogString(params.internalReason) }

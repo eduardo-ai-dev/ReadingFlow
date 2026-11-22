@@ -24,10 +24,15 @@ const searchQuerySchema = z.object({
     ),
 });
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" };
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const ws = await getAuthenticatedWorkspace();
   if (!ws) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    return NextResponse.json(
+      { error: "Não autenticado." },
+      { status: 401, headers: PRIVATE_NO_STORE }
+    );
   }
 
   const parsed = searchQuerySchema.safeParse({
@@ -36,7 +41,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? "Termo de busca inválido." },
-      { status: 400 }
+      { status: 400, headers: PRIVATE_NO_STORE }
     );
   }
 
@@ -50,7 +55,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       { error: `Muitas buscas seguidas. Aguarde ${rl.retryAfterSeconds}s.` },
       {
         status: 429,
-        headers: { "Retry-After": String(rl.retryAfterSeconds) },
+        headers: {
+          ...PRIVATE_NO_STORE,
+          "Retry-After": String(rl.retryAfterSeconds),
+        },
       }
     );
   }
@@ -64,14 +72,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      return new NextResponse(null, { status: 499 });
+      return new NextResponse(null, { status: 499, headers: PRIVATE_NO_STORE });
     }
     if (error instanceof BookSearchUnavailableError) {
-      return NextResponse.json({ error: error.message }, { status: 502 });
+      return NextResponse.json(
+        { error: error.message },
+        { status: 502, headers: PRIVATE_NO_STORE }
+      );
     }
     return NextResponse.json(
       { error: "Não foi possível consultar a base online." },
-      { status: 502 }
+      { status: 502, headers: PRIVATE_NO_STORE }
     );
   }
 }

@@ -22,10 +22,15 @@ const coverQuerySchema = z.object({
  * URLs de hosts permitidos (a mesma lista da CSP); o cliente ainda valida o
  * carregamento da imagem (`naturalWidth > 1`).
  */
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" };
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const ws = await getAuthenticatedWorkspace();
   if (!ws) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    return NextResponse.json(
+      { error: "Não autenticado." },
+      { status: 401, headers: PRIVATE_NO_STORE }
+    );
   }
 
   const parsed = coverQuerySchema.safeParse({
@@ -34,7 +39,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? "ISBN inválido." },
-      { status: 400 }
+      { status: 400, headers: PRIVATE_NO_STORE }
     );
   }
 
@@ -46,7 +51,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!rl.allowed) {
     return NextResponse.json(
       { error: `Muitas consultas. Aguarde ${rl.retryAfterSeconds}s.` },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+      {
+        status: 429,
+        headers: {
+          ...PRIVATE_NO_STORE,
+          "Retry-After": String(rl.retryAfterSeconds),
+        },
+      }
     );
   }
 
@@ -61,6 +72,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       { headers: { "Cache-Control": "private, max-age=300" } }
     );
   } catch {
-    return NextResponse.json({ coverUrl: null });
+    return NextResponse.json({ coverUrl: null }, { headers: PRIVATE_NO_STORE });
   }
 }

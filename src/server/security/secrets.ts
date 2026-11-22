@@ -108,6 +108,28 @@ export function normalizeClientIp(rawIp: string | null | undefined): string {
   return "unknown";
 }
 
+/**
+ * Trunca o endereço IP para logs estruturados (LGPD / minimização de dados):
+ * - IPv4 → máscara `/24` (ex.: `198.51.100.42` → `198.51.100.0/24`)
+ * - IPv6 → prefixo `/64` (ex.: `2001:0db8:abcd:0012::/64`)
+ * - Ausente ou inválido → `null`
+ */
+export function truncateIpForLog(
+  rawIp: string | null | undefined
+): string | null {
+  if (!rawIp) return null;
+  const normalized = normalizeClientIp(rawIp);
+  if (normalized === "unknown") return null;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(normalized)) {
+    const parts = normalized.split(".");
+    return `${parts[0]}.${parts[1]}.${parts[2]}.0/24`;
+  }
+  if (normalized.endsWith("::/64")) {
+    return normalized;
+  }
+  return null;
+}
+
 function expandIpv6(raw: string): string[] | null {
   const clean = raw.split("%")[0]?.toLowerCase() ?? "";
   const halves = clean.split("::");
