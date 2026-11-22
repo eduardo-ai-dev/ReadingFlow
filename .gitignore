@@ -20,6 +20,15 @@ node_modules/
 .env.*
 !.env.example
 
+# SQLite local database & WAL/SHM artifacts
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+
 # Misc
 .DS_Store
 *.pem
@@ -32,6 +41,8 @@ next-env.d.ts
 
 # Local tooling
 .vercel
+.wrangler/
+.open-next/
 .taste-skill/
 .loadtest-data/
 loadtest/latest-results.json
