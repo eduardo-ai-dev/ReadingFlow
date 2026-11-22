@@ -23,6 +23,9 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Verificar ausência de middleware.ts legado (Next 16 usa proxy.ts)
+        run: npm run check:middleware
+
       - name: Lint
         run: npm run lint
 

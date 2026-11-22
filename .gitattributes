@@ -1,0 +1,18 @@
+# Normaliza fins de linha para LF em todos os arquivos de texto (Windows/Linux/CI)
+* text=auto eol=lf
+
+# Arquivos binários preservados sem conversão
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
