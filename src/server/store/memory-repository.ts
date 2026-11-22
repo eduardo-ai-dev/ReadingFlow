@@ -1255,31 +1255,48 @@ export function cachedWorkspaceQuery<T>(
 
 export function saveUndoSnapshot(ws: UserWorkspaceData, label: string): void {
   bumpWorkspaceRevision(ws.profile.id);
+  const now = Date.now();
+  const cloneShallowList = <T extends object>(list: readonly T[]): T[] => {
+    const out = new Array<T>(list.length);
+    for (let i = 0; i < list.length; i += 1) {
+      out[i] = { ...list[i]! };
+    }
+    return out;
+  };
+  const works = new Array<Work>(ws.works.length);
+  for (let i = 0; i < ws.works.length; i += 1) {
+    const w = ws.works[i]!;
+    works[i] = { ...w, contributors: w.contributors.slice() };
+  }
+  const editions = new Array<Edition>(ws.editions.length);
+  for (let i = 0; i < ws.editions.length; i += 1) {
+    const e = ws.editions[i]!;
+    editions[i] = { ...e, contributors: e.contributors.slice() };
+  }
+  const readings = new Array<Reading>(ws.readings.length);
+  for (let i = 0; i < ws.readings.length; i += 1) {
+    const r = ws.readings[i]!;
+    readings[i] = {
+      ...r,
+      dailyLogs: r.dailyLogs ? r.dailyLogs.slice() : undefined,
+    };
+  }
   ws.lastUndoAction = {
-    id: `undo-${Date.now()}`,
+    id: `undo-${now}`,
     label,
-    createdAtMs: Date.now(),
+    createdAtMs: now,
     restoreSnapshot: {
       profile: { ...ws.profile },
       passwordHashSim: ws.passwordHashSim,
-      works: ws.works.map((w) => ({
-        ...w,
-        contributors: w.contributors.map((c) => ({ ...c })),
-      })),
-      editions: ws.editions.map((e) => ({
-        ...e,
-        contributors: e.contributors.map((c) => ({ ...c })),
-      })),
-      shelves: ws.shelves.map((s) => ({ ...s })),
-      items: ws.items.map((i) => ({ ...i })),
-      wishlist: ws.wishlist.map((w) => ({ ...w })),
-      readings: ws.readings.map((r) => ({
-        ...r,
-        dailyLogs: r.dailyLogs ? r.dailyLogs.map((d) => ({ ...d })) : undefined,
-      })),
-      reviews: ws.reviews.map((r) => ({ ...r })),
-      goals: ws.goals.map((g) => ({ ...g })),
-      importJobs: ws.importJobs.map((j) => ({ ...j })),
+      works,
+      editions,
+      shelves: cloneShallowList(ws.shelves),
+      items: cloneShallowList(ws.items),
+      wishlist: cloneShallowList(ws.wishlist),
+      readings,
+      reviews: cloneShallowList(ws.reviews),
+      goals: cloneShallowList(ws.goals),
+      importJobs: cloneShallowList(ws.importJobs),
     },
   };
 }
