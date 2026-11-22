@@ -5,7 +5,8 @@
   "description": "Biblioteca pessoal digital para livros físicos, e-books e audiobooks (Release R0 — 2D)",
   "scripts": {
     "dev": "next dev",
-    "build": "npm run check:contrast && npm run check:images && next build",
+    "generate:landing-manifest": "node scripts/generate-landing-manifest.mjs",
+    "build": "npm run generate:landing-manifest && npm run check:contrast && npm run check:images && next build",
     "start": "next start",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",

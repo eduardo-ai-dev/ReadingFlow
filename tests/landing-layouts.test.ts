@@ -1,29 +1,16 @@
-import fs from "node:fs/promises";
-import os from "node:os";
+import fs from "node:fs";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { discoverLandingLayouts } from "@/server/landing/discover-layouts";
 import {
+  buildLandingLayoutsFromEntries,
   compareLandingLayoutFilenames,
   deriveDefaultLabelFromFilename,
   isSupportedLandingImageFilename,
+  parseLandingLayoutsManifest,
 } from "@/lib/landing-layouts";
 
-const tempDirs: string[] = [];
-
-async function makeTempDir(): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "rf-landing-layouts-"));
-  tempDirs.push(dir);
-  return dir;
-}
-
-afterEach(async () => {
-  await Promise.all(
-    tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true }))
-  );
-});
-
-describe("Landing hero layouts automatic discovery", () => {
+describe("Landing hero layouts static manifest & pure builder", () => {
   it("filters supported extensions and sorts filenames naturally", () => {
     expect(isSupportedLandingImageFilename("01-hero.webp")).toBe(true);
     expect(isSupportedLandingImageFilename("02-HERO.AVIF")).toBe(true);
@@ -32,7 +19,12 @@ describe("Landing hero layouts automatic discovery", () => {
     expect(isSupportedLandingImageFilename("layouts.json")).toBe(false);
     expect(isSupportedLandingImageFilename("notes.txt")).toBe(false);
 
-    const names = ["10-decimo.webp", "02-segundo.jpg", "01-primeiro.png", "03-terceiro.avif"];
+    const names = [
+      "10-decimo.webp",
+      "02-segundo.jpg",
+      "01-primeiro.png",
+      "03-terceiro.avif",
+    ];
     expect([...names].sort(compareLandingLayoutFilenames)).toEqual([
       "01-primeiro.png",
       "02-segundo.jpg",
@@ -45,19 +37,19 @@ describe("Landing hero layouts automatic discovery", () => {
     );
   });
 
-  it("returns an empty array without throwing when folder does not exist or is empty", async () => {
-    const missing = path.join(os.tmpdir(), `nonexistent-${Date.now()}`);
-    expect(await discoverLandingLayouts(missing)).toEqual([]);
-
-    const emptyDir = await makeTempDir();
-    expect(await discoverLandingLayouts(emptyDir)).toEqual([]);
+  it("returns an empty array when no supported filenames are provided", () => {
+    expect(buildLandingLayoutsFromEntries({ filenames: [] })).toEqual([]);
+    expect(
+      buildLandingLayoutsFromEntries({
+        filenames: ["README.md", "layouts.json"],
+      })
+    ).toEqual([]);
   });
 
-  it("works with a single image and no layouts.json manifest using defaults", async () => {
-    const dir = await makeTempDir();
-    await fs.writeFile(path.join(dir, "01-sala-leitura.webp"), "fake");
-
-    const layouts = await discoverLandingLayouts(dir);
+  it("works with a single image and no manifest using defaults", () => {
+    const layouts = buildLandingLayoutsFromEntries({
+      filenames: ["01-sala-leitura.webp"],
+    });
     expect(layouts).toHaveLength(1);
     expect(layouts[0]).toMatchObject({
       filename: "01-sala-leitura.webp",
@@ -70,46 +62,46 @@ describe("Landing hero layouts automatic discovery", () => {
     expect(layouts[0]?.alt).toContain("Sala leitura");
   });
 
-  it("merges optional layouts.json manifest and still auto-discovers newly dropped files", async () => {
-    const dir = await makeTempDir();
-    await fs.writeFile(path.join(dir, "01-classica.webp"), "a");
-    await fs.writeFile(path.join(dir, "02-novo-layout.png"), "b");
-    await fs.writeFile(path.join(dir, "README.md"), "ignored");
-    await fs.writeFile(
-      path.join(dir, "layouts.json"),
-      JSON.stringify({
-        layouts: {
-          "01-classica.webp": {
-            label: "Biblioteca Clássica",
-            alt: "Biblioteca clássica com lua na janela",
-            objectPosition: "40% 55%",
-            mobileObjectPosition: "30% 50%",
-            hotspots: [
-              {
-                id: "nicho-1",
-                label: "Estante principal",
-                description: "Organize seus livros",
-                x: 38,
-                y: 45,
-                href: "#funcionalidades",
-              },
-              {
-                id: "xss-test",
-                label: "Link inseguro",
-                x: 50,
-                y: 50,
-                href: "javascript:alert(1)",
-              },
-            ],
-          },
+  it("merges optional layouts.json manifest, pairs mobile crops and strips unsafe hotspot hrefs", () => {
+    const manifest = parseLandingLayoutsManifest({
+      layouts: {
+        "01-classica.webp": {
+          label: "Biblioteca Clássica",
+          alt: "Biblioteca clássica com lua na janela",
+          objectPosition: "40% 55%",
+          mobileObjectPosition: "30% 50%",
+          hotspots: [
+            {
+              id: "nicho-1",
+              label: "Estante principal",
+              description: "Organize seus livros",
+              x: 38,
+              y: 45,
+              href: "#funcionalidades",
+            },
+            {
+              id: "xss-test",
+              label: "Link inseguro",
+              x: 50,
+              y: 50,
+              href: "javascript:alert(1)",
+            },
+          ],
         },
-      })
-    );
+      },
+    });
 
-    const layouts = await discoverLandingLayouts(dir);
+    const layouts = buildLandingLayoutsFromEntries({
+      filenames: ["02-novo-layout.png", "01-classica.webp", "README.md"],
+      mobileFilenames: ["01-classica.webp"],
+      manifest,
+    });
+
     expect(layouts).toHaveLength(2);
     expect(layouts[0]).toMatchObject({
       filename: "01-classica.webp",
+      src: "/landing-layouts/01-classica.webp",
+      mobileSrc: "/landing-layouts/mobile/01-classica.webp",
       label: "Biblioteca Clássica",
       alt: "Biblioteca clássica com lua na janela",
       objectPosition: "40% 55%",
@@ -118,31 +110,37 @@ describe("Landing hero layouts automatic discovery", () => {
     expect(layouts[0]?.hotspots).toHaveLength(2);
     expect(layouts[0]?.hotspots[0]?.href).toBe("#funcionalidades");
     expect(layouts[0]?.hotspots[1]?.href).toBeUndefined();
-
-    // Newly dropped file not present in layouts.json still loads with defaults
-    expect(layouts[1]).toMatchObject({
-      filename: "02-novo-layout.png",
-      src: "/landing-layouts/02-novo-layout.png",
-      objectPosition: "50% 50%",
-      hotspots: [],
-    });
   });
 
-  it("falls back gracefully when layouts.json is malformed JSON", async () => {
-    const dir = await makeTempDir();
-    await fs.writeFile(path.join(dir, "01-fallback.jpg"), "a");
-    await fs.writeFile(path.join(dir, "layouts.json"), "{ invalid json");
-
-    const layouts = await discoverLandingLayouts(dir);
-    expect(layouts).toHaveLength(1);
-    expect(layouts[0]?.filename).toBe("01-fallback.jpg");
-    expect(layouts[0]?.objectPosition).toBe("50% 50%");
-  });
-
-  it("discovers the repository public/landing-layouts assets in order", async () => {
+  it("discoverLandingLayouts() retorna o manifesto estático sem fs.readdir e todos os arquivos existem em public/ com case exato", async () => {
     const layouts = await discoverLandingLayouts();
     expect(layouts.length).toBeGreaterThanOrEqual(8);
-    expect(layouts[0]?.filename).toBe("01-biblioteca-classica.webp");
-    expect(layouts.every((l) => !l.hasEmbeddedBrandText)).toBe(true);
+
+    const publicDir = path.resolve(process.cwd(), "public");
+    const desktopOnDisk = new Set(
+      fs.readdirSync(path.join(publicDir, "landing-layouts"))
+    );
+    const mobileOnDisk = new Set(
+      fs.readdirSync(path.join(publicDir, "landing-layouts", "mobile"))
+    );
+
+    for (const layout of layouts) {
+      const decodedDesktop = decodeURIComponent(
+        layout.src.replace(/^\/landing-layouts\//, "")
+      );
+      expect(desktopOnDisk.has(decodedDesktop)).toBe(true);
+
+      if (layout.mobileSrc) {
+        const decodedMobile = decodeURIComponent(
+          layout.mobileSrc.replace(/^\/landing-layouts\/mobile\//, "")
+        );
+        expect(mobileOnDisk.has(decodedMobile)).toBe(true);
+      }
+    }
+
+    // Fallback estático do HeroRotator também deve existir em public/
+    expect(fs.existsSync(path.join(publicDir, "hero-library-4k.webp"))).toBe(
+      true
+    );
   });
 });

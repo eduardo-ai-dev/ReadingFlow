@@ -125,3 +125,79 @@ export function parseLandingLayoutsManifest(
   }
   return {};
 }
+
+/**
+ * Constrói a lista ordenada e sanitizada de layouts da landing em função pura
+ * (sem acesso a filesystem — reutilizada no gerador de build e nos testes).
+ */
+export function buildLandingLayoutsFromEntries(params: {
+  filenames: readonly string[];
+  mobileFilenames?: readonly string[];
+  manifest?: Record<string, LandingLayoutManifestEntry>;
+  publicPrefix?: string;
+}): LandingHeroLayout[] {
+  const publicPrefix = params.publicPrefix ?? LANDING_LAYOUTS_PUBLIC_PREFIX;
+  const entries = params.filenames
+    .filter((name) => isSupportedLandingImageFilename(name))
+    .sort(compareLandingLayoutFilenames);
+
+  if (entries.length === 0) {
+    return [];
+  }
+
+  const manifest = params.manifest ?? {};
+  const mobilePrefix =
+    publicPrefix === LANDING_LAYOUTS_PUBLIC_PREFIX
+      ? LANDING_LAYOUTS_MOBILE_PUBLIC_PREFIX
+      : `${publicPrefix}/mobile`;
+  const mobileFiles = new Set(
+    (params.mobileFilenames ?? []).filter((name) =>
+      isSupportedLandingImageFilename(name)
+    )
+  );
+
+  return entries.map((filename, index) => {
+    const meta = manifest[filename];
+    const defaultLabel = deriveDefaultLabelFromFilename(filename);
+    const objectPosition = sanitizeObjectPosition(
+      meta?.objectPosition,
+      "50% 50%"
+    );
+    const mobileObjectPosition = sanitizeObjectPosition(
+      meta?.mobileObjectPosition,
+      objectPosition
+    );
+
+    const baseName = filename.replace(/\.[^.]+$/, "");
+    const mobileCandidate = `${baseName}.webp`;
+    const mobileSrc = mobileFiles.has(mobileCandidate)
+      ? `${mobilePrefix}/${encodeURIComponent(mobileCandidate)}`
+      : mobileFiles.has(filename)
+        ? `${mobilePrefix}/${encodeURIComponent(filename)}`
+        : undefined;
+
+    const hotspots: LandingLayoutHotspot[] = (meta?.hotspots ?? []).map(
+      (hs, hsIdx) => ({
+        id: hs.id ?? `${index + 1}-hs-${hsIdx + 1}`,
+        label: hs.label,
+        description: hs.description,
+        x: hs.x,
+        y: hs.y,
+        href: sanitizeHotspotHref(hs.href),
+      })
+    );
+
+    return {
+      id: `layout-${index + 1}-${filename.replace(/[^a-zA-Z0-9_-]/g, "")}`,
+      filename,
+      src: `${publicPrefix}/${encodeURIComponent(filename)}`,
+      ...(mobileSrc ? { mobileSrc } : {}),
+      label: meta?.label ?? defaultLabel,
+      alt: meta?.alt ?? deriveDefaultAltFromFilename(filename),
+      objectPosition,
+      mobileObjectPosition,
+      hasEmbeddedBrandText: Boolean(meta?.hasEmbeddedBrandText),
+      hotspots,
+    };
+  });
+}

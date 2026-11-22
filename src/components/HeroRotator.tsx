@@ -34,6 +34,8 @@ function resolveLayoutSrc(
  * - Direção de arte mobile: em viewports `< 768px`, entrega recorte retrato dedicado (`1080×1920`, `mobileSrc`)
  *   ou `mobileObjectPosition` ajustado, evitando ampliação excessiva de foto 16:9 em tela vertical.
  */
+const FALLBACK_HERO_SRC = "/hero-library-4k.webp";
+
 export function HeroRotator({
   layouts,
   isAuthenticated = false,
@@ -41,18 +43,19 @@ export function HeroRotator({
   const count = layouts.length;
   const [openHotspotId, setOpenHotspotId] = useState<string | null>(null);
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
-  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return false;
-    return window.matchMedia("(max-width: 767px)").matches;
-  });
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
     const mql = window.matchMedia("(max-width: 767px)");
     const update = () => setIsMobileViewport(mql.matches);
-    update();
+    const rafId = window.requestAnimationFrame(update);
     mql.addEventListener("change", update);
-    return () => mql.removeEventListener("change", update);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      mql.removeEventListener("change", update);
+    };
   }, []);
 
   const { activeIndex, prefersReducedMotion } = useHeroRotator(count);
@@ -66,9 +69,13 @@ export function HeroRotator({
       ? (layouts[nextIndex] ?? null)
       : null;
 
-  const activeResolvedSrc = activeLayout
+  const rawActiveSrc = activeLayout
     ? resolveLayoutSrc(activeLayout, isMobileViewport)
     : null;
+  const activeResolvedSrc =
+    rawActiveSrc && failedSrc === rawActiveSrc
+      ? FALLBACK_HERO_SRC
+      : rawActiveSrc;
   const nextResolvedSrc = nextLayout
     ? resolveLayoutSrc(nextLayout, isMobileViewport)
     : null;
@@ -129,7 +136,19 @@ export function HeroRotator({
               preload
               quality={85}
               sizes="100vw"
+              ref={(el) => {
+                if (el?.complete && el.naturalWidth > 0) {
+                  setLoadedSrc(activeResolvedSrc);
+                }
+              }}
               onLoad={() => setLoadedSrc(activeResolvedSrc)}
+              onError={() => {
+                if (activeResolvedSrc !== FALLBACK_HERO_SRC) {
+                  setFailedSrc(activeResolvedSrc);
+                } else {
+                  setLoadedSrc(FALLBACK_HERO_SRC);
+                }
+              }}
             />
           </div>
 
