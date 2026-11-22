@@ -97,11 +97,10 @@ export default async function EvolucaoPage() {
         </div>
       </header>
 
-      {/* Estado vazio acolhedor para contas sem livros, sessões ou metas */}
+      {/* Estado vazio acolhedor para contas sem livros ou leituras registradas */}
       {stats.uniqueOwnedWorks === 0 &&
       stats.finishedReadingsCount === 0 &&
-      stats.pagesRead === 0 &&
-      goalsData.entries.length === 0 ? (
+      stats.pagesRead === 0 ? (
         <section
           aria-labelledby="evolucao-vazia-titulo"
           data-testid="evolucao-empty-state"
