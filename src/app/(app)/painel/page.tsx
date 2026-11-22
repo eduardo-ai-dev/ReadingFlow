@@ -689,9 +689,9 @@ async function DashboardSecondaryBand({
                               className="mt-2 h-1.5 w-full overflow-hidden rounded-[var(--rf-radius-full)] bg-[var(--rf-surface-subtle)]"
                             >
                               <div
-                                className="h-full rounded-[var(--rf-radius-full)] bg-gradient-to-r from-[var(--rf-accent-secondary)] to-[var(--rf-accent-primary)] transition-all duration-300"
+                                className="rf-progress-fill h-full w-full rounded-[var(--rf-radius-full)] bg-gradient-to-r from-[var(--rf-accent-secondary)] to-[var(--rf-accent-primary)]"
                                 style={{
-                                  width: `${Math.min(100, evaluation.progressPercent)}%`,
+                                  transform: `scaleX(${Math.min(100, evaluation.progressPercent) / 100})`,
                                 }}
                               />
                             </div>

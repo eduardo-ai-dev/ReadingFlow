@@ -1080,7 +1080,71 @@ textarea:focus {
 }
 
 .rf-scroll-pulse {
-  animation: rfScrollPulse 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  animation: rfScrollPulse 2.4s var(--motion-ease) infinite;
+}
+
+/* ==========================================================================
+   ETAPA 6 · MICROINTERAÇÕES SÓBRIAS (APENAS transform E opacity)
+   ========================================================================== */
+
+@keyframes rfToastEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.rf-toast-enter {
+  animation: rfToastEnter var(--motion-base) var(--motion-ease) 1 both;
+}
+
+@keyframes rfDayPulse {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.94);
+  }
+
+  55% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.rf-day-pulse {
+  animation: rfDayPulse var(--motion-slow) var(--motion-ease) 1 both;
+}
+
+@keyframes rfBookmarkRibbonDrop {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -18px, 0) scaleY(0.7);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scaleY(1);
+  }
+}
+
+.rf-bookmark-ribbon {
+  transform-origin: top center;
+  animation: rfBookmarkRibbonDrop var(--motion-slow) var(--motion-ease) 1 both;
+}
+
+.rf-progress-fill {
+  transform-origin: left center;
+  transition: transform var(--motion-slow) var(--motion-ease);
+  will-change: transform;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1091,6 +1155,16 @@ textarea:focus {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .rf-toast-enter,
+  .rf-day-pulse,
+  .rf-bookmark-ribbon {
+    animation: none !important;
+  }
+
+  .rf-progress-fill {
+    transition: none !important;
   }
 
   .interactive-card:hover,

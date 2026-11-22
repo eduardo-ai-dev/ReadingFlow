@@ -10,6 +10,7 @@ export function ProgressBar({
   className?: string;
 }) {
   const clamped = Math.max(0, Math.min(100, Math.round(value)));
+  const scale = clamped / 100;
   return (
     <div className={`w-full ${className}`}>
       <div
@@ -21,8 +22,8 @@ export function ProgressBar({
         className="h-2 w-full overflow-hidden rounded-[var(--rf-radius-full)] bg-[var(--rf-surface-subtle)]"
       >
         <div
-          style={{ width: `${clamped}%` }}
-          className={`h-full rounded-[var(--rf-radius-full)] transition-[width] duration-300 ${
+          style={{ transform: `scaleX(${scale})` }}
+          className={`rf-progress-fill h-full w-full rounded-[var(--rf-radius-full)] ${
             variant === "gradient"
               ? "bg-gradient-to-r from-[var(--rf-accent-secondary)] to-[var(--rf-accent-primary)]"
               : "bg-[var(--rf-accent-secondary)]"

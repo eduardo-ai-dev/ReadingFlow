@@ -12,10 +12,16 @@
 @import "./themes/gotico.css";
 
 :root {
-  /* Curvas e tempos de transição */
-  --ease-editorial: cubic-bezier(0.22, 1, 0.36, 1);
-  --duration-fast: 180ms;
-  --duration-normal: 220ms;
+  /* Tokens oficiais de movimento (sóbrio e editorial — animar só transform e opacity) */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Compatibilidade legada de curvas e tempos */
+  --ease-editorial: var(--motion-ease);
+  --duration-fast: var(--motion-fast);
+  --duration-normal: var(--motion-base);
 
   /* Escala de raios */
   --rf-radius-xs: 4px;

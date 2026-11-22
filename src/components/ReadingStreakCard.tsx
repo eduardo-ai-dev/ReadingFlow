@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import {
@@ -62,7 +62,32 @@ export const ReadingStreakCard = memo(function ReadingStreakCard({
     calendar.initialYearMonth
   );
   const [selectedDayYmd, setSelectedDayYmd] = useState<string | null>(null);
+  const [pulsingYmd, setPulsingYmd] = useState<string | null>(null);
   const hoverHintRef = useRef<HTMLSpanElement | null>(null);
+
+  // Pulsa uma única vez o dia recém-preenchido ao registrar progresso
+  useEffect(() => {
+    let clearTimer: number | null = null;
+    function handleDayPulse(e: Event & { detail?: { ymd?: string } }) {
+      const targetYmd = e.detail?.ymd ?? calendar.todayYmd;
+      setPulsingYmd(targetYmd);
+      if (clearTimer !== null) window.clearTimeout(clearTimer);
+      clearTimer = window.setTimeout(() => {
+        setPulsingYmd((curr) => (curr === targetYmd ? null : curr));
+      }, 420);
+    }
+    window.addEventListener(
+      "rf:reading-day-pulse",
+      handleDayPulse as EventListener
+    );
+    return () => {
+      window.removeEventListener(
+        "rf:reading-day-pulse",
+        handleDayPulse as EventListener
+      );
+      if (clearTimer !== null) window.clearTimeout(clearTimer);
+    };
+  }, [calendar.todayYmd]);
 
   const grid = useMemo(
     () => buildMonthCalendarGrid(selectedYearMonth, calendar.daysByYmd),
@@ -197,13 +222,14 @@ export const ReadingStreakCard = memo(function ReadingStreakCard({
             const hasSessions = day.sessions.length > 0;
             const isSelected = selectedDayYmd === day.ymd;
             const isToday = day.ymd === calendar.todayYmd;
+            const isPulsing = pulsingYmd === day.ymd;
             const levelClass = LEVEL_SWATCH_CLASSES[day.level];
 
             const sharedClass = `flex h-11 lg:h-8 w-full items-center justify-center rounded-[var(--rf-radius-sm)] font-sans text-[13px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums] transition-colors ${levelClass} ${
               isToday && !isSelected
                 ? "outline outline-1 outline-[var(--rf-text-accent-secondary)] outline-offset-1"
                 : ""
-            }`;
+            } ${isPulsing ? "rf-day-pulse" : ""}`;
 
             if (hasSessions) {
               return (
