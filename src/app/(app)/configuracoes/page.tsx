@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/features/auth/queries";
 import { getOnboardingGuideSummary } from "@/features/onboarding/queries";
+import { getUserSettings } from "@/features/settings/queries";
 import { SettingsClient } from "@/components/SettingsClient";
 
 export const metadata: Metadata = {
@@ -9,9 +10,10 @@ export const metadata: Metadata = {
 };
 
 export default async function SettingsPage() {
-  const [profile, onboardingGuide] = await Promise.all([
+  const [profile, onboardingGuide, userSettings] = await Promise.all([
     getCurrentProfile(),
     getOnboardingGuideSummary(),
+    getUserSettings(),
   ]);
   if (!profile) {
     redirect("/entrar");
@@ -28,7 +30,11 @@ export default async function SettingsPage() {
         </h1>
       </header>
 
-      <SettingsClient profile={profile} onboardingGuide={onboardingGuide} />
+      <SettingsClient
+        profile={profile}
+        onboardingGuide={onboardingGuide}
+        initialHapticsEnabled={userSettings.hapticsEnabled ?? true}
+      />
     </div>
   );
 }

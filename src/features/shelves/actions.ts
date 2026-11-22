@@ -40,7 +40,9 @@ export async function updateShelfSortModeAction(
 
 export async function removeLibraryItemAction(
   rawInput: unknown
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; undoId: string; undoLabel: string } | { ok: false; error: string }
+> {
   const ws = await requireAuthenticatedWorkspace();
   const parsed = removeLibraryItemSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -53,10 +55,11 @@ export async function removeLibraryItemAction(
   }
 
   const edition = ws.editions.find((e) => e.id === item.editionId);
-  saveUndoSnapshot(
-    ws,
-    `Remoção de exemplar${edition ? ` "${edition.title}"` : ""}`
-  );
+  const undoLabel = edition
+    ? `Livro "${edition.title}" removido da estante`
+    : "Livro removido da estante";
+  saveUndoSnapshot(ws, undoLabel);
+  const undoId = ws.lastUndoAction?.id ?? `undo-${Date.now()}`;
 
   ws.items = ws.items.filter((it) => it.id !== item.id);
   for (const reading of ws.readings) {
@@ -74,7 +77,7 @@ export async function removeLibraryItemAction(
   }
   invalidateUserWorkspaceCache(ws.profile.id);
   revalidatePath("/", "layout");
-  return { ok: true };
+  return { ok: true, undoId, undoLabel };
 }
 
 export async function updateItemOwnershipAction(

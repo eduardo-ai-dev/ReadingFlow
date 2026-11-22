@@ -240,3 +240,30 @@ export async function updateOnboardingGuideAction(
     onboardingGuide: structuredClone(settings.onboardingGuide!),
   };
 }
+
+const updateHapticsSchema = z.object({
+  hapticsEnabled: z.boolean(),
+});
+
+/**
+ * Persiste preferência de feedback tátil leve no celular (`hapticsEnabled`) em `user_settings`.
+ */
+export async function updateHapticsPreferenceAction(
+  rawInput: unknown
+): Promise<
+  { ok: true; hapticsEnabled: boolean } | { ok: false; error: string }
+> {
+  const ws = await requireAuthenticatedWorkspace();
+  const parsed = updateHapticsSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { ok: false, error: "Preferência de vibração inválida." };
+  }
+
+  const settings = ensureWorkspaceSettings(ws);
+  settings.hapticsEnabled = parsed.data.hapticsEnabled;
+  settings.updatedAt = new Date().toISOString();
+  invalidateUserWorkspaceCache(ws.profile.id);
+  revalidatePath("/configuracoes");
+
+  return { ok: true, hapticsEnabled: settings.hapticsEnabled };
+}

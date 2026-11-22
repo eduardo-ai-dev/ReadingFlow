@@ -8,7 +8,11 @@ import {
   deleteMyAccountAction,
   updateProfileAction,
 } from "@/features/auth/actions";
-import { updateOnboardingGuideAction } from "@/features/settings/actions";
+import {
+  updateHapticsPreferenceAction,
+  updateOnboardingGuideAction,
+} from "@/features/settings/actions";
+import { dispatchFeedbackToast, setHapticsEnabledLocal } from "@/lib/feedback";
 import type { OnboardingGuideEvaluation } from "@/features/onboarding/rules";
 import { restoreBackupJsonAction } from "@/features/portability/actions";
 import { useTheme } from "@/components/ThemeProvider";
@@ -17,13 +21,16 @@ import { ThemeCardsPicker } from "@/components/ThemeCardsPicker";
 export function SettingsClient({
   profile,
   onboardingGuide,
+  initialHapticsEnabled = true,
 }: {
   profile: UserProfile;
   onboardingGuide: OnboardingGuideEvaluation;
+  initialHapticsEnabled?: boolean;
 }) {
   const router = useRouter();
   const { themePreference, fx, setFx } = useTheme();
   const [guideVisible, setGuideVisible] = useState(onboardingGuide.shouldShow);
+  const [hapticsEnabled, setHapticsEnabled] = useState(initialHapticsEnabled);
   const [defaultCurrency, setDefaultCurrency] = useState(
     profile.defaultCurrency
   );
@@ -277,6 +284,40 @@ export function SettingsClient({
               </strong>
               Quando desativado, apenas a primeira leitura da obra entra no
               cômputo anual.
+            </span>
+          </label>
+
+          <label className="flex min-h-[44px] cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={hapticsEnabled}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setHapticsEnabled(next);
+                setHapticsEnabledLocal(next);
+                startTransition(async () => {
+                  const res = await updateHapticsPreferenceAction({
+                    hapticsEnabled: next,
+                  });
+                  if (res.ok) {
+                    dispatchFeedbackToast({
+                      message: next
+                        ? "Feedback tátil ativado no celular."
+                        : "Feedback tátil desativado.",
+                      tone: "info",
+                    });
+                  }
+                });
+              }}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-primary)]"
+            />
+            <span className="text-xs text-[var(--text-primary)]">
+              <strong className="block font-semibold">
+                Feedback tátil leve no celular
+              </strong>
+              Emite uma vibração curta ao registrar páginas, concluir livros ou
+              salvar alterações (quando o dispositivo suportar e o movimento não
+              estiver reduzido).
             </span>
           </label>
 

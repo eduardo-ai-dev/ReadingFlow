@@ -266,6 +266,7 @@ export interface UserSettings {
   shelfLayout: PersistedShelfLayout;
   ambientPreferences: AmbientPreferences;
   focusDefaultMode: FocusSessionMode;
+  hapticsEnabled?: boolean;
   onboardingGuide?: OnboardingGuideState;
   updatedAt: string;
 }

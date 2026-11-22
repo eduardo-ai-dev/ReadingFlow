@@ -3,6 +3,7 @@
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import {
+  invalidateUserWorkspaceCache,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
 } from "@/server/store/memory-repository";
@@ -24,7 +25,7 @@ import {
   resolveReadingAudioSecondsContribution,
   resolveReadingPagesContribution,
 } from "@/features/goals/rules";
-import { formatDateInTimezone } from "@/lib/dates";
+import { daysBetweenInclusive, formatDateInTimezone } from "@/lib/dates";
 import type { ProgressUnit } from "@/lib/domain";
 import { sanitizePlainText } from "@/server/security/sanitize";
 
@@ -103,6 +104,10 @@ export async function updateReadingProgressAction(rawInput: unknown): Promise<
       progressUnit: ProgressUnit;
       progressValue: number;
       progressTotal?: number;
+      undoId?: string;
+      undoLabel?: string;
+      todayYmd: string;
+      deltaPages: number;
     }
   | { ok: false; error: string }
 > {
@@ -128,12 +133,19 @@ export async function updateReadingProgressAction(rawInput: unknown): Promise<
     reading,
     editionsById
   );
+  const previousValue = reading.progressValue;
+  const previousUnit = reading.progressUnit;
   const previousYmd =
     (reading.updatedAt
       ? formatDateInTimezone(reading.updatedAt, ws.profile.timezone)
       : undefined) ||
     reading.startedOn ||
     formatDateInTimezone(new Date(), ws.profile.timezone);
+
+  // Validação prévia antes de gravar snapshot de desfazer
+  let nextUnit: ProgressUnit;
+  let nextValue: number;
+  let nextTotal: number | undefined;
 
   if (
     data.convertFromPreviousUnit &&
@@ -151,9 +163,9 @@ export async function updateReadingProgressAction(rawInput: unknown): Promise<
         durationSeconds: edition?.durationSeconds,
       }
     );
-    reading.progressUnit = converted.progressUnit;
-    reading.progressValue = converted.progressValue;
-    reading.progressTotal = converted.progressTotal;
+    nextUnit = converted.progressUnit;
+    nextValue = converted.progressValue;
+    nextTotal = converted.progressTotal;
   } else {
     if (!Number.isInteger(data.progressValue)) {
       return {
@@ -187,10 +199,34 @@ export async function updateReadingProgressAction(rawInput: unknown): Promise<
       };
     }
 
-    reading.progressUnit = data.progressUnit;
-    reading.progressValue = data.progressValue;
-    reading.progressTotal = resolvedTotal;
+    nextUnit = data.progressUnit;
+    nextValue = data.progressValue;
+    nextTotal = resolvedTotal;
   }
+
+  // Salva snapshot ANTES da mutação para permitir Desfazer (~5s) removendo a sessão criada
+  let undoId: string | undefined;
+  let undoLabel: string | undefined;
+  if (!data.convertFromPreviousUnit) {
+    if (nextUnit === "pages") {
+      const delta = nextValue - (previousUnit === "pages" ? previousValue : 0);
+      const totalSuffix = nextTotal ? ` de ${nextTotal}` : "";
+      undoLabel =
+        delta > 0
+          ? `+${delta} ${delta === 1 ? "página registrada" : "páginas registradas"}: ${nextValue}${totalSuffix}`
+          : `Progresso atualizado: ${nextValue}${totalSuffix} páginas`;
+    } else if (nextUnit === "percent") {
+      undoLabel = `Progresso atualizado: ${nextValue}%`;
+    } else {
+      undoLabel = `Tempo ouvido atualizado: ${Math.round(nextValue / 60)} min`;
+    }
+    saveUndoSnapshot(ws, undoLabel);
+    undoId = ws.lastUndoAction?.id ?? `undo-${Date.now()}`;
+  }
+
+  reading.progressUnit = nextUnit;
+  reading.progressValue = nextValue;
+  reading.progressTotal = nextTotal;
 
   const nowIso = new Date().toISOString();
   const todayYmd = formatDateInTimezone(nowIso, ws.profile.timezone);
@@ -219,12 +255,17 @@ export async function updateReadingProgressAction(rawInput: unknown): Promise<
   }
 
   reading.updatedAt = nowIso;
+  invalidateUserWorkspaceCache(ws.profile.id);
   revalidatePath("/", "layout");
   return {
     ok: true,
     progressUnit: reading.progressUnit,
     progressValue: reading.progressValue,
     progressTotal: reading.progressTotal,
+    undoId,
+    undoLabel,
+    todayYmd,
+    deltaPages: Math.max(0, nextPages - previousPages),
   };
 }
 
@@ -253,10 +294,24 @@ export async function togglePauseReadingAction(
   return { ok: true };
 }
 
-export async function finishReadingAction(
-  rawInput: unknown
-): Promise<
-  { ok: true; undoId: string; label: string } | { ok: false; error: string }
+export interface ReadingCompletionStats {
+  workId: string;
+  title: string;
+  author: string;
+  daysCount: number;
+  pagesTotal: number | null;
+  pagesPerDay: number | null;
+  existingRating?: number;
+}
+
+export async function finishReadingAction(rawInput: unknown): Promise<
+  | {
+      ok: true;
+      undoId: string;
+      label: string;
+      completionStats?: ReadingCompletionStats;
+    }
+  | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
   const parsed = finishReadingSchema.safeParse(rawInput);
@@ -271,13 +326,57 @@ export async function finishReadingAction(
   }
 
   const work = ws.works.find((w) => w.id === reading.workId);
+  const author =
+    work?.contributors.find((c) => c.role === "author")?.name ??
+    "Autor desconhecido";
+  const existingReview = ws.reviews.find(
+    (rev) => rev.workId === reading.workId
+  );
+  const editionsById = new Map(ws.editions.map((e) => [e.id, e]));
+
+  const buildCompletionStats = (
+    finishedRec: typeof reading
+  ): ReadingCompletionStats => {
+    const finishYmd =
+      finishedRec.finishedOn ??
+      formatDateInTimezone(new Date(), ws.profile.timezone);
+    const startYmd = finishedRec.startedOn ?? finishYmd;
+    const daysCount = Math.max(
+      1,
+      daysBetweenInclusive(
+        startYmd <= finishYmd ? startYmd : finishYmd,
+        finishYmd
+      )
+    );
+    const pagesTotalRaw = resolveReadingPagesContribution(
+      finishedRec,
+      editionsById
+    );
+    const pagesTotal = pagesTotalRaw > 0 ? pagesTotalRaw : null;
+    const pagesPerDay =
+      pagesTotal !== null
+        ? Math.max(1, Math.round(pagesTotal / daysCount))
+        : null;
+
+    return {
+      workId: reading.workId,
+      title: work?.title ?? "Livro concluído",
+      author,
+      daysCount,
+      pagesTotal,
+      pagesPerDay,
+      existingRating: existingReview?.rating,
+    };
+  };
+
   if (reading.status === "finished") {
     return {
       ok: true,
       undoId: ws.lastUndoAction?.id ?? `undo-${Date.now()}`,
       label:
         ws.lastUndoAction?.label ??
-        (work ? `Livro "${work.title}" concluído` : "Leitura concluída"),
+        (work ? `Livro "${work.title}" concluído` : "Livro concluído"),
+      completionStats: buildCompletionStats(reading),
     };
   }
   const prevProgressText =
@@ -288,15 +387,15 @@ export async function finishReadingAction(
         : `${reading.progressValue}%`;
 
   const undoLabel = work
-    ? `Livro "${work.title}" concluído (anterior: Lendo agora · ${prevProgressText})`
-    : `Leitura concluída (anterior: Lendo agora · ${prevProgressText})`;
+    ? `Livro concluído: "${work.title}" (anterior: ${prevProgressText})`
+    : `Livro concluído (anterior: ${prevProgressText})`;
 
   saveUndoSnapshot(ws, undoLabel);
   const undoId = ws.lastUndoAction?.id ?? `undo-${Date.now()}`;
 
+  let finishedRecord = reading;
   try {
     const nowIso = new Date().toISOString();
-    const editionsById = new Map(ws.editions.map((e) => [e.id, e]));
     const previousPages = resolveReadingPagesContribution(
       reading,
       editionsById
@@ -335,6 +434,7 @@ export async function finishReadingAction(
     });
 
     ws.readings[idx] = finished;
+    finishedRecord = finished;
   } catch (err) {
     return {
       ok: false,
@@ -345,8 +445,14 @@ export async function finishReadingAction(
     };
   }
 
+  invalidateUserWorkspaceCache(ws.profile.id);
   revalidatePath("/", "layout");
-  return { ok: true, undoId, label: undoLabel };
+  return {
+    ok: true,
+    undoId,
+    label: undoLabel,
+    completionStats: buildCompletionStats(finishedRecord),
+  };
 }
 
 export async function abandonReadingAction(
