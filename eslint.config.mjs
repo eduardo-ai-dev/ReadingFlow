@@ -61,6 +61,8 @@ const eslintConfig = [
   {
     ignores: [
       ".next/**",
+      ".open-next/**",
+      ".wrangler/**",
       "out/**",
       "build/**",
       "coverage/**",

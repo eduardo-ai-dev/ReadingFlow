@@ -7,6 +7,8 @@
     "dev": "next dev",
     "build": "npm run check:contrast && npm run check:images && next build",
     "start": "next start",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "check:contrast": "node scripts/verify-theme-contrast.mjs",
     "check:contrast:rendered": "node scripts/verify-theme-contrast.mjs --rendered",
     "check:images": "node scripts/check-images.mjs",
