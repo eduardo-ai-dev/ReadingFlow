@@ -70,6 +70,8 @@ function initTables(sqlite: DatabaseSync) {
       duration_seconds INTEGER,
       cover_url TEXT,
       cover_source TEXT,
+      cover_locked INTEGER NOT NULL DEFAULT 0,
+      cover_selected_at TEXT,
       cover_color TEXT,
       spine_accent TEXT,
       contributors_json TEXT NOT NULL DEFAULT '[]',
@@ -167,6 +169,18 @@ function initTables(sqlite: DatabaseSync) {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS user_settings (
+      user_id TEXT PRIMARY KEY,
+      theme TEXT NOT NULL DEFAULT 'caderno',
+      density TEXT NOT NULL DEFAULT 'comfortable',
+      motion TEXT NOT NULL DEFAULT 'system',
+      fx TEXT NOT NULL DEFAULT 'full',
+      shelf_layout_json TEXT NOT NULL DEFAULT '{}',
+      ambient_preferences_json TEXT NOT NULL DEFAULT '{}',
+      focus_default_mode TEXT NOT NULL DEFAULT 'free',
+      updated_at TEXT NOT NULL
+    );
+
     -- Tabelas de segurança de autenticação (nunca armazenam e-mail em claro nem senhas)
     CREATE TABLE IF NOT EXISTS auth_login_attempts (
       scope_type TEXT NOT NULL,
@@ -238,6 +252,14 @@ function initTables(sqlite: DatabaseSync) {
   }
   if (!colNames.has("spine_accent")) {
     sqlite.exec("ALTER TABLE editions ADD COLUMN spine_accent TEXT");
+  }
+  if (!colNames.has("cover_locked")) {
+    sqlite.exec(
+      "ALTER TABLE editions ADD COLUMN cover_locked INTEGER NOT NULL DEFAULT 0"
+    );
+  }
+  if (!colNames.has("cover_selected_at")) {
+    sqlite.exec("ALTER TABLE editions ADD COLUMN cover_selected_at TEXT");
   }
 
   const userCols = sqlite.prepare("PRAGMA table_info(users)").all() as Array<{

@@ -63,6 +63,10 @@ export const editionsTable = sqliteTable("editions", {
   durationSeconds: integer("duration_seconds"),
   coverUrl: text("cover_url"),
   coverSource: text("cover_source"),
+  coverLocked: integer("cover_locked", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  coverSelectedAt: text("cover_selected_at"),
   coverColor: text("cover_color"),
   coverAccentColor: text("spine_accent"),
   contributorsJson: text("contributors_json").notNull().default("[]"),
@@ -124,7 +128,9 @@ export const reviewsTable = sqliteTable("reviews", {
   rating: real("rating").notNull(),
   narrationRating: real("narration_rating"),
   body: text("body"),
-  isPrivate: integer("is_private", { mode: "boolean" }).notNull().default(false),
+  isPrivate: integer("is_private", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -162,4 +168,18 @@ export const sessionsTable = sqliteTable("sessions", {
   token: text("token").primaryKey(),
   userId: text("user_id").notNull(),
   createdAt: text("created_at").notNull(),
+});
+
+export const userSettingsTable = sqliteTable("user_settings", {
+  userId: text("user_id").primaryKey(),
+  theme: text("theme").notNull().default("caderno"),
+  density: text("density").notNull().default("comfortable"),
+  motion: text("motion").notNull().default("system"),
+  fx: text("fx").notNull().default("full"),
+  shelfLayoutJson: text("shelf_layout_json").notNull().default("{}"),
+  ambientPreferencesJson: text("ambient_preferences_json")
+    .notNull()
+    .default("{}"),
+  focusDefaultMode: text("focus_default_mode").notNull().default("free"),
+  updatedAt: text("updated_at").notNull(),
 });

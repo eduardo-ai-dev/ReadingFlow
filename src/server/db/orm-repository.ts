@@ -12,6 +12,7 @@ import {
   goalsTable,
   wishlistTable,
   sessionsTable,
+  userSettingsTable,
 } from "./schema";
 import type {
   Work,
@@ -109,6 +110,7 @@ export async function ormUpdateUser(
 
 export async function ormDeleteUser(id: string) {
   const db = getOrmDb();
+  await db.delete(userSettingsTable).where(eq(userSettingsTable.userId, id));
   await db.delete(sessionsTable).where(eq(sessionsTable.userId, id));
   await db.delete(wishlistTable).where(eq(wishlistTable.userId, id));
   await db.delete(goalsTable).where(eq(goalsTable.userId, id));
@@ -246,6 +248,8 @@ export async function ormGetEditions(userId: string): Promise<Edition[]> {
     durationSeconds: r.durationSeconds ?? undefined,
     coverUrl: r.coverUrl ?? undefined,
     coverSource: (r.coverSource as Edition["coverSource"]) ?? null,
+    coverLocked: Boolean(r.coverLocked),
+    coverSelectedAt: r.coverSelectedAt ?? undefined,
     coverColor: r.coverColor ?? undefined,
     coverAccentColor: r.coverAccentColor ?? undefined,
     contributors: JSON.parse(r.contributorsJson || "[]") as Contributor[],
@@ -269,6 +273,8 @@ export async function ormInsertEdition(edition: Edition): Promise<void> {
     durationSeconds: edition.durationSeconds,
     coverUrl: edition.coverUrl,
     coverSource: edition.coverSource ?? null,
+    coverLocked: Boolean(edition.coverLocked),
+    coverSelectedAt: edition.coverSelectedAt ?? null,
     coverColor: edition.coverColor,
     coverAccentColor: edition.coverAccentColor,
     contributorsJson: JSON.stringify(edition.contributors),
@@ -615,6 +621,47 @@ export async function ormDeleteWishlistItem(
   await db
     .delete(wishlistTable)
     .where(and(eq(wishlistTable.id, wishId), eq(wishlistTable.userId, userId)));
+}
+
+export async function ormGetUserSettings(userId: string) {
+  const db = getOrmDb();
+  const rows = await db
+    .select()
+    .from(userSettingsTable)
+    .where(eq(userSettingsTable.userId, userId));
+  return rows[0] ?? null;
+}
+
+export async function ormUpsertUserSettings(settings: {
+  userId: string;
+  theme: string;
+  density: string;
+  motion: string;
+  fx: string;
+  shelfLayoutJson: string;
+  ambientPreferencesJson: string;
+  focusDefaultMode: string;
+  updatedAt: string;
+}) {
+  const db = getOrmDb();
+  const existing = await ormGetUserSettings(settings.userId);
+  if (existing) {
+    await db
+      .update(userSettingsTable)
+      .set({
+        theme: settings.theme,
+        density: settings.density,
+        motion: settings.motion,
+        fx: settings.fx,
+        shelfLayoutJson: settings.shelfLayoutJson,
+        ambientPreferencesJson: settings.ambientPreferencesJson,
+        focusDefaultMode: settings.focusDefaultMode,
+        updatedAt: settings.updatedAt,
+      })
+      .where(eq(userSettingsTable.userId, settings.userId));
+  } else {
+    await db.insert(userSettingsTable).values(settings);
+  }
 }
 
 // ============================================================================
