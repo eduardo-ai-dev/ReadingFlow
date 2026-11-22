@@ -83,11 +83,13 @@
   opacity: 0.9;
 }
 
-.rf-book-cover-wishlist:hover,
-.group:hover .rf-book-cover-wishlist,
-a:hover .rf-book-cover-wishlist {
-  filter: grayscale(0%) saturate(100%);
-  opacity: 1;
+@media (hover: hover) {
+  .rf-book-cover-wishlist:hover,
+  .group:hover .rf-book-cover-wishlist,
+  a:hover .rf-book-cover-wishlist {
+    filter: grayscale(0%) saturate(100%);
+    opacity: 1;
+  }
 }
 
 /* Capas compactas (<= 72px, inclui size="xs" 44px e size="sm" 64px): escala proporcional sem cortar título/autor */
@@ -378,7 +380,6 @@ a:hover .rf-book-cover-wishlist {
   pointer-events: auto;
 }
 
-.rf-book-slot:hover,
 .rf-book-slot.is-focused,
 .rf-book-slot.is-selected {
   z-index: 40;
@@ -491,10 +492,27 @@ a:hover .rf-book-cover-wishlist {
   transform: translateY(-10px) translateZ(45px) rotateY(-72deg) scale(1.1);
 }
 
-/* @media (hover:none): apenas o toque/seleção ativa */
+/* @media (hover:none): apenas o toque/seleção ativa (nunca sticky hover) */
 @media (hover: none) {
   .rf-book-slot:hover:not(.is-selected):not(.is-focused) .rf-book-prism {
     transform: none;
+  }
+
+  .rf-book-slot:not(.is-focused):not(.is-selected) .rf-face-top-pages,
+  .rf-book-slot:not(.is-focused):not(.is-selected) .rf-face-back-cover,
+  .rf-book-slot:not(.is-focused):not(.is-selected) .rf-face-fore-edge-pages,
+  .rf-book-slot:not(.is-focused):not(.is-selected) .rf-face-side-cover {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .rf-covers-mode .rf-book-slot .rf-face-top-pages,
+  .rf-covers-mode .rf-book-slot .rf-face-back-cover,
+  .rf-covers-mode .rf-book-slot .rf-face-fore-edge-pages,
+  .rf-covers-mode .rf-book-slot .rf-face-side-cover {
+    visibility: visible;
+    opacity: 1;
   }
 }
 
@@ -1360,7 +1378,12 @@ a:hover .rf-book-cover-wishlist {
   pointer-events: none;
 }
 
-.rf-book-slot:hover .rf-side-cover-progress-badge,
+@media (hover: hover) {
+  .rf-book-slot:hover .rf-side-cover-progress-badge {
+    opacity: 1;
+  }
+}
+
 .rf-book-slot:has(.rf-book-prism:focus-visible) .rf-side-cover-progress-badge,
 .rf-book-slot.is-selected .rf-side-cover-progress-badge,
 .rf-covers-mode .rf-side-cover-progress-badge {
@@ -1376,9 +1399,17 @@ a:hover .rf-book-cover-wishlist {
     transform: none !important;
   }
 
-  .rf-book-slot:hover .rf-book-prism,
   .rf-book-slot:has(.rf-book-prism:focus-visible) .rf-book-prism,
   .rf-book-slot.is-selected .rf-book-prism {
+    transition: none !important;
+    transform: translateY(-3px) !important;
+    outline: 2px solid var(--rf-camel) !important;
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) and (hover: hover) {
+  .rf-book-slot:hover .rf-book-prism {
     transition: none !important;
     transform: translateY(-3px) !important;
     outline: 2px solid var(--rf-camel) !important;

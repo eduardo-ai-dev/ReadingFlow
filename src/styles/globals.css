@@ -673,10 +673,12 @@ textarea:focus {
     border-color 0.25s var(--ease);
 }
 
-.card:hover,
-.interactive-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 36px rgba(5, 6, 9, 0.14);
+@media (hover: hover) {
+  .card:hover,
+  .interactive-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 36px rgba(5, 6, 9, 0.14);
+  }
 }
 
 /* Barras de progresso crescem ao carregar */
@@ -987,9 +989,11 @@ textarea:focus {
     border-color 180ms ease;
 }
 
-.interactive-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-elevated);
+@media (hover: hover) {
+  .interactive-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-elevated);
+  }
 }
 
 @keyframes heroEnter {

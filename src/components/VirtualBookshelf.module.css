@@ -627,10 +627,12 @@
     border-color 160ms ease;
 }
 
-.addInGenreLink:hover {
-  border-color: var(--rf-camel);
-  color: var(--rf-onyx);
-  background-color: var(--rf-camel);
+@media (hover: hover) {
+  .addInGenreLink:hover {
+    border-color: var(--rf-camel);
+    color: var(--rf-onyx);
+    background-color: var(--rf-camel);
+  }
 }
 
 .addInGenreLink:focus-visible {
@@ -716,8 +718,10 @@
   transition: background-color 160ms ease;
 }
 
-.primaryActionBtn:hover {
-  background-color: var(--rf-fawn);
+@media (hover: hover) {
+  .primaryActionBtn:hover {
+    background-color: var(--rf-fawn);
+  }
 }
 
 .primaryActionBtn:focus-visible {
@@ -744,9 +748,11 @@
     border-color 160ms ease;
 }
 
-.secondaryActionBtn:hover {
-  background-color: rgb(200 164 110 / 0.16);
-  border-color: var(--rf-fawn);
+@media (hover: hover) {
+  .secondaryActionBtn:hover {
+    background-color: rgb(200 164 110 / 0.16);
+    border-color: var(--rf-fawn);
+  }
 }
 
 .secondaryActionBtn:focus-visible {
@@ -815,11 +821,18 @@
     transform 180ms ease-out;
 }
 
-.ghostBook:hover .ghostSilhouette,
 .ghostBook:focus-visible .ghostSilhouette {
   opacity: 0.36;
   border-color: rgb(200 164 110 / 0.68);
   transform: translateY(-2px);
+}
+
+@media (hover: hover) {
+  .ghostBook:hover .ghostSilhouette {
+    opacity: 0.36;
+    border-color: rgb(200 164 110 / 0.68);
+    transform: translateY(-2px);
+  }
 }
 
 .ghostPlus {
@@ -834,9 +847,14 @@
   transition: opacity 180ms ease-out;
 }
 
-.ghostBook:hover .ghostPlus,
 .ghostBook:focus-visible .ghostPlus {
   opacity: 1;
+}
+
+@media (hover: hover) {
+  .ghostBook:hover .ghostPlus {
+    opacity: 1;
+  }
 }
 
 .ghostLabel {
@@ -869,17 +887,26 @@
   transform: translateX(0) translateY(4px);
 }
 
-.ghostBook:hover .ghostLabel,
 .ghostBook:focus-visible .ghostLabel {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
 
-.ghostSlot:last-child .ghostBook:hover .ghostLabel,
-.ghostSlot:nth-last-child(2) .ghostBook:hover .ghostLabel,
 .ghostSlot:last-child .ghostBook:focus-visible .ghostLabel,
 .ghostSlot:nth-last-child(2) .ghostBook:focus-visible .ghostLabel {
   transform: translateX(0) translateY(0);
+}
+
+@media (hover: hover) {
+  .ghostBook:hover .ghostLabel {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .ghostSlot:last-child .ghostBook:hover .ghostLabel,
+  .ghostSlot:nth-last-child(2) .ghostBook:hover .ghostLabel {
+    transform: translateX(0) translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -926,9 +953,11 @@
     color 160ms ease;
 }
 
-.filterPill:hover {
-  border-color: var(--rf-camel);
-  background-color: var(--rf-coffee);
+@media (hover: hover) {
+  .filterPill:hover {
+    border-color: var(--rf-camel);
+    background-color: var(--rf-coffee);
+  }
 }
 
 .filterPill:focus-visible {
@@ -942,9 +971,11 @@
   color: var(--rf-onyx);
 }
 
-.filterPillActive:hover {
-  background-color: var(--rf-fawn);
-  border-color: var(--rf-fawn);
+@media (hover: hover) {
+  .filterPillActive:hover {
+    background-color: var(--rf-fawn);
+    border-color: var(--rf-fawn);
+  }
 }
 
 .filterCount {
@@ -1007,8 +1038,10 @@
   cursor: pointer;
 }
 
-.filterResetBtn:hover {
-  background-color: rgb(200 164 110 / 0.16);
+@media (hover: hover) {
+  .filterResetBtn:hover {
+    background-color: rgb(200 164 110 / 0.16);
+  }
 }
 
 .filterResetBtn:focus-visible {
@@ -1101,10 +1134,12 @@
     color 150ms ease;
 }
 
-.categoryEditBtn:hover {
-  background-color: var(--rf-surface-subtle);
-  border-color: var(--rf-border-default);
-  color: var(--rf-text-primary);
+@media (hover: hover) {
+  .categoryEditBtn:hover {
+    background-color: var(--rf-surface-subtle);
+    border-color: var(--rf-border-default);
+    color: var(--rf-text-primary);
+  }
 }
 
 .categoryEditBtn:focus-visible {
@@ -1187,9 +1222,11 @@
   cursor: pointer;
 }
 
-.shelfSuggestionChip:hover {
-  border-color: var(--rf-camel);
-  color: var(--rf-linen);
+@media (hover: hover) {
+  .shelfSuggestionChip:hover {
+    border-color: var(--rf-camel);
+    color: var(--rf-linen);
+  }
 }
 
 /* ==========================================================================
@@ -1280,9 +1317,11 @@
   cursor: pointer;
 }
 
-.organizeMiniBtn:hover {
-  border-color: var(--rf-camel);
-  background-color: var(--rf-coffee);
+@media (hover: hover) {
+  .organizeMiniBtn:hover {
+    border-color: var(--rf-camel);
+    background-color: var(--rf-coffee);
+  }
 }
 
 .organizeMiniBtn:focus-visible,
@@ -1331,14 +1370,16 @@
   color: var(--rf-fawn);
 }
 
-.headerIconBtn:hover:not(:disabled) {
-  background-color: rgb(44 34 30 / 0.1);
-  color: var(--rf-onyx);
-}
+@media (hover: hover) {
+  .headerIconBtn:hover:not(:disabled) {
+    background-color: rgb(44 34 30 / 0.1);
+    color: var(--rf-onyx);
+  }
 
-:global([data-shelf-theme="dark"]) .headerIconBtn:hover:not(:disabled) {
-  background-color: rgb(200 164 110 / 0.18);
-  color: var(--rf-linen);
+  :global([data-shelf-theme="dark"]) .headerIconBtn:hover:not(:disabled) {
+    background-color: rgb(200 164 110 / 0.18);
+    color: var(--rf-linen);
+  }
 }
 
 .headerIconBtn:disabled {
@@ -1744,8 +1785,10 @@
   transition: background-color 160ms ease;
 }
 
-.quickPanelBtnPrimary:hover {
-  background-color: var(--rf-accent-secondary-hover);
+@media (hover: hover) {
+  .quickPanelBtnPrimary:hover {
+    background-color: var(--rf-accent-secondary-hover);
+  }
 }
 
 .quickPanelBtnPrimary:focus-visible,
@@ -2099,12 +2142,18 @@
   border-radius: 3px;
 }
 
-.bookFrontButton:hover,
 .bookFrontButton:focus-visible {
   transform: perspective(640px) rotateX(1deg) translateY(-5px) scale(1.03);
   filter: drop-shadow(0 12px 14px rgba(18, 12, 8, 0.42));
   outline: 2px solid var(--rf-focus-ring-color);
   outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .bookFrontButton:hover {
+    transform: perspective(640px) rotateX(1deg) translateY(-5px) scale(1.03);
+    filter: drop-shadow(0 12px 14px rgba(18, 12, 8, 0.42));
+  }
 }
 
 .bookFrontSelected .bookFrontButton {
@@ -2248,10 +2297,16 @@
     background-color 140ms ease;
 }
 
-.decorRemoveBtn:hover,
 .decorRemoveBtn:focus-visible {
   transform: scale(1.08);
   background-color: var(--rf-status-error-bg);
   outline: 2px solid var(--rf-focus-ring-color);
   outline-offset: 1px;
+}
+
+@media (hover: hover) {
+  .decorRemoveBtn:hover {
+    transform: scale(1.08);
+    background-color: var(--rf-status-error-bg);
+  }
 }
