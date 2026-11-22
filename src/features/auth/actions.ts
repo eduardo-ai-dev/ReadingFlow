@@ -56,7 +56,6 @@ import {
 } from "@/features/auth/rules";
 import { sanitizePlainText } from "@/server/security/sanitize";
 import {
-  hashPassword,
   hashPasswordAsync,
   hashResetToken,
   isHashedPassword,
@@ -110,10 +109,9 @@ const PASSWORD_RESET_TTL_MS = 15 * 60 * 1000;
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
 const RECENT_SESSION_WINDOW_MS = 15 * 60 * 1000;
 
-// Hash scrypt fixo usado para equalizar custo de CPU quando o e-mail não existe
-const DUMMY_PASSWORD_HASH = hashPassword(
-  "readingflow-dummy-password-equalization-v1"
-);
+// Hash PBKDF2-SHA256 pré-formatado (zero CPU no startup do Worker) para equalizar custo quando e-mail não existe
+const DUMMY_PASSWORD_HASH =
+  "pbkdf2$sha256$100000$0102030405060708090a0b0c0d0e0f10$000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 
 async function readSafeRequestContext(overrides?: {
   clientIp?: string;

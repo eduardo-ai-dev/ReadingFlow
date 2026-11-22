@@ -1,47 +1,43 @@
 import crypto from "node:crypto";
 import { getAuthSecurityConfig } from "@/server/security/auth-config";
+import { constantTimeEqualBytes } from "@/server/security/password";
 
 export const KNOWN_DEVICE_COOKIE_NAME = "rf_known_device";
 const KNOWN_DEVICE_TTL_MS = 1000 * 60 * 60 * 24 * 90; // 90 dias
 
-const ARGON2_TAG_LENGTH = 32;
-const ARGON2_SALT_BYTES = 16;
+const SECRET_PBKDF2_ITERATIONS = 100_000;
+const SECRET_PBKDF2_TAG_BYTES = 32;
+const SECRET_PBKDF2_SALT_BYTES = 16;
+const SECRET_PBKDF2_PREFIX = "$pbkdf2-sha256$";
 
-// Mínimos obrigatórios conforme OWASP Password Storage Cheat Sheet
-const OWASP_MIN_MEMORY_KIB = 19456; // 19 MiB
-const OWASP_MIN_PASSES = 2;
-const OWASP_MIN_PARALLELISM = 1;
+const textEncoder = new TextEncoder();
 
-type NodeArgon2Options = {
-  message: string | Buffer;
-  nonce: Buffer;
-  memory: number;
-  passes: number;
-  parallelism: number;
-  tagLength: number;
-};
-
-type NodeArgon2Fn = (
-  algorithm: "argon2id" | "argon2i" | "argon2d",
-  parameters: NodeArgon2Options,
-  callback: (err: Error | null, derivedKey: Buffer) => void
-) => void;
-
-function deriveArgon2idNative(options: NodeArgon2Options): Promise<Buffer> {
-  const nativeArgon2 = (crypto as unknown as { argon2?: NodeArgon2Fn }).argon2;
-  if (typeof nativeArgon2 !== "function") {
-    return Promise.reject(
-      new Error(
-        "crypto.argon2 nativo indisponível neste runtime Node.js (requer Node >= 24.7)."
-      )
-    );
-  }
-  return new Promise<Buffer>((resolve, reject) => {
-    nativeArgon2("argon2id", options, (err: Error | null, key: Buffer) => {
-      if (err) reject(err);
-      else resolve(key);
-    });
-  });
+async function deriveSecretPbkdf2(
+  plainSecret: string,
+  salt: Uint8Array,
+  iterations: number,
+  tagBytes: number
+): Promise<Uint8Array> {
+  const keyMaterial = await globalThis.crypto.subtle.importKey(
+    "raw",
+    textEncoder.encode(plainSecret),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"]
+  );
+  const saltCopy = new Uint8Array(salt.byteLength);
+  saltCopy.set(salt);
+  const bits = await globalThis.crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: saltCopy,
+      iterations,
+    },
+    keyMaterial,
+    tagBytes * 8
+  );
+  return new Uint8Array(bits);
 }
 
 /**
@@ -198,49 +194,41 @@ export function extractTrustedClientIp(
 }
 
 /**
- * Armazenamento de segredos próprios do app (códigos de recuperação, OTP/link mágico,
- * chaves de API) usando Argon2id nativo do Node.js (`node:crypto`), com salt aleatório
- * por item e parâmetros mínimos OWASP (m >= 19 MiB, t >= 2, p >= 1), parametrizáveis via env.
+ * Armazenamento de segredos próprios do app (códigos de recuperação, OTP/link mágico)
+ * usando Web Crypto API (`crypto.subtle` PBKDF2 / SHA-256, 100.000 iterações) com
+ * salt aleatório de 128 bits por item — 100% compatível com Cloudflare Workers (`workerd`).
  *
- * Formato PHC: `$argon2id$v=19$m=<KiB>,t=<passes>,p=<parallelism>$<saltB64>$<hashB64>`
+ * Formato PHC: `$pbkdf2-sha256$i=100000$<saltB64Url>$<hashB64Url>`
  */
 export async function hashAppSecretArgon2id(
   plainSecret: string,
-  overrideParams?: { memory?: number; passes?: number; parallelism?: number }
+  overrideParams?: { iterations?: number }
 ): Promise<string> {
-  const cfg = getAuthSecurityConfig();
-  const memory = Math.max(
-    OWASP_MIN_MEMORY_KIB,
-    overrideParams?.memory ?? cfg.argon2MemoryKiB
+  const iterations = Math.max(
+    10_000,
+    Math.min(100_000, overrideParams?.iterations ?? SECRET_PBKDF2_ITERATIONS)
   );
-  const passes = Math.max(
-    OWASP_MIN_PASSES,
-    overrideParams?.passes ?? cfg.argon2Passes
-  );
-  const parallelism = Math.max(
-    OWASP_MIN_PARALLELISM,
-    overrideParams?.parallelism ?? cfg.argon2Parallelism
-  );
-  const nonce = crypto.randomBytes(ARGON2_SALT_BYTES);
+  const nonce = new Uint8Array(SECRET_PBKDF2_SALT_BYTES);
+  globalThis.crypto.getRandomValues(nonce);
 
-  const derived = await deriveArgon2idNative({
-    message: plainSecret,
+  const derived = await deriveSecretPbkdf2(
+    plainSecret,
     nonce,
-    memory,
-    passes,
-    parallelism,
-    tagLength: ARGON2_TAG_LENGTH,
-  });
+    iterations,
+    SECRET_PBKDF2_TAG_BYTES
+  );
 
-  return `$argon2id$v=19$m=${memory},t=${passes},p=${parallelism}$${nonce.toString("base64url")}$${derived.toString("base64url")}`;
+  const saltB64 = Buffer.from(nonce).toString("base64url");
+  const hashB64 = Buffer.from(derived).toString("base64url");
+  return `${SECRET_PBKDF2_PREFIX}i=${iterations}$${saltB64}$${hashB64}`;
 }
 
 export function isArgon2idHash(stored: string): boolean {
-  return stored.startsWith("$argon2id$v=19$");
+  return stored.startsWith(SECRET_PBKDF2_PREFIX);
 }
 
 /**
- * Verifica segredo próprio armazenado com Argon2id usando comparação em tempo constante.
+ * Verifica segredo próprio armazenado via PBKDF2-SHA256 (Web Crypto) em tempo constante.
  */
 export async function verifyAppSecretArgon2id(
   plainSecret: string,
@@ -249,46 +237,36 @@ export async function verifyAppSecretArgon2id(
   if (!plainSecret || !storedPhc || !isArgon2idHash(storedPhc)) return false;
 
   const parts = storedPhc.split("$");
-  // ['', 'argon2id', 'v=19', 'm=...,t=...,p=...', saltB64, hashB64]
-  if (parts.length !== 6) return false;
+  // ['', 'pbkdf2-sha256', 'i=100000', saltB64, hashB64]
+  if (parts.length !== 5) return false;
 
-  const paramPart = parts[3] ?? "";
-  const saltB64 = parts[4] ?? "";
-  const hashB64 = parts[5] ?? "";
+  const iterMatch = /^i=(\d+)$/.exec(parts[2] ?? "");
+  const saltB64 = parts[3] ?? "";
+  const hashB64 = parts[4] ?? "";
+  if (!iterMatch) return false;
 
-  const mMatch = /m=(\d+)/.exec(paramPart);
-  const tMatch = /t=(\d+)/.exec(paramPart);
-  const pMatch = /p=(\d+)/.exec(paramPart);
-  if (!mMatch || !tMatch || !pMatch) return false;
-
-  const memory = Number.parseInt(mMatch[1]!, 10);
-  const passes = Number.parseInt(tMatch[1]!, 10);
-  const parallelism = Number.parseInt(pMatch[1]!, 10);
-
+  const iterations = Number.parseInt(iterMatch[1]!, 10);
   if (
-    memory < OWASP_MIN_MEMORY_KIB ||
-    passes < OWASP_MIN_PASSES ||
-    parallelism < OWASP_MIN_PARALLELISM
+    !Number.isFinite(iterations) ||
+    iterations < 10_000 ||
+    iterations > 1_000_000
   ) {
     return false;
   }
 
   try {
-    const nonce = Buffer.from(saltB64, "base64url");
-    const expected = Buffer.from(hashB64, "base64url");
+    const nonce = new Uint8Array(Buffer.from(saltB64, "base64url"));
+    const expected = new Uint8Array(Buffer.from(hashB64, "base64url"));
     if (nonce.length < 8 || expected.length < 16) return false;
 
-    const derived = await deriveArgon2idNative({
-      message: plainSecret,
+    const derived = await deriveSecretPbkdf2(
+      plainSecret,
       nonce,
-      memory,
-      passes,
-      parallelism,
-      tagLength: expected.length,
-    });
+      iterations,
+      expected.length
+    );
 
-    if (derived.length !== expected.length) return false;
-    return crypto.timingSafeEqual(derived, expected);
+    return constantTimeEqualBytes(derived, expected);
   } catch {
     return false;
   }

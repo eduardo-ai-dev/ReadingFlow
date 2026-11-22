@@ -38,6 +38,7 @@ import {
   SESSION_COOKIE_NAME,
   getMemoryStore,
 } from "@/server/store/memory-repository";
+import { getAuthSecurityConfig } from "@/server/security/auth-config";
 import {
   computeAccountHmac,
   extractTrustedClientIp,
@@ -311,16 +312,39 @@ describe("Segurança de login: credential stuffing, anti-enumeração, Argon2id,
     expect(knownGate.isKnownDevice).toBe(true);
   });
 
-  it("armazena segredos próprios com Argon2id nativo (salt único, m>=19MiB, t>=2, p=1) e bloqueia senhas vazadas via HIBP k-anonymity", async () => {
+  it("armazena segredos próprios com PBKDF2-SHA256 (Web Crypto, 100.000 iterações, salt único), exige AUTH_HMAC_SECRET em produção e bloqueia senhas vazadas via HIBP k-anonymity", async () => {
     const h1 = await hashAppSecretArgon2id("codigo-recuperacao-secreto-1");
     const h2 = await hashAppSecretArgon2id("codigo-recuperacao-secreto-1");
     expect(isArgon2idHash(h1)).toBe(true);
     expect(h1).not.toBe(h2); // salt aleatório por item
-    expect(h1).toMatch(/^\$argon2id\$v=19\$m=\d+,t=\d+,p=\d+\$/);
+    expect(h1).toMatch(/^\$pbkdf2-sha256\$i=100000\$/);
     expect(
       await verifyAppSecretArgon2id("codigo-recuperacao-secreto-1", h1)
     ).toBe(true);
     expect(await verifyAppSecretArgon2id("codigo-errado", h1)).toBe(false);
+
+    // Garante que em NODE_ENV=production fora de VITEST/build, AUTH_HMAC_SECRET é obrigatório mesmo sem VERCEL_ENV
+    const prevNodeEnv = process.env.NODE_ENV;
+    const prevVitest = process.env.VITEST;
+    const prevHmac = process.env.AUTH_HMAC_SECRET;
+    const prevVercel = process.env.VERCEL_ENV;
+    try {
+      (process.env as Record<string, string | undefined>).NODE_ENV =
+        "production";
+      delete process.env.VITEST;
+      delete process.env.VERCEL_ENV;
+      delete process.env.AUTH_HMAC_SECRET;
+      expect(() => getAuthSecurityConfig()).toThrow(/AUTH_HMAC_SECRET/);
+    } finally {
+      (process.env as Record<string, string | undefined>).NODE_ENV =
+        prevNodeEnv;
+      if (prevVitest !== undefined) process.env.VITEST = prevVitest;
+      else delete process.env.VITEST;
+      if (prevHmac !== undefined) process.env.AUTH_HMAC_SECRET = prevHmac;
+      else delete process.env.AUTH_HMAC_SECRET;
+      if (prevVercel !== undefined) process.env.VERCEL_ENV = prevVercel;
+      else delete process.env.VERCEL_ENV;
+    }
 
     // Mock HIBP k-anonymity: envia apenas 5 chars do SHA-1, jamais a senha
     const leakedPass = "minha frase vazada 2026";

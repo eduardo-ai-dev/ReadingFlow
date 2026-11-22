@@ -75,13 +75,17 @@ export function getAuthSecurityConfig(): AuthSecurityConfig {
   const isTest = process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
 
   const rawHmacSecret = process.env.AUTH_HMAC_SECRET?.trim();
-  if (isProd && (!rawHmacSecret || rawHmacSecret.length < 32)) {
-    // Em produção exige segredo dedicado de >= 32 caracteres; em build/preview local sem segredo gera fallback derivado de chave do processo
-    if (process.env.VERCEL_ENV === "production") {
-      throw new Error(
-        "AUTH_HMAC_SECRET deve ser configurado em produção com pelo menos 32 caracteres."
-      );
-    }
+  const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+  if (
+    isProd &&
+    !isTest &&
+    !isBuildPhase &&
+    (!rawHmacSecret || rawHmacSecret.length < 32)
+  ) {
+    // Proíbe fallback silencioso para DEV_EPHEMERAL_SECRET em qualquer runtime de produção (Cloudflare, Vercel, Node)
+    throw new Error(
+      "AUTH_HMAC_SECRET deve ser configurado em produção com pelo menos 32 caracteres."
+    );
   }
   const hmacSecret = rawHmacSecret || DEV_EPHEMERAL_SECRET;
   const deviceCookieSecret =
