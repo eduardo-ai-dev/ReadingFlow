@@ -8,6 +8,8 @@ import { computeReadingForecast } from "@/lib/reading-metrics";
 import { formatDisplayDatePtBr } from "@/lib/dates";
 import { ProgressBar } from "@/components/ProgressBar";
 import { GoalPaceBadge } from "@/components/StatusBadge";
+import { GoalCardActionsClient } from "@/components/GoalCardActionsClient";
+import { MetricFormulaHint } from "@/components/MetricFormulaHint";
 import { CountUp } from "@/components/MotionPrimitives";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
 import {
@@ -188,7 +190,7 @@ export default async function EvolucaoPage() {
                 className="rf-panel flex flex-col justify-between p-6"
               >
                 <div>
-                  <div className="mb-2 flex items-start justify-between gap-3">
+                  <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
                     <h3 className="font-serif text-xl font-semibold text-[var(--rf-text-heading)]">
                       {goal.title}
                     </h3>
@@ -198,10 +200,9 @@ export default async function EvolucaoPage() {
                     Período: {formatDisplayDatePtBr(goal.startsOn)} a{" "}
                     {formatDisplayDatePtBr(goal.endsOn)}
                   </p>
+                  {/* Progresso em primeiro lugar */}
                   <p className="mb-2 font-serif text-2xl font-semibold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-heading)]">
-                    {evaluation.completedValue} de {evaluation.targetValue}{" "}
-                    {goal.kind === "books" ? "livros" : "páginas"} (
-                    {evaluation.progressPercent}%)
+                    {evaluation.progressHeadlinePtBr}
                   </p>
                   <ProgressBar
                     value={evaluation.progressPercent}
@@ -210,11 +211,47 @@ export default async function EvolucaoPage() {
 
                   <p className="mt-3 inline-flex w-full items-start gap-2 rounded-[var(--rf-radius-md)] border border-[var(--rf-border-subtle)] bg-[var(--rf-surface-canvas)] px-3.5 py-2.5 font-sans text-xs font-medium tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)]">
                     <Compass
-                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--rf-status-info)]"
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--rf-text-accent-secondary)]"
                       aria-hidden="true"
                     />
-                    <span>{evaluation.neutralMessagePtBr}</span>
+                    <span>{evaluation.concreteActionPtBr}</span>
                   </p>
+
+                  {evaluation.hasEnoughData &&
+                  evaluation.paceStatus !== "completed" &&
+                  evaluation.paceStatus !== "paused" ? (
+                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 font-sans text-xs tabular-nums [font-variant-numeric:lining-nums_tabular-nums]">
+                      <span className="font-semibold text-[var(--rf-text-accent-secondary)]">
+                        Necessário: {evaluation.requiredPerDayFormatted}
+                      </span>
+                      <MetricFormulaHint
+                        basisLabel="ver fórmula"
+                        formula={evaluation.requiredFormulaTooltip}
+                      />
+                    </div>
+                  ) : null}
+
+                  {evaluation.realisticAlternativePtBr ? (
+                    <p className="mt-2.5 rounded-[var(--rf-radius-sm)] border border-[var(--rf-border-secondary)] bg-[var(--rf-accent-secondary-subtle)] px-3 py-2 font-sans text-xs font-medium text-[var(--rf-text-accent-secondary)]">
+                      {evaluation.realisticAlternativePtBr}
+                    </p>
+                  ) : null}
+
+                  <GoalCardActionsClient
+                    goalId={goal.id}
+                    goalTitle={goal.title}
+                    goalKind={goal.kind}
+                    targetValue={goal.targetValue}
+                    startsOn={goal.startsOn}
+                    endsOn={goal.endsOn}
+                    paused={goal.paused}
+                    paceStatus={evaluation.paceStatus}
+                    suggestedTargetValue={evaluation.suggestedTargetValue}
+                    realisticAlternativePtBr={
+                      evaluation.realisticAlternativePtBr
+                    }
+                    howToReachStepsPtBr={evaluation.howToReachStepsPtBr}
+                  />
                 </div>
               </div>
             ))}

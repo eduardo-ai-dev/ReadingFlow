@@ -111,6 +111,48 @@ export function CreateGoalFormClient({
         Nova meta de leitura
       </h2>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-[var(--text-muted)]">
+          Sugestões leves:
+        </span>
+        {[
+          {
+            label: "6 livros no ano",
+            kind: "books" as const,
+            target: "6",
+            title: `Leituras de ${defaultYear}`,
+          },
+          {
+            label: "12 livros no ano",
+            kind: "books" as const,
+            target: "12",
+            title: `Leituras de ${defaultYear}`,
+          },
+          {
+            label: "1.500 páginas no ano",
+            kind: "pages" as const,
+            target: "1500",
+            title: `Páginas em ${defaultYear}`,
+          },
+        ].map((preset) => (
+          <button
+            key={preset.label}
+            type="button"
+            onClick={() => {
+              setKind(preset.kind);
+              setPeriod("year");
+              setYear(String(defaultYear));
+              setTargetValue(preset.target);
+              setTitle(preset.title);
+              setError(null);
+            }}
+            className="inline-flex min-h-[36px] items-center rounded-full border border-[var(--border-ui)] bg-[var(--bg-elevated)] px-3 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--rf-border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+
       {error ? (
         <div
           role="alert"

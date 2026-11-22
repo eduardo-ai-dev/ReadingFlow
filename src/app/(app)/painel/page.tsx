@@ -11,6 +11,7 @@ import { getDashboardEditorialData } from "@/features/dashboard/queries";
 import { formatFullDatePtBr, formatNumberPtBr } from "@/lib/formatters";
 import { BookCover } from "@/components/BookCover";
 import { GoalPaceBadge } from "@/components/StatusBadge";
+import { GoalCardActionsClient } from "@/components/GoalCardActionsClient";
 import { StarRatingDisplay } from "@/components/StarRating";
 import {
   ActiveReadingSpotlight,
@@ -643,15 +644,6 @@ async function DashboardSecondaryBand({
                     {goalsData.entries
                       .slice(0, 3)
                       .map(({ goal, evaluation }) => {
-                        const unitSingular =
-                          goal.kind === "books" ? "livro" : "página";
-                        const unitPlural =
-                          goal.kind === "books" ? "livros" : "páginas";
-                        const remainingPhrase =
-                          evaluation.remainingValue === 1
-                            ? `Falta 1 ${unitSingular}`
-                            : `Faltam ${formatNumberPtBr(evaluation.remainingValue)} ${unitPlural}`;
-
                         return (
                           <div
                             key={goal.id}
@@ -664,11 +656,10 @@ async function DashboardSecondaryBand({
                               <GoalPaceBadge status={evaluation.paceStatus} />
                             </div>
 
-                            <div className="mt-2 flex items-baseline justify-between font-sans text-[13px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums]">
+                            {/* Progresso sempre antes do que falta */}
+                            <div className="mt-2 flex items-baseline justify-between gap-2 font-sans text-[13px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums]">
                               <span className="font-semibold text-[var(--rf-text-primary)]">
-                                {formatNumberPtBr(evaluation.completedValue)} de{" "}
-                                {formatNumberPtBr(evaluation.targetValue)}{" "}
-                                {unitPlural}
+                                {evaluation.progressHeadlinePtBr}
                               </span>
                               <span className="font-serif text-base font-bold text-[var(--rf-text-accent-secondary)]">
                                 {evaluation.progressPercent}%
@@ -691,22 +682,23 @@ async function DashboardSecondaryBand({
                               />
                             </div>
 
-                            {evaluation.paceStatus === "completed" ? (
-                              <p className="rf-type-caption mt-2.5 font-semibold text-[var(--rf-status-success)]">
-                                Meta cumprida neste período.
+                            <div className="mt-2.5 space-y-1.5 font-sans text-[13px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums]">
+                              {/* Ação concreta ou mensagem de coleta / pausa / conclusão */}
+                              <p
+                                className={
+                                  evaluation.paceStatus === "completed"
+                                    ? "rf-type-caption font-semibold text-[var(--rf-status-success)]"
+                                    : "font-medium text-[var(--rf-text-primary)]"
+                                }
+                              >
+                                {evaluation.concreteActionPtBr}
                               </p>
-                            ) : (
-                              <div className="mt-2.5 space-y-1.5 font-sans text-[13px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums]">
-                                {/* Restante + dias até o prazo */}
-                                <p className="font-medium text-[var(--rf-text-primary)]">
-                                  {remainingPhrase} ·{" "}
-                                  <span className="text-[var(--rf-text-secondary)]">
-                                    {evaluation.requiredBasisLabel}
-                                  </span>
-                                </p>
 
-                                {/* Ritmo necessário por dia com tooltip da fórmula */}
-                                <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                              {/* Detalhe de fórmula apenas quando há dados suficientes e meta ativa */}
+                              {evaluation.hasEnoughData &&
+                              evaluation.paceStatus !== "completed" &&
+                              evaluation.paceStatus !== "paused" ? (
+                                <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-xs">
                                   <span className="font-semibold text-[var(--rf-text-accent-secondary)]">
                                     Necessário:{" "}
                                     {evaluation.requiredPerDayFormatted}
@@ -716,36 +708,51 @@ async function DashboardSecondaryBand({
                                     formula={evaluation.requiredFormulaTooltip}
                                   />
                                 </div>
+                              ) : null}
 
-                                {/* Equivalente em dias de leitura/semana no ritmo atual (quando há base) */}
-                                {evaluation.requiredDaysPerWeekLabel &&
-                                evaluation.requiredDaysPerWeekFormulaTooltip ? (
-                                  <div>
-                                    <MetricFormulaHint
-                                      basisLabel={`Equivale a ${evaluation.requiredDaysPerWeekLabel}`}
-                                      formula={
-                                        evaluation.requiredDaysPerWeekFormulaTooltip
-                                      }
-                                    />
-                                  </div>
-                                ) : null}
+                              {evaluation.hasEnoughData &&
+                              evaluation.paceStatus !== "completed" &&
+                              evaluation.paceStatus !== "paused" &&
+                              evaluation.requiredDaysPerWeekLabel &&
+                              evaluation.requiredDaysPerWeekFormulaTooltip ? (
+                                <div>
+                                  <MetricFormulaHint
+                                    basisLabel={`Equivale a ${evaluation.requiredDaysPerWeekLabel}`}
+                                    formula={
+                                      evaluation.requiredDaysPerWeekFormulaTooltip
+                                    }
+                                  />
+                                </div>
+                              ) : null}
 
-                                {/* Projeção só aparece se terminar DENTRO do prazo da meta */}
-                                {evaluation.projectedFitsBeforeDeadline &&
-                                evaluation.projectedDaysToFinish &&
-                                evaluation.projectedDaysToFinish > 0 ? (
-                                  <p className="rf-type-caption text-[var(--rf-status-success)]">
-                                    No ritmo ({evaluation.currentBasisLabel})
-                                    termina em{" "}
-                                    {evaluation.projectedDaysToFinish}{" "}
-                                    {evaluation.projectedDaysToFinish === 1
-                                      ? "dia"
-                                      : "dias"}
-                                    .
-                                  </p>
-                                ) : null}
-                              </div>
-                            )}
+                              {/* Alternativa realista quando a meta é ambiciosa */}
+                              {evaluation.realisticAlternativePtBr ? (
+                                <p className="rounded-[var(--rf-radius-sm)] border border-[var(--rf-border-secondary)] bg-[var(--rf-accent-secondary-subtle)] px-2.5 py-1.5 text-xs font-medium text-[var(--rf-text-accent-secondary)]">
+                                  {evaluation.realisticAlternativePtBr}
+                                </p>
+                              ) : null}
+                            </div>
+
+                            <GoalCardActionsClient
+                              goalId={goal.id}
+                              goalTitle={goal.title}
+                              goalKind={goal.kind}
+                              targetValue={goal.targetValue}
+                              startsOn={goal.startsOn}
+                              endsOn={goal.endsOn}
+                              paused={goal.paused}
+                              paceStatus={evaluation.paceStatus}
+                              suggestedTargetValue={
+                                evaluation.suggestedTargetValue
+                              }
+                              realisticAlternativePtBr={
+                                evaluation.realisticAlternativePtBr
+                              }
+                              howToReachStepsPtBr={
+                                evaluation.howToReachStepsPtBr
+                              }
+                              compact
+                            />
                           </div>
                         );
                       })}
