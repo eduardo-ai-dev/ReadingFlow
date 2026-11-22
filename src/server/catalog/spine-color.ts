@@ -1,70 +1,45 @@
-import { pickDominantSpinePalette } from "@/features/catalog/spine-color-rules";
-import { getCatalogFetch } from "@/server/catalog/http-client";
-import { validateExternalCoverUrl } from "@/server/security/sanitize";
-
-const MAX_IMAGE_BYTES = 3_000_000;
-
-async function loadImageBuffer(
-  coverUrl: string,
-  signal?: AbortSignal
-): Promise<Buffer | null> {
-  if (coverUrl.startsWith("data:")) {
-    const match =
-      /^data:image\/(?:png|jpe?g|webp);base64,([A-Za-z0-9+/=]+)$/i.exec(
-        coverUrl
-      );
-    if (!match?.[1]) return null;
-    const buf = Buffer.from(match[1], "base64");
-    return buf.byteLength <= MAX_IMAGE_BYTES ? buf : null;
-  }
-
-  const safeUrl = validateExternalCoverUrl(coverUrl);
-  if (!safeUrl) return null;
-
-  const catalogFetch = getCatalogFetch();
-  const res = await catalogFetch(safeUrl, { signal, redirect: "follow" });
-  if (!res.ok) return null;
-  const contentType = res.headers.get("content-type") ?? "";
-  if (contentType && !contentType.startsWith("image/")) return null;
-  const arrayBuffer = await res.arrayBuffer();
-  if (
-    arrayBuffer.byteLength < 200 ||
-    arrayBuffer.byteLength > MAX_IMAGE_BYTES
-  ) {
-    return null;
-  }
-  return Buffer.from(arrayBuffer);
-}
+import { hashCoverSeed } from "@/lib/cover-color";
+import { deriveSpineAccentHex } from "@/features/catalog/spine-color-rules";
 
 /**
- * Calcula, no servidor, a cor principal (`spineColor`) e a segunda cor dominante
- * (`spineAccent`) da capa do livro no cadastro.
+ * Paleta editorial de encadernação derivada de forma determinística em JS puro
+ * (100% compatível com Cloudflare Workers / workerd, sem binários nativos).
+ * Quando o cliente extrai a cor real via Canvas no navegador, essa cor prevalece;
+ * no servidor, o fallback determinístico evita bloqueio de CPU e dependências nativas.
+ */
+const EDITORIAL_BOOKBINDING_SWATCHES = [
+  "#6E1E2A", // Couro Bordô
+  "#2F5C46", // Verde Biblioteca
+  "#26466D", // Azul Prussiano
+  "#7A4B2A", // Nogueira
+  "#8A3B2B", // Terracota
+  "#5B3A63", // Ameixa Editorial
+  "#8F6B24", // Ocre Dourado
+  "#2D524E", // Petróleo Escuro
+  "#6C2D3C", // Vinho Antigo
+  "#47392E", // Tabaco Escuro
+] as const;
+
+/**
+ * Calcula no servidor, em TypeScript puro (sem `sharp`), uma paleta editorial
+ * determinística (`spineColor` + `spineAccent`) para a lombada a partir da URL da capa.
  */
 export async function extractSpinePaletteFromCover(
   coverUrl: string,
-  signal?: AbortSignal
+  _signal?: AbortSignal
 ): Promise<{ spineColor: string; spineAccent: string } | null> {
-  try {
-    const buffer = await loadImageBuffer(coverUrl, signal);
-    if (!buffer) return null;
+  void _signal;
+  const trimmed = coverUrl.trim();
+  if (!trimmed) return null;
 
-    const sharpModule = await import("sharp");
-    const sharp = sharpModule.default;
-    const { data, info } = await sharp(buffer, { failOn: "none" })
-      .resize(24, 24, { fit: "cover" })
-      .removeAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
+  const idx = hashCoverSeed(trimmed) % EDITORIAL_BOOKBINDING_SWATCHES.length;
+  const primary = EDITORIAL_BOOKBINDING_SWATCHES[idx] ?? "#6E1E2A";
+  const accent = deriveSpineAccentHex(primary);
 
-    const palette = pickDominantSpinePalette(data, info.channels === 4 ? 4 : 3);
-    if (!palette) return null;
-    return {
-      spineColor: palette.primary,
-      spineAccent: palette.accent,
-    };
-  } catch {
-    return null;
-  }
+  return {
+    spineColor: primary,
+    spineAccent: accent,
+  };
 }
 
 /**

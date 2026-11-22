@@ -1,6 +1,6 @@
 import "server-only";
 
-import sharp from "sharp";
+import { inspectImageHeader } from "@/server/catalog/image-header";
 import { getServerEnv, type ServerEnv } from "@/lib/env";
 import { getCatalogFetch } from "@/server/catalog/http-client";
 import { normalizeToIsbn13 } from "@/lib/isbn";
@@ -304,9 +304,9 @@ export async function probeCoverImageDimensions(
       return { ok: false, url: safeUrl, reason: "quality_filter" };
     }
 
-    const meta = await sharp(Buffer.from(arrayBuf)).metadata();
-    const width = meta.width;
-    const height = meta.height;
+    const meta = inspectImageHeader(new Uint8Array(arrayBuf));
+    const width = meta?.width;
+    const height = meta?.height;
 
     // Descarta imagens inválidas (1x1 ou <= 2x2 pixel transparente)
     if (
@@ -374,13 +374,8 @@ export async function validateChosenCoverWithSharp(
       const commaIdx = trimmed.indexOf(",");
       if (commaIdx < 0) return { ok: false, error: "Data URL inválida." };
       const buf = Buffer.from(trimmed.slice(commaIdx + 1), "base64");
-      const meta = await sharp(buf).metadata();
-      if (
-        !meta.width ||
-        !meta.height ||
-        meta.width <= 10 ||
-        meta.height <= 10
-      ) {
+      const meta = inspectImageHeader(buf);
+      if (!meta || meta.width <= 10 || meta.height <= 10) {
         return {
           ok: false,
           error: "A imagem enviada tem dimensões inválidas.",
@@ -428,8 +423,8 @@ export async function validateChosenCoverWithSharp(
       };
     }
 
-    const meta = await sharp(buf).metadata();
-    if (!meta.width || !meta.height || meta.width <= 10 || meta.height <= 10) {
+    const meta = inspectImageHeader(buf);
+    if (!meta || meta.width <= 10 || meta.height <= 10) {
       return {
         ok: false,
         error:

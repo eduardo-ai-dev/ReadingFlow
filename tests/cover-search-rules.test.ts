@@ -40,9 +40,9 @@ describe("cover-search-rules", () => {
     it("mantém títulos legítimos de obras", () => {
       expect(isDisqualifiedCoverTitle("Dom Casmurro")).toBe(false);
       expect(isDisqualifiedCoverTitle("Torto Arado")).toBe(false);
-      expect(isDisqualifiedCoverTitle("O Guia do Mochileiro das Galáxias")).toBe(
-        false
-      );
+      expect(
+        isDisqualifiedCoverTitle("O Guia do Mochileiro das Galáxias")
+      ).toBe(false);
       expect(isDisqualifiedCoverTitle("Grande Sertão: Veredas")).toBe(false);
     });
   });
@@ -135,7 +135,8 @@ describe("cover-search-rules", () => {
       const candidateWithCoauthor: CoverSearchCandidate = {
         id: "ol-coragem",
         source: "openlibrary",
-        coverUrl: "https://covers.openlibrary.org/b/id/12345-L.jpg?default=false",
+        coverUrl:
+          "https://covers.openlibrary.org/b/id/12345-L.jpg?default=false",
         title: "A Coragem de Não Agradar",
         authors: ["Fumitake Koga"],
       };
@@ -456,9 +457,11 @@ describe("cover-search-rules", () => {
 
       expect(okImport.ok).toBe(true);
       if (okImport.ok) {
-        expect(okImport.dataUrl).toMatch(/^data:image\/webp;base64,/);
+        expect(okImport.dataUrl).toMatch(
+          /^data:image\/(webp|png|jpeg);base64,/
+        );
         expect(okImport.bucketPath).toMatch(
-          /^covers\/user-demo-acervo\/ed-test-1-[0-9a-f]+\.webp$/
+          /^covers\/user-demo-acervo\/ed-test-1-[0-9a-f]+\.(webp|png|jpg)$/
         );
         expect(okImport.width).toBe(420);
         expect(okImport.height).toBe(630);
@@ -468,7 +471,7 @@ describe("cover-search-rules", () => {
           okImport.bucketPath
         );
         expect(stored).not.toBeNull();
-        expect(stored?.mimeType).toBe("image/webp");
+        expect(stored?.mimeType).toBe("image/png");
       }
 
       // Rejeita content-type text/html

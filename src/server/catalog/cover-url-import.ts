@@ -3,12 +3,11 @@ import "server-only";
 import { createHash } from "node:crypto";
 import dns from "node:dns/promises";
 import net from "node:net";
-import sharp from "sharp";
 import {
-  COVER_DATA_URL_MAX_BYTES,
-  COVER_UPLOAD_MAX_HEIGHT,
-  COVER_UPLOAD_MAX_WIDTH,
-} from "@/features/catalog/cover-rules";
+  inspectImageHeader,
+  type SupportedRasterMime,
+} from "@/server/catalog/image-header";
+import { COVER_DATA_URL_MAX_BYTES } from "@/features/catalog/cover-rules";
 
 /**
  * Importação segura de capa por link externo ("Colar link da imagem"):
@@ -29,7 +28,7 @@ import {
 export const COVER_URL_IMPORT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 export const COVER_URL_IMPORT_TIMEOUT_MS = 5000; // 5 s
 const MAX_REDIRECT_HOPS = 3;
-const WEBP_QUALITY_STEPS = [82, 70, 58, 45] as const;
+const MAX_INPUT_PIXELS = 4096 * 4096;
 
 export type DnsLookupFn = (
   hostname: string
@@ -68,7 +67,7 @@ export type CoverUrlImportResult =
 interface UserCoverBucketObject {
   userId: string;
   bucketPath: string;
-  mimeType: "image/webp";
+  mimeType: SupportedRasterMime;
   bytes: Buffer;
   width: number;
   height: number;
@@ -77,8 +76,7 @@ interface UserCoverBucketObject {
 
 declare global {
   var __readingFlowUserCoverBucket:
-    | Map<string, UserCoverBucketObject>
-    | undefined;
+    Map<string, UserCoverBucketObject> | undefined;
 }
 
 function getUserCoverBucketStore(): Map<string, UserCoverBucketObject> {
@@ -95,6 +93,8 @@ export function saveToUserCoverBucket(params: {
   userId: string;
   editionId?: string | null;
   webpBuffer: Buffer;
+  mimeType?: SupportedRasterMime;
+  extension?: "webp" | "png" | "jpg" | "gif";
   width: number;
   height: number;
 }): { bucketPath: string; dataUrl: string } {
@@ -106,13 +106,15 @@ export function saveToUserCoverBucket(params: {
   const safeEditionPart = params.editionId
     ? params.editionId.replace(/[^a-zA-Z0-9_-]/g, "_")
     : "cover";
-  const bucketPath = `covers/${safeUserId}/${safeEditionPart}-${digest}.webp`;
-  const dataUrl = `data:image/webp;base64,${params.webpBuffer.toString("base64")}`;
+  const mimeType: SupportedRasterMime = params.mimeType ?? "image/webp";
+  const extension = params.extension ?? "webp";
+  const bucketPath = `covers/${safeUserId}/${safeEditionPart}-${digest}.${extension}`;
+  const dataUrl = `data:${mimeType};base64,${params.webpBuffer.toString("base64")}`;
 
   getUserCoverBucketStore().set(bucketPath, {
     userId: params.userId,
     bucketPath,
-    mimeType: "image/webp",
+    mimeType,
     bytes: params.webpBuffer,
     width: params.width,
     height: params.height,
@@ -371,7 +373,8 @@ export async function validateAndResolveSsrfSafeUrl(
     return {
       ok: false,
       code: "non_https",
-      error: "Por segurança, apenas links com protocolo https:// são permitidos.",
+      error:
+        "Por segurança, apenas links com protocolo https:// são permitidos.",
     };
   }
 
@@ -653,86 +656,51 @@ export async function importCoverFromExternalUrl(params: {
     return streamResult;
   }
 
-  // Re-encoda com `sharp` validando dimensões reais
-  try {
-    const image = sharp(streamResult.buffer, {
-      failOn: "error",
-      limitInputPixels: 4096 * 4096,
-    });
-    const metadata = await image.metadata();
-    if (
-      !metadata.width ||
-      !metadata.height ||
-      metadata.width <= 10 ||
-      metadata.height <= 10
-    ) {
-      return {
-        ok: false,
-        code: "invalid_image",
-        error:
-          "A imagem baixada tem dimensões inválidas ou é um placeholder 1×1.",
-      };
-    }
-
-    let encodedBuffer: Buffer | null = null;
-    let outWidth = metadata.width;
-    let outHeight = metadata.height;
-
-    for (const quality of WEBP_QUALITY_STEPS) {
-      const { data, info } = await sharp(streamResult.buffer, {
-        failOn: "error",
-        limitInputPixels: 4096 * 4096,
-      })
-        .rotate()
-        .resize({
-          width: COVER_UPLOAD_MAX_WIDTH,
-          height: COVER_UPLOAD_MAX_HEIGHT,
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .flatten({ background: "#F4EFE6" })
-        .webp({ quality })
-        .toBuffer({ resolveWithObject: true });
-
-      outWidth = info.width;
-      outHeight = info.height;
-      if (data.byteLength <= COVER_DATA_URL_MAX_BYTES) {
-        encodedBuffer = data;
-        break;
-      }
-    }
-
-    if (!encodedBuffer) {
-      return {
-        ok: false,
-        code: "too_large",
-        error:
-          "A imagem continua grande demais após a compressão. Escolha outra imagem.",
-      };
-    }
-
-    const saved = saveToUserCoverBucket({
-      userId: params.userId,
-      editionId: params.editionId,
-      webpBuffer: encodedBuffer,
-      width: outWidth,
-      height: outHeight,
-    });
-
-    return {
-      ok: true,
-      dataUrl: saved.dataUrl,
-      bucketPath: saved.bucketPath,
-      width: outWidth,
-      height: outHeight,
-      byteLength: encodedBuffer.byteLength,
-    };
-  } catch {
+  // Valida magic bytes e dimensões reais em TypeScript puro (sem binário nativo)
+  const header = inspectImageHeader(streamResult.buffer);
+  if (!header || header.width <= 10 || header.height <= 10) {
     return {
       ok: false,
       code: "invalid_image",
       error:
-        "Não foi possível decodificar a imagem com sharp. Verifique se o link é de um arquivo JPEG, PNG ou WebP válido.",
+        "A imagem baixada tem formato não suportado, dimensões inválidas ou é um placeholder 1×1.",
     };
   }
+
+  if (header.width * header.height > MAX_INPUT_PIXELS) {
+    return {
+      ok: false,
+      code: "too_large",
+      error:
+        "A imagem excede a resolução máxima permitida (4096×4096). Escolha outra imagem.",
+    };
+  }
+
+  if (streamResult.buffer.byteLength > COVER_DATA_URL_MAX_BYTES) {
+    return {
+      ok: false,
+      code: "too_large",
+      error:
+        "A imagem excede o tamanho máximo suportado. Envie pelo seletor de arquivo para otimizar no navegador.",
+    };
+  }
+
+  const saved = saveToUserCoverBucket({
+    userId: params.userId,
+    editionId: params.editionId,
+    webpBuffer: streamResult.buffer,
+    mimeType: header.mimeType,
+    extension: header.extension,
+    width: header.width,
+    height: header.height,
+  });
+
+  return {
+    ok: true,
+    dataUrl: saved.dataUrl,
+    bucketPath: saved.bucketPath,
+    width: header.width,
+    height: header.height,
+    byteLength: streamResult.buffer.byteLength,
+  };
 }

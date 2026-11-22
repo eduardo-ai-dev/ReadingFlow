@@ -766,7 +766,7 @@ export function CoverEditionPicker({
               </div>
               <p className="text-[11px] text-[#5A5045]">
                 O servidor baixa a imagem via HTTPS com verificação de segurança
-                (SSRF), otimiza com <code>sharp</code> e salva no seu acervo.
+                (SSRF), valida o arquivo e salva no seu acervo.
               </p>
               {pasteUrlError ? (
                 <p
