@@ -119,7 +119,10 @@ export default async function ReadingPage() {
 
       {/* Fila de livros adquiridos ainda não lidos */}
       {overview.unreadOwnedWorks.length > 0 ? (
-        <section aria-labelledby="fila-heading" className="space-y-3">
+        <section
+          aria-labelledby="fila-heading"
+          className="space-y-3 [content-visibility:auto] [contain-intrinsic-size:auto_480px]"
+        >
           <h2
             id="fila-heading"
             className="font-serif text-xl font-semibold text-[var(--text-heading)]"
@@ -131,7 +134,7 @@ export default async function ReadingPage() {
             {overview.unreadOwnedWorks.map((u) => (
               <div
                 key={u.work.id}
-                className="flex items-center justify-between gap-3 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4"
+                className="flex items-center justify-between gap-3 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 [content-visibility:auto] [contain-intrinsic-size:auto_108px]"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <BookCover
@@ -168,7 +171,10 @@ export default async function ReadingPage() {
       ) : null}
 
       {/* Histórico de concluídos */}
-      <section aria-labelledby="concluidos-heading" className="space-y-3">
+      <section
+        aria-labelledby="concluidos-heading"
+        className="space-y-3 [content-visibility:auto] [contain-intrinsic-size:auto_480px]"
+      >
         <h2
           id="concluidos-heading"
           className="font-serif text-xl font-semibold text-[var(--text-heading)]"
@@ -185,7 +191,7 @@ export default async function ReadingPage() {
               {overview.finished.map((entry) => (
                 <li
                   key={entry.reading.id}
-                  className="flex flex-wrap items-center justify-between gap-4 p-4"
+                  className="flex flex-wrap items-center justify-between gap-4 p-4 [content-visibility:auto] [contain-intrinsic-size:auto_108px]"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <BookCover

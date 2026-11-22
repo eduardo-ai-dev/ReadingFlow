@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BookMarked, Flame } from "lucide-react";
@@ -30,32 +31,54 @@ export const metadata: Metadata = {
   title: "Painel · Mesa de Leitura",
 };
 
-export default async function DashboardPage() {
-  const ws = await requireAuthenticatedWorkspace();
-  const userTimezone = ws.profile.timezone || "America/Sao_Paulo";
+function DashboardPrimarySkeleton() {
+  return (
+    <div aria-hidden="true" className="space-y-8">
+      <div className="border-y border-[var(--rf-divider)] py-4 sm:py-5">
+        <div className="rf-skeleton h-3.5 w-36" />
+        <div className="rf-skeleton mt-3 h-10 w-72 max-w-full" />
+      </div>
+      <div className="rf-card-spotlight h-64 animate-pulse opacity-90" />
+    </div>
+  );
+}
 
-  const [
-    readingsResult,
-    goalsResult,
-    statsResult,
-    rankingResult,
-    editorialResult,
-  ] = await Promise.allSettled([
-    getReadingsOverview(),
-    getEvaluatedGoals(),
-    getStatisticsView({ preset: "current_year" }),
-    getAutomaticRankingView(),
-    getDashboardEditorialData(),
-  ]);
+function DashboardSecondarySkeleton() {
+  return (
+    <div aria-hidden="true" className="space-y-4">
+      <div className="border-b border-[var(--rf-divider)] pb-2">
+        <div className="rf-skeleton h-3.5 w-44" />
+      </div>
+      <div className="rf-dashboard-band">
+        <div className="rf-dashboard-main">
+          <div className="rf-card h-56 animate-pulse bg-[var(--rf-surface-subtle)]/50" />
+        </div>
+        <div className="rf-dashboard-aside">
+          <div className="rf-card h-56 animate-pulse bg-[var(--rf-surface-subtle)]/50" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function DashboardPrimaryBand({
+  userTimezone,
+  readingsPromise,
+  statsPromise,
+  editorialPromise,
+}: {
+  userTimezone: string;
+  readingsPromise: ReturnType<typeof getReadingsOverview>;
+  statsPromise: ReturnType<typeof getStatisticsView>;
+  editorialPromise: ReturnType<typeof getDashboardEditorialData>;
+}) {
+  const [readingsResult, statsResult, editorialResult] =
+    await Promise.allSettled([readingsPromise, statsPromise, editorialPromise]);
 
   const readings =
     readingsResult.status === "fulfilled" ? readingsResult.value : null;
-  const goalsData =
-    goalsResult.status === "fulfilled" ? goalsResult.value : null;
   const statsData =
     statsResult.status === "fulfilled" ? statsResult.value : null;
-  const ranking =
-    rankingResult.status === "fulfilled" ? rankingResult.value : null;
   const editorialData =
     editorialResult.status === "fulfilled" ? editorialResult.value : null;
 
@@ -137,7 +160,7 @@ export default async function DashboardPage() {
   })();
 
   return (
-    <div className="rf-dashboard-shell">
+    <>
       {/* ====================================================================
           01 · CABEÇALHO EDITORIAL + FAIXA DE INDICADORES (KPIs)
           ==================================================================== */}
@@ -482,344 +505,397 @@ export default async function DashboardPage() {
           </div>
         </div>
       </section>
+    </>
+  );
+}
 
-      {/* ====================================================================
-          03 · ACERVO & CADERNO (8/12 PRINCIPAL + 4/12 LATERAL EM >= 1200px)
-          ==================================================================== */}
-      <section aria-labelledby="acervo-caderno-titulo" className="space-y-4">
-        <div className="border-b border-[var(--rf-divider)] pb-2">
-          <h2 id="acervo-caderno-titulo" className="rf-section-marker">
-            03 · Acervo &amp; Caderno
-          </h2>
-        </div>
+async function DashboardSecondaryBand({
+  goalsPromise,
+  rankingPromise,
+  editorialPromise,
+}: {
+  goalsPromise: ReturnType<typeof getEvaluatedGoals>;
+  rankingPromise: ReturnType<typeof getAutomaticRankingView>;
+  editorialPromise: ReturnType<typeof getDashboardEditorialData>;
+}) {
+  const [goalsResult, rankingResult, editorialResult] =
+    await Promise.allSettled([goalsPromise, rankingPromise, editorialPromise]);
 
-        <div className="rf-dashboard-band">
-          {/* Coluna Principal (8/12 em >= 1200px): Coleção, Atividade, Consolidado */}
-          <div className="rf-dashboard-main">
-            <div data-rf-block="collection">
-              {!editorialData ? (
-                <DashboardBlockError
-                  eyebrow="Visão Geral do Acervo"
-                  title="Coleção & Prateleiras"
-                />
-              ) : (
-                <CollectionStatusOverview
-                  counts={editorialData.collectionOverview.counts}
-                  books={editorialData.collectionOverview.recentBooks}
-                  wishlistBooks={editorialData.collectionOverview.wishlistBooks}
-                />
-              )}
-            </div>
+  const goalsData =
+    goalsResult.status === "fulfilled" ? goalsResult.value : null;
+  const ranking =
+    rankingResult.status === "fulfilled" ? rankingResult.value : null;
+  const editorialData =
+    editorialResult.status === "fulfilled" ? editorialResult.value : null;
 
-            <div data-rf-block="activity">
-              {!editorialData ? (
-                <DashboardBlockError
-                  eyebrow="Caderno de Registros"
-                  title="Atividade Recente"
-                  className="h-full"
-                />
-              ) : (
-                <RecentActivityFeed
-                  events={editorialData.activityFeed}
-                  referenceDateIso={editorialData.referenceDateIso}
-                  timeZone={editorialData.timezone}
-                />
-              )}
-            </div>
+  return (
+    <section
+      aria-labelledby="acervo-caderno-titulo"
+      className="space-y-4 [content-visibility:auto] [contain-intrinsic-size:auto_760px]"
+    >
+      <div className="border-b border-[var(--rf-divider)] pb-2">
+        <h2 id="acervo-caderno-titulo" className="rf-section-marker">
+          03 · Acervo &amp; Caderno
+        </h2>
+      </div>
 
-            <div data-rf-block="monthly">
-              {!editorialData ? (
-                <DashboardBlockError
-                  eyebrow="Consolidado Mensal"
-                  title="Resumo do Mês"
-                  className="h-full"
-                />
-              ) : (
-                <MonthlyStatsCard monthly={editorialData.monthly} />
-              )}
-            </div>
+      <div className="rf-dashboard-band">
+        {/* Coluna Principal (8/12 em >= 1200px): Coleção, Atividade, Consolidado */}
+        <div className="rf-dashboard-main">
+          <div data-rf-block="collection">
+            {!editorialData ? (
+              <DashboardBlockError
+                eyebrow="Visão Geral do Acervo"
+                title="Coleção & Prateleiras"
+              />
+            ) : (
+              <CollectionStatusOverview
+                counts={editorialData.collectionOverview.counts}
+                books={editorialData.collectionOverview.recentBooks}
+                wishlistBooks={editorialData.collectionOverview.wishlistBooks}
+              />
+            )}
           </div>
 
-          {/* Coluna Lateral (4/12 em >= 1200px): Metas, Calendário, Ranking */}
-          <div className="rf-dashboard-aside">
-            {/* Metas Ativas: ÚNICO lugar de "Leituras de 2026" e "Páginas no ano" */}
-            {!goalsData ? (
-              <div data-rf-block="goals">
-                <DashboardBlockError
-                  eyebrow="Acompanhamento"
-                  title="Metas Ativas"
-                  className="h-full"
-                />
-              </div>
+          <div data-rf-block="activity">
+            {!editorialData ? (
+              <DashboardBlockError
+                eyebrow="Caderno de Registros"
+                title="Atividade Recente"
+                className="h-full"
+              />
             ) : (
-              <section
-                data-rf-block="goals"
-                aria-labelledby="metas-painel-titulo"
-                className="rf-card flex h-full flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2 border-b border-[var(--rf-divider)] pb-3.5">
-                    <div>
-                      <p className="rf-type-label text-[var(--rf-text-accent-secondary)]">
-                        Acompanhamento
-                      </p>
-                      <h2
-                        id="metas-painel-titulo"
-                        className="rf-type-section-title mt-0.5"
-                      >
-                        Metas Ativas
-                      </h2>
-                    </div>
-
-                    <Link
-                      href="/metas"
-                      className={rfButtonClassName({
-                        variant: "subtle",
-                        size: "sm",
-                        className: "sm:-mr-2",
-                      })}
-                    >
-                      <span>Gerenciar</span>
-                      <span aria-hidden="true">→</span>
-                    </Link>
-                  </div>
-
-                  {goalsData.entries.length === 0 ? (
-                    <DashboardBlockEmpty
-                      compact
-                      title="Nenhuma meta ativa no período"
-                      description="Crie uma meta anual ou mensal de livros ou páginas para acompanhar seu ritmo com serenidade."
-                      actionLabel="Criar meta"
-                      actionHref="/metas"
-                    />
-                  ) : (
-                    <div className="mt-2 divide-y divide-[var(--rf-divider)]">
-                      {goalsData.entries
-                        .slice(0, 3)
-                        .map(({ goal, evaluation }) => {
-                          const unitSingular =
-                            goal.kind === "books" ? "livro" : "página";
-                          const unitPlural =
-                            goal.kind === "books" ? "livros" : "páginas";
-                          const remainingPhrase =
-                            evaluation.remainingValue === 1
-                              ? `Falta 1 ${unitSingular}`
-                              : `Faltam ${formatNumberPtBr(evaluation.remainingValue)} ${unitPlural}`;
-
-                          return (
-                            <div
-                              key={goal.id}
-                              className="py-4 first:pt-2.5 last:pb-0"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <h3 className="font-serif text-base font-bold text-[var(--rf-text-primary)]">
-                                  {goal.title}
-                                </h3>
-                                <GoalPaceBadge status={evaluation.paceStatus} />
-                              </div>
-
-                              <div className="mt-2 flex items-baseline justify-between font-sans text-[13px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums]">
-                                <span className="font-semibold text-[var(--rf-text-primary)]">
-                                  {formatNumberPtBr(evaluation.completedValue)}{" "}
-                                  de {formatNumberPtBr(evaluation.targetValue)}{" "}
-                                  {unitPlural}
-                                </span>
-                                <span className="font-serif text-base font-bold text-[var(--rf-text-accent-secondary)]">
-                                  {evaluation.progressPercent}%
-                                </span>
-                              </div>
-
-                              <div
-                                role="progressbar"
-                                aria-valuenow={evaluation.progressPercent}
-                                aria-valuemin={0}
-                                aria-valuemax={100}
-                                aria-label={`Progresso da meta ${goal.title}: ${evaluation.progressPercent}%`}
-                                className="mt-2 h-1.5 w-full overflow-hidden rounded-[var(--rf-radius-full)] bg-[var(--rf-surface-subtle)]"
-                              >
-                                <div
-                                  className="h-full rounded-[var(--rf-radius-full)] bg-gradient-to-r from-[var(--rf-accent-secondary)] to-[var(--rf-accent-primary)] transition-all duration-300"
-                                  style={{
-                                    width: `${Math.min(100, evaluation.progressPercent)}%`,
-                                  }}
-                                />
-                              </div>
-
-                              {evaluation.paceStatus === "completed" ? (
-                                <p className="rf-type-caption mt-2.5 font-semibold text-[var(--rf-status-success)]">
-                                  Meta cumprida neste período.
-                                </p>
-                              ) : (
-                                <div className="mt-2.5 space-y-1.5 font-sans text-[13px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums]">
-                                  {/* Restante + dias até o prazo */}
-                                  <p className="font-medium text-[var(--rf-text-primary)]">
-                                    {remainingPhrase} ·{" "}
-                                    <span className="text-[var(--rf-text-secondary)]">
-                                      {evaluation.requiredBasisLabel}
-                                    </span>
-                                  </p>
-
-                                  {/* Ritmo necessário por dia com tooltip da fórmula */}
-                                  <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-                                    <span className="font-semibold text-[var(--rf-text-accent-secondary)]">
-                                      Necessário:{" "}
-                                      {evaluation.requiredPerDayFormatted}
-                                    </span>
-                                    <MetricFormulaHint
-                                      basisLabel="ver fórmula"
-                                      formula={
-                                        evaluation.requiredFormulaTooltip
-                                      }
-                                    />
-                                  </div>
-
-                                  {/* Equivalente em dias de leitura/semana no ritmo atual (quando há base) */}
-                                  {evaluation.requiredDaysPerWeekLabel &&
-                                  evaluation.requiredDaysPerWeekFormulaTooltip ? (
-                                    <div>
-                                      <MetricFormulaHint
-                                        basisLabel={`Equivale a ${evaluation.requiredDaysPerWeekLabel}`}
-                                        formula={
-                                          evaluation.requiredDaysPerWeekFormulaTooltip
-                                        }
-                                      />
-                                    </div>
-                                  ) : null}
-
-                                  {/* Projeção só aparece se terminar DENTRO do prazo da meta */}
-                                  {evaluation.projectedFitsBeforeDeadline &&
-                                  evaluation.projectedDaysToFinish &&
-                                  evaluation.projectedDaysToFinish > 0 ? (
-                                    <p className="rf-type-caption text-[var(--rf-status-success)]">
-                                      No ritmo ({evaluation.currentBasisLabel})
-                                      termina em{" "}
-                                      {evaluation.projectedDaysToFinish}{" "}
-                                      {evaluation.projectedDaysToFinish === 1
-                                        ? "dia"
-                                        : "dias"}
-                                      .
-                                    </p>
-                                  ) : null}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                    </div>
-                  )}
-                </div>
-              </section>
+              <RecentActivityFeed
+                events={editorialData.activityFeed}
+                referenceDateIso={editorialData.referenceDateIso}
+                timeZone={editorialData.timezone}
+              />
             )}
+          </div>
 
-            {/* Calendário mensal ("Registro Diário" com 5 níveis por quantis) */}
-            <div data-rf-block="calendar" className="h-full">
-              {!editorialData ? (
-                <DashboardBlockError
-                  eyebrow="Registro Diário"
-                  title="Calendário de Leitura"
-                  className="h-full"
-                />
-              ) : (
-                <ReadingStreakCard calendar={editorialData.calendar} />
-              )}
-            </div>
-
-            {/* Destaques do Ranking */}
-            {!ranking ? (
-              <div data-rf-block="ranking">
-                <DashboardBlockError
-                  eyebrow="Avaliações"
-                  title="Destaques do Ranking"
-                />
-              </div>
+          <div data-rf-block="monthly">
+            {!editorialData ? (
+              <DashboardBlockError
+                eyebrow="Consolidado Mensal"
+                title="Resumo do Mês"
+                className="h-full"
+              />
             ) : (
-              <section
-                data-rf-block="ranking"
-                aria-labelledby="ranking-painel-titulo"
-                className="rf-card"
-              >
+              <MonthlyStatsCard monthly={editorialData.monthly} />
+            )}
+          </div>
+        </div>
+
+        {/* Coluna Lateral (4/12 em >= 1200px): Metas, Calendário, Ranking */}
+        <div className="rf-dashboard-aside">
+          {/* Metas Ativas: ÚNICO lugar de "Leituras de 2026" e "Páginas no ano" */}
+          {!goalsData ? (
+            <div data-rf-block="goals">
+              <DashboardBlockError
+                eyebrow="Acompanhamento"
+                title="Metas Ativas"
+                className="h-full"
+              />
+            </div>
+          ) : (
+            <section
+              data-rf-block="goals"
+              aria-labelledby="metas-painel-titulo"
+              className="rf-card flex h-full flex-col justify-between"
+            >
+              <div>
                 <div className="flex items-start justify-between gap-2 border-b border-[var(--rf-divider)] pb-3.5">
                   <div>
                     <p className="rf-type-label text-[var(--rf-text-accent-secondary)]">
-                      Avaliações
+                      Acompanhamento
                     </p>
                     <h2
-                      id="ranking-painel-titulo"
+                      id="metas-painel-titulo"
                       className="rf-type-section-title mt-0.5"
                     >
-                      Destaques do Ranking
+                      Metas Ativas
                     </h2>
                   </div>
 
                   <Link
-                    href="/estatisticas"
+                    href="/metas"
                     className={rfButtonClassName({
                       variant: "subtle",
                       size: "sm",
                       className: "sm:-mr-2",
                     })}
                   >
-                    <span>Ver ranking</span>
+                    <span>Gerenciar</span>
                     <span aria-hidden="true">→</span>
                   </Link>
                 </div>
 
-                {ranking.length === 0 ? (
+                {goalsData.entries.length === 0 ? (
                   <DashboardBlockEmpty
                     compact
-                    title="Nenhuma obra avaliada ainda"
-                    description="Avalie livros concluídos de 0,5 a 5,0 estrelas para formar seu ranking pessoal automático."
-                    actionLabel="Ver leituras concluídas"
-                    actionHref="/leitura"
+                    title="Nenhuma meta ativa no período"
+                    description="Crie uma meta anual ou mensal de livros ou páginas para acompanhar seu ritmo com serenidade."
+                    actionLabel="Criar meta"
+                    actionHref="/metas"
                   />
                 ) : (
-                  <ol className="rf-ranking-list mt-2">
-                    {ranking.slice(0, 4).map((entry) => (
-                      <li
-                        key={entry.work.id}
-                        className="flex items-center justify-between gap-3 py-3 first:pt-2 last:pb-0"
-                      >
-                        <div className="flex min-w-0 items-center gap-3">
-                          <span className="w-6 shrink-0 text-center font-serif text-base font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-accent-secondary)]">
-                            {entry.position}º
-                          </span>
+                  <div className="mt-2 divide-y divide-[var(--rf-divider)]">
+                    {goalsData.entries
+                      .slice(0, 3)
+                      .map(({ goal, evaluation }) => {
+                        const unitSingular =
+                          goal.kind === "books" ? "livro" : "página";
+                        const unitPlural =
+                          goal.kind === "books" ? "livros" : "páginas";
+                        const remainingPhrase =
+                          evaluation.remainingValue === 1
+                            ? `Falta 1 ${unitSingular}`
+                            : `Faltam ${formatNumberPtBr(evaluation.remainingValue)} ${unitPlural}`;
 
-                          <BookCover
-                            title={entry.work.title}
-                            author={entry.primaryAuthor}
-                            coverUrl={entry.coverUrl}
-                            spineColor={entry.spineColor}
-                            spineAccent={entry.spineAccent}
-                            seed={entry.seed ?? entry.work.id}
-                            size="xs"
-                          />
+                        return (
+                          <div
+                            key={goal.id}
+                            className="py-4 first:pt-2.5 last:pb-0"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <h3 className="font-serif text-base font-bold text-[var(--rf-text-primary)]">
+                                {goal.title}
+                              </h3>
+                              <GoalPaceBadge status={evaluation.paceStatus} />
+                            </div>
 
-                          <div className="min-w-0">
-                            <Link
-                              href={`/livros/${entry.work.id}`}
-                              className="block truncate font-serif text-sm font-bold text-[var(--rf-text-primary)] transition-colors hover:text-[var(--rf-text-accent-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                            <div className="mt-2 flex items-baseline justify-between font-sans text-[13px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums]">
+                              <span className="font-semibold text-[var(--rf-text-primary)]">
+                                {formatNumberPtBr(evaluation.completedValue)} de{" "}
+                                {formatNumberPtBr(evaluation.targetValue)}{" "}
+                                {unitPlural}
+                              </span>
+                              <span className="font-serif text-base font-bold text-[var(--rf-text-accent-secondary)]">
+                                {evaluation.progressPercent}%
+                              </span>
+                            </div>
+
+                            <div
+                              role="progressbar"
+                              aria-valuenow={evaluation.progressPercent}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-label={`Progresso da meta ${goal.title}: ${evaluation.progressPercent}%`}
+                              className="mt-2 h-1.5 w-full overflow-hidden rounded-[var(--rf-radius-full)] bg-[var(--rf-surface-subtle)]"
                             >
-                              {entry.work.title}
-                            </Link>
-                            <p className="rf-type-caption truncate">
-                              {entry.primaryAuthor}
-                            </p>
-                          </div>
-                        </div>
+                              <div
+                                className="h-full rounded-[var(--rf-radius-full)] bg-gradient-to-r from-[var(--rf-accent-secondary)] to-[var(--rf-accent-primary)] transition-all duration-300"
+                                style={{
+                                  width: `${Math.min(100, evaluation.progressPercent)}%`,
+                                }}
+                              />
+                            </div>
 
-                        <StarRatingDisplay
-                          rating={entry.review.rating}
-                          variant="gold"
-                        />
-                      </li>
-                    ))}
-                  </ol>
+                            {evaluation.paceStatus === "completed" ? (
+                              <p className="rf-type-caption mt-2.5 font-semibold text-[var(--rf-status-success)]">
+                                Meta cumprida neste período.
+                              </p>
+                            ) : (
+                              <div className="mt-2.5 space-y-1.5 font-sans text-[13px] tabular-nums [font-variant-numeric:lining-nums_tabular-nums]">
+                                {/* Restante + dias até o prazo */}
+                                <p className="font-medium text-[var(--rf-text-primary)]">
+                                  {remainingPhrase} ·{" "}
+                                  <span className="text-[var(--rf-text-secondary)]">
+                                    {evaluation.requiredBasisLabel}
+                                  </span>
+                                </p>
+
+                                {/* Ritmo necessário por dia com tooltip da fórmula */}
+                                <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                                  <span className="font-semibold text-[var(--rf-text-accent-secondary)]">
+                                    Necessário:{" "}
+                                    {evaluation.requiredPerDayFormatted}
+                                  </span>
+                                  <MetricFormulaHint
+                                    basisLabel="ver fórmula"
+                                    formula={evaluation.requiredFormulaTooltip}
+                                  />
+                                </div>
+
+                                {/* Equivalente em dias de leitura/semana no ritmo atual (quando há base) */}
+                                {evaluation.requiredDaysPerWeekLabel &&
+                                evaluation.requiredDaysPerWeekFormulaTooltip ? (
+                                  <div>
+                                    <MetricFormulaHint
+                                      basisLabel={`Equivale a ${evaluation.requiredDaysPerWeekLabel}`}
+                                      formula={
+                                        evaluation.requiredDaysPerWeekFormulaTooltip
+                                      }
+                                    />
+                                  </div>
+                                ) : null}
+
+                                {/* Projeção só aparece se terminar DENTRO do prazo da meta */}
+                                {evaluation.projectedFitsBeforeDeadline &&
+                                evaluation.projectedDaysToFinish &&
+                                evaluation.projectedDaysToFinish > 0 ? (
+                                  <p className="rf-type-caption text-[var(--rf-status-success)]">
+                                    No ritmo ({evaluation.currentBasisLabel})
+                                    termina em{" "}
+                                    {evaluation.projectedDaysToFinish}{" "}
+                                    {evaluation.projectedDaysToFinish === 1
+                                      ? "dia"
+                                      : "dias"}
+                                    .
+                                  </p>
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
                 )}
-              </section>
+              </div>
+            </section>
+          )}
+
+          {/* Calendário mensal ("Registro Diário" com 5 níveis por quantis) */}
+          <div data-rf-block="calendar" className="h-full">
+            {!editorialData ? (
+              <DashboardBlockError
+                eyebrow="Registro Diário"
+                title="Calendário de Leitura"
+                className="h-full"
+              />
+            ) : (
+              <ReadingStreakCard calendar={editorialData.calendar} />
             )}
           </div>
+
+          {/* Destaques do Ranking */}
+          {!ranking ? (
+            <div data-rf-block="ranking">
+              <DashboardBlockError
+                eyebrow="Avaliações"
+                title="Destaques do Ranking"
+              />
+            </div>
+          ) : (
+            <section
+              data-rf-block="ranking"
+              aria-labelledby="ranking-painel-titulo"
+              className="rf-card"
+            >
+              <div className="flex items-start justify-between gap-2 border-b border-[var(--rf-divider)] pb-3.5">
+                <div>
+                  <p className="rf-type-label text-[var(--rf-text-accent-secondary)]">
+                    Avaliações
+                  </p>
+                  <h2
+                    id="ranking-painel-titulo"
+                    className="rf-type-section-title mt-0.5"
+                  >
+                    Destaques do Ranking
+                  </h2>
+                </div>
+
+                <Link
+                  href="/estatisticas"
+                  className={rfButtonClassName({
+                    variant: "subtle",
+                    size: "sm",
+                    className: "sm:-mr-2",
+                  })}
+                >
+                  <span>Ver ranking</span>
+                  <span aria-hidden="true">→</span>
+                </Link>
+              </div>
+
+              {ranking.length === 0 ? (
+                <DashboardBlockEmpty
+                  compact
+                  title="Nenhuma obra avaliada ainda"
+                  description="Avalie livros concluídos de 0,5 a 5,0 estrelas para formar seu ranking pessoal automático."
+                  actionLabel="Ver leituras concluídas"
+                  actionHref="/leitura"
+                />
+              ) : (
+                <ol className="rf-ranking-list mt-2">
+                  {ranking.slice(0, 4).map((entry) => (
+                    <li
+                      key={entry.work.id}
+                      className="flex items-center justify-between gap-3 py-3 first:pt-2 last:pb-0"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="w-6 shrink-0 text-center font-serif text-base font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-accent-secondary)]">
+                          {entry.position}º
+                        </span>
+
+                        <BookCover
+                          title={entry.work.title}
+                          author={entry.primaryAuthor}
+                          coverUrl={entry.coverUrl}
+                          spineColor={entry.spineColor}
+                          spineAccent={entry.spineAccent}
+                          seed={entry.seed ?? entry.work.id}
+                          size="xs"
+                        />
+
+                        <div className="min-w-0">
+                          <Link
+                            href={`/livros/${entry.work.id}`}
+                            className="block truncate font-serif text-sm font-bold text-[var(--rf-text-primary)] transition-colors hover:text-[var(--rf-text-accent-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                          >
+                            {entry.work.title}
+                          </Link>
+                          <p className="rf-type-caption truncate">
+                            {entry.primaryAuthor}
+                          </p>
+                        </div>
+                      </div>
+
+                      <StarRatingDisplay
+                        rating={entry.review.rating}
+                        variant="gold"
+                      />
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+          )}
         </div>
-      </section>
+      </div>
+    </section>
+  );
+}
+
+export default async function DashboardPage() {
+  const ws = await requireAuthenticatedWorkspace();
+  const userTimezone = ws.profile.timezone || "America/Sao_Paulo";
+
+  // Dispara todas as consultas em paralelo imediatamente e faz streaming por bloco via Suspense
+  const readingsPromise = getReadingsOverview();
+  const goalsPromise = getEvaluatedGoals();
+  const statsPromise = getStatisticsView({ preset: "current_year" });
+  const rankingPromise = getAutomaticRankingView();
+  const editorialPromise = getDashboardEditorialData();
+
+  return (
+    <div className="rf-dashboard-shell">
+      <Suspense fallback={<DashboardPrimarySkeleton />}>
+        <DashboardPrimaryBand
+          userTimezone={userTimezone}
+          readingsPromise={readingsPromise}
+          statsPromise={statsPromise}
+          editorialPromise={editorialPromise}
+        />
+      </Suspense>
+
+      <Suspense fallback={<DashboardSecondarySkeleton />}>
+        <DashboardSecondaryBand
+          goalsPromise={goalsPromise}
+          rankingPromise={rankingPromise}
+          editorialPromise={editorialPromise}
+        />
+      </Suspense>
     </div>
   );
 }
