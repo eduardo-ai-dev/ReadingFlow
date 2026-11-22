@@ -26,6 +26,7 @@ import { CoverUploader, type CoverSource } from "@/components/CoverUploader";
 import { CoverEditionPicker } from "@/components/CoverEditionPicker";
 import { resolveBestCover } from "@/features/catalog/search-client";
 import type { BookSearchResult } from "@/features/catalog/search-types";
+import { dispatchFeedbackToast } from "@/lib/feedback";
 
 export function BookDetailActionsClient({
   work,
@@ -255,15 +256,28 @@ export function BookDetailActionsClient({
                       });
                       if (!res.ok) {
                         setFeedback(res.error);
+                        dispatchFeedbackToast({
+                          tone: "error",
+                          message: res.error,
+                        });
                         setConfirmingRemove(false);
                         return;
                       }
+                      dispatchFeedbackToast({
+                        message: res.undoLabel,
+                        undoId: res.undoId,
+                        durationMs: 5000,
+                      });
                       router.push("/estantes");
                       router.refresh();
                     } catch {
-                      setFeedback(
-                        "Não foi possível remover o exemplar agora. Tente novamente."
-                      );
+                      const errMsg =
+                        "Não foi possível remover o exemplar agora. Tente novamente.";
+                      setFeedback(errMsg);
+                      dispatchFeedbackToast({
+                        tone: "error",
+                        message: errMsg,
+                      });
                       setConfirmingRemove(false);
                     }
                   });
@@ -405,6 +419,10 @@ export function BookDetailActionsClient({
                 });
                 if (!res.ok) {
                   setFeedback(res.error);
+                  dispatchFeedbackToast({
+                    tone: "error",
+                    message: res.error,
+                  });
                   return;
                 }
                 if (pageCount && pageCount > 0 && !pages.trim()) {
@@ -427,11 +445,18 @@ export function BookDetailActionsClient({
                     ? "Capa e cores da lombada atualizadas com sucesso em todo o ReadingFlow."
                     : "Capa removida. O fallback editorial foi aplicado."
                 );
+                dispatchFeedbackToast({
+                  message: res.coverUrl ? "Capa atualizada" : "Capa removida",
+                });
                 router.refresh();
               } catch {
-                setFeedback(
-                  "Não foi possível salvar a capa agora. Tente novamente."
-                );
+                const errMsg =
+                  "Não foi possível salvar a capa agora. Tente novamente.";
+                setFeedback(errMsg);
+                dispatchFeedbackToast({
+                  tone: "error",
+                  message: errMsg,
+                });
               }
             });
           }}

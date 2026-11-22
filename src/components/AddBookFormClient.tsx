@@ -15,6 +15,7 @@ import { CoverUploader, type CoverSource } from "@/components/CoverUploader";
 import { CoverEditionPicker } from "@/components/CoverEditionPicker";
 import { resolveBestCover } from "@/features/catalog/search-client";
 import type { BookSearchResult } from "@/features/catalog/search-types";
+import { dispatchFeedbackToast } from "@/lib/feedback";
 
 const BarcodeScannerModal = dynamic(
   () =>
@@ -359,9 +360,20 @@ export function AddBookFormClient({
             });
           } else {
             setFormError(res.error);
+            dispatchFeedbackToast({
+              tone: "error",
+              message: res.error,
+              onRetry: () => submitBook(forceDuplicateCopy),
+            });
           }
           return;
         }
+
+        dispatchFeedbackToast({
+          message: addToWishlistOnly
+            ? `Livro "${cleanTitle}" adicionado à Lista de Desejos`
+            : `Livro "${cleanTitle}" adicionado à estante`,
+        });
 
         if (addToWishlistOnly) {
           router.push("/desejos");
@@ -370,9 +382,14 @@ export function AddBookFormClient({
         }
         router.refresh();
       } catch {
-        setFormError(
-          "Não foi possível salvar o livro agora. Seus dados foram preservados; tente novamente."
-        );
+        const errMsg =
+          "Não foi possível salvar o livro agora. Seus dados foram preservados; tente novamente.";
+        setFormError(errMsg);
+        dispatchFeedbackToast({
+          tone: "error",
+          message: errMsg,
+          onRetry: () => submitBook(forceDuplicateCopy),
+        });
       } finally {
         submittingRef.current = false;
       }

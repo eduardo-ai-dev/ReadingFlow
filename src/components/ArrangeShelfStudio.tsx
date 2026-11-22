@@ -64,6 +64,7 @@ import {
 } from "@/components/ShelfView";
 import { BookCover } from "@/components/BookCover";
 import { ArrangeQuickAddModal } from "@/components/ArrangeQuickAddModal";
+import { dispatchFeedbackToast } from "@/lib/feedback";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
 import styles from "./VirtualBookshelf.module.css";
 
@@ -924,6 +925,11 @@ export function ArrangeShelfStudio({
             `Não foi possível salvar na sua conta. Alterações revertidas: ${res.error}`,
             "error"
           );
+          dispatchFeedbackToast({
+            tone: "error",
+            message: `Não foi possível salvar a estante: ${res.error}`,
+            onRetry: handleSave,
+          });
           return;
         }
         setSavedLayout(res.layout);
@@ -937,6 +943,9 @@ export function ArrangeShelfStudio({
         showNotice(
           "Personalização salva na sua conta e sincronizada com a Estante 3D!"
         );
+        dispatchFeedbackToast({
+          message: "Estante salva",
+        });
         onSaved?.();
       } catch {
         setSavedLayout(previousLayout);
@@ -950,6 +959,12 @@ export function ArrangeShelfStudio({
           "Falha de conexão ao salvar na sua conta. As alterações foram revertidas — tente novamente.",
           "error"
         );
+        dispatchFeedbackToast({
+          tone: "error",
+          message:
+            "Falha de conexão ao salvar a estante. As alterações foram revertidas.",
+          onRetry: handleSave,
+        });
       }
     });
   };

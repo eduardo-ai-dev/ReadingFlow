@@ -56,6 +56,11 @@ export function ActiveReadingSpotlight({
   const [selectedId, setSelectedId] = useState<string>(
     orderedEntries[0]?.readingId ?? ""
   );
+  const [optimisticProgress, setOptimisticProgress] = useState<{
+    readingId: string;
+    value: number;
+    unit: ProgressUnit;
+  } | null>(null);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const activeIndex = Math.max(
@@ -83,10 +88,27 @@ export function ActiveReadingSpotlight({
     current.progressTotal ??
     (current.progressUnit === "pages" ? current.editionPages : undefined);
 
+  const activeOptimistic =
+    optimisticProgress && optimisticProgress.readingId === current.readingId
+      ? optimisticProgress
+      : null;
+  const displayedUnit = activeOptimistic?.unit ?? current.progressUnit;
+  const displayedValue = activeOptimistic?.value ?? current.progressValue;
+  const displayedPercent = activeOptimistic
+    ? displayedUnit === "percent"
+      ? Math.max(0, Math.min(100, Math.round(displayedValue)))
+      : effectiveTotal && effectiveTotal > 0
+        ? Math.max(
+            0,
+            Math.min(100, Math.round((displayedValue / effectiveTotal) * 100))
+          )
+        : current.percent
+    : current.percent;
+
   const forecast = computeReadingForecast({
-    progressValue: current.progressValue,
+    progressValue: displayedValue,
     progressTotal: effectiveTotal,
-    progressUnit: current.progressUnit,
+    progressUnit: displayedUnit,
     dailyPacePages: dailyPace.value,
     referenceDate: new Date(referenceDateIso),
     timeZone,
@@ -106,10 +128,10 @@ export function ActiveReadingSpotlight({
         : `Atualizado em ${relativeRaw}`;
 
   const progressCaption =
-    current.progressUnit === "pages" && effectiveTotal
-      ? `Página ${formatNumberPtBr(current.progressValue)} de ${formatNumberPtBr(effectiveTotal)}`
-      : current.progressUnit === "seconds"
-        ? `${formatNumberPtBr(Math.round(current.progressValue / 60))} minutos ouvidos`
+    displayedUnit === "pages" && effectiveTotal
+      ? `Página ${formatNumberPtBr(displayedValue)} de ${formatNumberPtBr(effectiveTotal)}`
+      : displayedUnit === "seconds"
+        ? `${formatNumberPtBr(Math.round(displayedValue / 60))} minutos ouvidos`
         : "Progresso atual";
 
   const handleTabKeyDown = (
@@ -266,21 +288,21 @@ export function ActiveReadingSpotlight({
                   {progressCaption}
                 </span>
                 <span className="font-serif text-xl font-bold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-on-contrast-muted)]">
-                  {current.percent}%
+                  {displayedPercent}%
                 </span>
               </div>
 
               <div
                 role="progressbar"
-                aria-valuenow={current.percent}
+                aria-valuenow={displayedPercent}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-label={`Progresso de leitura em ${current.title}: ${current.percent}%`}
+                aria-label={`Progresso de leitura em ${current.title}: ${displayedPercent}%`}
                 className="h-2 w-full overflow-hidden rounded-[var(--rf-radius-full)] bg-[var(--rf-surface-contrast-elevated)]"
               >
                 <div
-                  className="h-full rounded-[var(--rf-radius-full)] bg-gradient-to-r from-[var(--rf-accent-primary)] to-[var(--rf-accent-primary-hover)] transition-all duration-500"
-                  style={{ width: `${current.percent}%` }}
+                  className="rf-progress-fill h-full w-full rounded-[var(--rf-radius-full)] bg-gradient-to-r from-[var(--rf-accent-primary)] to-[var(--rf-accent-primary-hover)]"
+                  style={{ transform: `scaleX(${displayedPercent / 100})` }}
                 />
               </div>
 
@@ -322,6 +344,17 @@ export function ActiveReadingSpotlight({
             initialValue={current.progressValue}
             total={effectiveTotal}
             focusHref={`/leitura/foco?readingId=${current.readingId}`}
+            onOptimisticProgress={(val, u) => {
+              if (val === null) {
+                setOptimisticProgress(null);
+              } else {
+                setOptimisticProgress({
+                  readingId: current.readingId,
+                  value: val,
+                  unit: u,
+                });
+              }
+            }}
           />
         </div>
       </div>

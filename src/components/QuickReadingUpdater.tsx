@@ -17,6 +17,11 @@ import {
   updateReadingProgressAction,
 } from "@/features/reading/actions";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
+import {
+  dispatchBookCompletedCard,
+  dispatchFeedbackToast,
+  dispatchReadingDayPulse,
+} from "@/lib/feedback";
 
 const CHAPTER_FALLBACK_PAGES = 15;
 
@@ -28,6 +33,7 @@ export function QuickReadingUpdater({
   focusHref,
   variant = "card",
   enableQuickShortcuts = false,
+  onOptimisticProgress,
 }: {
   readingId: string;
   initialUnit: ProgressUnit;
@@ -36,6 +42,7 @@ export function QuickReadingUpdater({
   focusHref?: string;
   variant?: "card" | "inline";
   enableQuickShortcuts?: boolean;
+  onOptimisticProgress?: (value: number | null, unit: ProgressUnit) => void;
 }) {
   const router = useRouter();
   const [unit, setUnit] = useState<ProgressUnit>(initialUnit);
@@ -45,15 +52,93 @@ export function QuickReadingUpdater({
       ? String(Math.round(initialValue / 60))
       : String(initialValue)
   );
+  const [prevInitialKey, setPrevInitialKey] = useState(
+    `${readingId}:${initialUnit}:${initialValue}:${total ?? ""}`
+  );
+  const currentInitialKey = `${readingId}:${initialUnit}:${initialValue}:${total ?? ""}`;
+  if (prevInitialKey !== currentInitialKey) {
+    setPrevInitialKey(currentInitialKey);
+    setUnit(initialUnit);
+    setCurrentTotal(total);
+    setVal(
+      initialUnit === "seconds"
+        ? String(Math.round(initialValue / 60))
+        : String(initialValue)
+    );
+  }
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isBusy = isPending || isSubmitting;
 
+  // Validação em linha em tempo real conforme o usuário digita (ex.: páginas acima do total)
+  const validateRawInput = (
+    targetUnit: ProgressUnit,
+    rawInput: string | number
+  ): { ok: true; numeric: number } | { ok: false; error: string } => {
+    let numeric: number;
+    if (typeof rawInput === "string") {
+      const trimmed = rawInput.trim();
+      if (!trimmed) {
+        return {
+          ok: false,
+          error: "Informe um valor numérico para atualizar o progresso.",
+        };
+      }
+      if (!/^-?\d+$/.test(trimmed)) {
+        return {
+          ok: false,
+          error: "Informe um número inteiro sem casas decimais.",
+        };
+      }
+      numeric = Number.parseInt(trimmed, 10);
+    } else {
+      numeric = rawInput;
+    }
+
+    if (!Number.isFinite(numeric) || !Number.isInteger(numeric)) {
+      return {
+        ok: false,
+        error: "Informe um número inteiro sem casas decimais.",
+      };
+    }
+    if (numeric < 0) {
+      return {
+        ok: false,
+        error: "Informe um valor numérico positivo (zero ou maior).",
+      };
+    }
+    if (targetUnit === "percent" && numeric > 100) {
+      return { ok: false, error: "A porcentagem não pode exceder 100%." };
+    }
+    if (targetUnit === "pages" && currentTotal && numeric > currentTotal) {
+      return {
+        ok: false,
+        error: `O número de páginas não pode exceder o total do livro (${currentTotal} pág.).`,
+      };
+    }
+    if (
+      targetUnit === "seconds" &&
+      currentTotal &&
+      numeric * 60 > currentTotal
+    ) {
+      return {
+        ok: false,
+        error: `O tempo informado não pode exceder a duração total (${Math.round(currentTotal / 60)} min).`,
+      };
+    }
+    return { ok: true, numeric };
+  };
+
+  const liveValidation = val.trim() ? validateRawInput(unit, val) : null;
+  const inlineValidationError =
+    liveValidation && !liveValidation.ok ? liveValidation.error : null;
+  const activeErrorMessage = errorMessage ?? inlineValidationError;
+
   /**
-   * Validação e envio únicos compartilhados entre o formulário "Atualizar"
-   * e os atalhos de um toque (+10, +25, "Terminei o capítulo").
+   * Validação, atualização otimista com rollback e envio únicos compartilhados
+   * entre o formulário "Atualizar" e os atalhos de um toque (+10, +25, "Terminei o capítulo").
    */
   const submitProgress = (
     targetUnit: ProgressUnit,
@@ -64,55 +149,18 @@ export function QuickReadingUpdater({
     setErrorMessage(null);
     setStatusMessage(null);
 
-    let numeric: number;
-    if (typeof rawInput === "string") {
-      const trimmed = rawInput.trim();
-      if (!trimmed) {
-        setErrorMessage(
-          "Informe um valor numérico para atualizar o progresso."
-        );
-        return;
-      }
-      if (!/^-?\d+$/.test(trimmed)) {
-        setErrorMessage("Informe um número inteiro sem casas decimais.");
-        return;
-      }
-      numeric = Number.parseInt(trimmed, 10);
-    } else {
-      numeric = rawInput;
-    }
-
-    if (!Number.isFinite(numeric) || !Number.isInteger(numeric)) {
-      setErrorMessage("Informe um número inteiro sem casas decimais.");
-      return;
-    }
-    if (numeric < 0) {
-      setErrorMessage("Informe um valor numérico positivo (zero ou maior).");
-      return;
-    }
-    if (targetUnit === "percent" && numeric > 100) {
-      setErrorMessage("A porcentagem não pode exceder 100%.");
-      return;
-    }
-    if (targetUnit === "pages" && currentTotal && numeric > currentTotal) {
-      setErrorMessage(
-        `O número de páginas não pode exceder o total do livro (${currentTotal} pág.).`
-      );
-      return;
-    }
-    if (
-      targetUnit === "seconds" &&
-      currentTotal &&
-      numeric * 60 > currentTotal
-    ) {
-      setErrorMessage(
-        `O tempo informado não pode exceder a duração total (${Math.round(currentTotal / 60)} min).`
-      );
+    const validated = validateRawInput(targetUnit, rawInput);
+    if (!validated.ok) {
+      setErrorMessage(validated.error);
       return;
     }
 
+    const numeric = validated.numeric;
     const rawVal = targetUnit === "seconds" ? numeric * 60 : numeric;
+    const previousValStr = val;
     setVal(String(numeric));
+    // Atualização otimista imediata da barra e contadores
+    onOptimisticProgress?.(rawVal, targetUnit);
 
     setIsSubmitting(true);
     startTransition(async () => {
@@ -123,15 +171,40 @@ export function QuickReadingUpdater({
           progressValue: rawVal,
         });
         if (!res.ok) {
+          // Rollback otimista + toast de erro com nova tentativa
+          setVal(previousValStr);
+          onOptimisticProgress?.(null, targetUnit);
           setErrorMessage(res.error);
+          dispatchFeedbackToast({
+            tone: "error",
+            message: res.error,
+            onRetry: () => submitProgress(targetUnit, rawInput, successMessage),
+          });
           return;
         }
-        setStatusMessage(successMessage);
+        const toastMsg = res.undoLabel ?? successMessage;
+        setStatusMessage(toastMsg);
+        dispatchFeedbackToast({
+          message: toastMsg,
+          undoId: res.undoId,
+          durationMs: 5000,
+        });
+        if (res.deltaPages > 0 || res.progressValue > 0) {
+          dispatchReadingDayPulse(res.todayYmd);
+        }
+        onOptimisticProgress?.(null, res.progressUnit);
         router.refresh();
       } catch {
-        setErrorMessage(
-          "Não foi possível salvar o progresso agora. Tente novamente."
-        );
+        setVal(previousValStr);
+        onOptimisticProgress?.(null, targetUnit);
+        const fallbackErr =
+          "Não foi possível salvar o progresso agora. Tente novamente.";
+        setErrorMessage(fallbackErr);
+        dispatchFeedbackToast({
+          tone: "error",
+          message: fallbackErr,
+          onRetry: () => submitProgress(targetUnit, rawInput, successMessage),
+        });
       } finally {
         setIsSubmitting(false);
       }
@@ -307,13 +380,21 @@ export function QuickReadingUpdater({
               inputMode="numeric"
               min={0}
               disabled={isBusy}
+              aria-invalid={Boolean(activeErrorMessage)}
+              aria-describedby={
+                activeErrorMessage ? `prog-err-${readingId}` : undefined
+              }
               value={val}
               onChange={(e) => {
                 setVal(e.target.value);
                 if (errorMessage) setErrorMessage(null);
                 if (statusMessage) setStatusMessage(null);
               }}
-              className="min-h-[44px] w-24 rounded-[var(--rf-radius-md)] border border-[var(--rf-border-strong)] bg-[var(--rf-surface-card-solid)] px-3 font-sans text-sm font-semibold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)] shadow-[var(--rf-shadow-xs)] transition-colors focus:border-[var(--rf-focus-ring-color)] focus:outline-none focus:ring-2 focus:ring-[var(--rf-focus-ring-color)] disabled:opacity-60 lg:min-h-[40px]"
+              className={`min-h-[44px] w-24 rounded-[var(--rf-radius-md)] border bg-[var(--rf-surface-card-solid)] px-3 font-sans text-base font-semibold tabular-nums [font-variant-numeric:lining-nums_tabular-nums] text-[var(--rf-text-primary)] shadow-[var(--rf-shadow-xs)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--rf-focus-ring-color)] disabled:opacity-60 sm:text-sm lg:min-h-[40px] ${
+                activeErrorMessage
+                  ? "border-[var(--rf-status-error)] focus:border-[var(--rf-status-error)]"
+                  : "border-[var(--rf-border-strong)] focus:border-[var(--rf-focus-ring-color)]"
+              }`}
             />
           </div>
 
@@ -393,33 +474,48 @@ export function QuickReadingUpdater({
           disabled={isBusy}
           aria-busy={isBusy}
           onClick={() => {
-            if (isBusy) return;
-            setErrorMessage(null);
-            setStatusMessage(null);
-            setIsSubmitting(true);
-            startTransition(async () => {
-              try {
-                const res = await finishReadingAction({ readingId });
-                if (!res.ok) {
-                  setErrorMessage(res.error);
-                  return;
+            const runFinish = () => {
+              if (isBusy) return;
+              setErrorMessage(null);
+              setStatusMessage(null);
+              setIsSubmitting(true);
+              startTransition(async () => {
+                try {
+                  const res = await finishReadingAction({ readingId });
+                  if (!res.ok) {
+                    setErrorMessage(res.error);
+                    dispatchFeedbackToast({
+                      tone: "error",
+                      message: res.error,
+                      onRetry: runFinish,
+                    });
+                    return;
+                  }
+                  dispatchFeedbackToast({
+                    message: "Livro concluído",
+                    undoId: res.undoId,
+                    durationMs: 5000,
+                  });
+                  dispatchReadingDayPulse();
+                  if (res.completionStats) {
+                    dispatchBookCompletedCard(res.completionStats);
+                  }
+                  router.refresh();
+                } catch {
+                  const errMsg =
+                    "Não foi possível concluir o livro agora. Tente novamente.";
+                  setErrorMessage(errMsg);
+                  dispatchFeedbackToast({
+                    tone: "error",
+                    message: errMsg,
+                    onRetry: runFinish,
+                  });
+                } finally {
+                  setIsSubmitting(false);
                 }
-                if (typeof window !== "undefined") {
-                  window.dispatchEvent(
-                    new CustomEvent("rf:undo-toast", {
-                      detail: { id: res.undoId, label: res.label },
-                    })
-                  );
-                }
-                router.refresh();
-              } catch {
-                setErrorMessage(
-                  "Não foi possível concluir o livro agora. Tente novamente."
-                );
-              } finally {
-                setIsSubmitting(false);
-              }
-            });
+              });
+            };
+            runFinish();
           }}
           className={rfButtonClassName({
             variant: "secondary",
@@ -433,17 +529,18 @@ export function QuickReadingUpdater({
             className="h-3.5 w-3.5 shrink-0 text-[var(--rf-text-on-contrast-muted)]"
             aria-hidden="true"
           />
-          <span>Concluir livro</span>
+          <span>{isBusy ? "Concluindo..." : "Concluir livro"}</span>
         </button>
       </form>
 
-      {errorMessage ? (
+      {activeErrorMessage ? (
         <p
+          id={`prog-err-${readingId}`}
           role="alert"
           className="mt-2.5 flex items-center gap-1.5 font-sans text-[13px] font-medium text-[var(--rf-nav-danger)]"
         >
           <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{errorMessage}</span>
+          <span>{activeErrorMessage}</span>
         </p>
       ) : null}
 
