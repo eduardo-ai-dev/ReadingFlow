@@ -1,55 +1,82 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { animate, motion, useInView, useReducedMotion } from "framer-motion";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 
-const MOTION_EASE = [0.2, 0.8, 0.2, 1] as const;
+const COUNT_UP_DURATION_MS = 260;
+
+/** Curva de suavização equivalente a cubic-bezier(0.2, 0.8, 0.2, 1) para CountUp. */
+function easeOutEditorial(t: number): number {
+  const clamped = Math.max(0, Math.min(1, t));
+  return 1 - Math.pow(1 - clamped, 3);
+}
 
 /**
- * Contador numérico discreto (<= 300ms) que anima trocas de valor e respeita `prefers-reduced-motion`.
+ * Contador numérico discreto (<= 300ms) que anima trocas de valor após a hidratação
+ * e respeita `prefers-reduced-motion` estritamente dentro de `useEffect`.
  */
 export function CountUp({ to }: { to: number }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true });
-  const prefersReduced = useReducedMotion();
-  const prevRef = useRef(0);
-  const [n, setN] = useState(to);
+  const prevRef = useRef(to);
+  const [displayValue, setDisplayValue] = useState(to);
 
   useEffect(() => {
-    if (!inView || prefersReduced) {
-      prevRef.current = to;
-      return;
-    }
     const from = prevRef.current;
     if (from === to) {
       return;
     }
-    const c = animate(from, to, {
-      duration: 0.26,
-      ease: MOTION_EASE,
-      onUpdate: (v) => setN(Math.round(v)),
-      onComplete: () => {
+
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reducedMotion || typeof window === "undefined") {
+      prevRef.current = to;
+      const frame = requestAnimationFrame(() => setDisplayValue(to));
+      return () => cancelAnimationFrame(frame);
+    }
+
+    let rafId = 0;
+    const startTime = performance.now();
+
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - startTime) / COUNT_UP_DURATION_MS);
+      const next = Math.round(from + (to - from) * easeOutEditorial(progress));
+      setDisplayValue(next);
+
+      if (progress < 1) {
+        rafId = requestAnimationFrame(step);
+      } else {
         prevRef.current = to;
-      },
-    });
+      }
+    };
+
+    rafId = requestAnimationFrame(step);
     return () => {
-      c.stop();
+      cancelAnimationFrame(rafId);
       prevRef.current = to;
     };
-  }, [inView, to, prefersReduced]);
+  }, [to]);
 
   return (
     <span
       ref={ref}
       className="tabular-nums [font-variant-numeric:lining-nums_tabular-nums]"
     >
-      {prefersReduced ? to : n}
+      {displayValue}
     </span>
   );
 }
 
-const ITEM = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
-
+/**
+ * Container semântico de agrupamento com SSR e primeiro render cliente 100% idênticos.
+ */
 export function Stagger({
   children,
   className,
@@ -59,27 +86,16 @@ export function Stagger({
   className?: string;
   "aria-label"?: string;
 }) {
-  const prefersReduced = useReducedMotion();
-  if (prefersReduced) {
-    return (
-      <div aria-label={ariaLabel} className={className}>
-        {children}
-      </div>
-    );
-  }
   return (
-    <motion.div
-      aria-label={ariaLabel}
-      className={className}
-      initial="hidden"
-      animate="show"
-      variants={{ show: { transition: { staggerChildren: 0.05 } } }}
-    >
+    <div aria-label={ariaLabel} className={className}>
       {children}
-    </motion.div>
+    </div>
   );
 }
 
+/**
+ * Item semântico interno do Stagger com SSR e primeiro render cliente 100% idênticos.
+ */
 export function Item({
   children,
   className,
@@ -87,21 +103,20 @@ export function Item({
   children: ReactNode;
   className?: string;
 }) {
-  const prefersReduced = useReducedMotion();
-  if (prefersReduced) {
-    return <div className={className}>{children}</div>;
-  }
-  return (
-    <motion.div
-      variants={ITEM}
-      transition={{ duration: 0.24, ease: MOTION_EASE }}
-      className={className}
-    >
-      {children}
-    </motion.div>
-  );
+  return <div className={className}>{children}</div>;
 }
 
+type RevealPhase = "idle" | "hidden" | "visible";
+
+/**
+ * Revelação discreta ao rolar (apenas `opacity` e `transform`).
+ *
+ * Hidratação determinística:
+ * - SSR e primeiro render do cliente produzem exatamente o mesmo `<div>` sem `style`
+ *   e sem qualquer leitura de `window`, `matchMedia` ou `IntersectionObserver`.
+ * - Toda detecção de `prefers-reduced-motion` e `IntersectionObserver` ocorre
+ *   exclusivamente dentro de `useEffect`, após a hidratação.
+ */
 export function ScrollReveal({
   children,
   className,
@@ -111,19 +126,68 @@ export function ScrollReveal({
   className?: string;
   delay?: number;
 }) {
-  const prefersReduced = useReducedMotion();
-  if (prefersReduced) {
-    return <div className={className}>{children}</div>;
+  const ref = useRef<HTMLDivElement>(null);
+  const [phase, setPhase] = useState<RevealPhase>("idle");
+
+  useEffect(() => {
+    const el = ref.current;
+    if (
+      !el ||
+      typeof window === "undefined" ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return;
+    }
+
+    const reducedMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+
+        if (entry.isIntersecting) {
+          setPhase("visible");
+          observer.disconnect();
+        } else if (entry.boundingClientRect.top > 0) {
+          // Elemento abaixo da dobra: oculta fora da tela para revelar ao entrar no viewport
+          setPhase((current) => (current === "idle" ? "hidden" : current));
+        } else {
+          // Já passou acima do viewport (ex.: recarregamento no meio da página)
+          setPhase("visible");
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.18 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  let style: CSSProperties | undefined;
+  if (phase === "hidden") {
+    style = {
+      opacity: 0,
+      transform: "translateY(12px)",
+    };
+  } else if (phase === "visible") {
+    const transitionDelay = delay > 0 ? ` ${delay}s` : "";
+    style = {
+      opacity: 1,
+      transform: "translateY(0)",
+      transition: `opacity var(--motion-slow, 320ms) var(--motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1))${transitionDelay}, transform var(--motion-slow, 320ms) var(--motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1))${transitionDelay}`,
+    };
   }
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.18 }}
-      transition={{ duration: 0.32, delay, ease: MOTION_EASE }}
-      className={className}
-    >
+    <div ref={ref} className={className} style={style}>
       {children}
-    </motion.div>
+    </div>
   );
 }
