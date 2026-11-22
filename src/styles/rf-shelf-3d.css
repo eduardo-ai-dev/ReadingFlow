@@ -613,13 +613,12 @@ a:hover .rf-book-cover-wishlist {
     );
 }
 
-/* Ruído de papel a ~6% com o único tile SVG compartilhado em :root */
+/* Ruído de papel a ~6% com o único tile SVG compartilhado em :root (sem mix-blend-mode por livro) */
 .rf-spine-noise {
   position: absolute;
   inset: 0;
   pointer-events: none;
   opacity: 0.06;
-  mix-blend-mode: multiply;
   background-image: var(--rf-paper-tile);
   background-repeat: repeat;
   z-index: 2;

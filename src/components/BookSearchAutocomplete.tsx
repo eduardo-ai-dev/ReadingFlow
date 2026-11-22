@@ -15,7 +15,13 @@ const EMPTY_MESSAGE =
 const ERROR_MESSAGE =
   "Não foi possível consultar a base online agora. Preencha os dados manualmente abaixo ou tente novamente.";
 
-function SuggestionThumb({ title, src }: { title: string; src: string | null }) {
+function SuggestionThumb({
+  title,
+  src,
+}: {
+  title: string;
+  src: string | null;
+}) {
   const [failed, setFailed] = useState(false);
   const typo = deriveTypographicCover(title);
 
@@ -34,7 +40,10 @@ function SuggestionThumb({ title, src }: { title: string; src: string | null }) 
       ) : (
         <span
           aria-hidden="true"
-          style={{ backgroundColor: typo.backgroundColor, color: typo.textColor }}
+          style={{
+            backgroundColor: typo.backgroundColor,
+            color: typo.textColor,
+          }}
           className="flex h-full w-full items-center justify-center font-sans text-[11px] font-bold tracking-[0.1em] uppercase"
         >
           {typo.monogram}
@@ -176,7 +185,9 @@ export function BookSearchAutocomplete({
           aria-expanded={listVisible}
           aria-controls={listVisible ? listboxId : undefined}
           aria-autocomplete="list"
-          aria-activedescendant={safeIndex >= 0 ? optionId(safeIndex) : undefined}
+          aria-activedescendant={
+            safeIndex >= 0 ? optionId(safeIndex) : undefined
+          }
           aria-describedby={hintId}
           value={query}
           onChange={(event) => {
@@ -200,8 +211,8 @@ export function BookSearchAutocomplete({
       </div>
 
       <p id={hintId} className="mt-1.5 text-xs text-[var(--text-muted)]">
-        Digite ao menos {BOOK_SEARCH_MIN_CHARS} caracteres. Use ↑ ↓ para navegar,
-        Enter para escolher e Esc para fechar.
+        Digite ao menos {BOOK_SEARCH_MIN_CHARS} caracteres. Use ↑ ↓ para
+        navegar, Enter para escolher e Esc para fechar.
       </p>
 
       <p role="status" aria-live="polite" className="sr-only">
@@ -271,7 +282,7 @@ export function BookSearchAutocomplete({
                       role="option"
                       aria-selected={active}
                       onMouseDown={(event) => event.preventDefault()}
-                      onMouseMove={() => {
+                      onMouseEnter={() => {
                         if (activeIndex !== index) setActiveIndex(index);
                       }}
                       onClick={() => select(result)}

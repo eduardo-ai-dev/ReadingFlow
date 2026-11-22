@@ -4,7 +4,6 @@ import {
   memo,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -836,20 +835,33 @@ function Book3DBase({
   void suppressSelectedTooltip;
   const tipVisible = Boolean(tipCoords) && !isDragging && (hovered || focused);
 
-  // Refina a medição após o portal montar (para usar a altura/largura exatas da tooltip)
-  useLayoutEffect(() => {
-    if (!tipVisible) return;
-    measureTip();
-  }, [tipVisible, measureTip]);
-
+  // Evita layout thrashing / setState em scroll contínuo: oculta a tooltip ao iniciar
+  // rolagem (listener passivo `once: true`) e reposiciona em `resize` via rAF único.
   useEffect(() => {
     if (!tipVisible) return;
-    const reposition = () => measureTip();
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    let resizeRaf: number | null = null;
+    const dismissOnScroll = () => {
+      setTipCoords(null);
+    };
+    const repositionOnResize = () => {
+      if (resizeRaf !== null) return;
+      resizeRaf = window.requestAnimationFrame(() => {
+        resizeRaf = null;
+        measureTip();
+      });
+    };
+    window.addEventListener("scroll", dismissOnScroll, {
+      capture: true,
+      passive: true,
+      once: true,
+    });
+    window.addEventListener("resize", repositionOnResize, { passive: true });
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      if (resizeRaf !== null) {
+        window.cancelAnimationFrame(resizeRaf);
+      }
+      window.removeEventListener("scroll", dismissOnScroll, true);
+      window.removeEventListener("resize", repositionOnResize);
     };
   }, [tipVisible, measureTip]);
 
