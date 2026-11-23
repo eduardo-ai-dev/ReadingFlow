@@ -29,10 +29,12 @@ const MOBILE_BOTTOM_NAV = [
 export function AppShell({
   profile,
   undoInfo,
+  isDemo = false,
   children,
 }: {
   profile: UserProfile;
   undoInfo: { id: string; label: string } | null;
+  isDemo?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -332,6 +334,42 @@ export function AppShell({
           tabIndex={-1}
           className="rf-editorial-sheet relative min-h-[calc(100dvh-4rem)] min-w-0 px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-10 lg:py-9 lg:pb-16"
         >
+          {isDemo ? (
+            <aside
+              role="status"
+              aria-label="Modo demonstração somente leitura"
+              data-demo-banner="true"
+              className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--rf-radius-lg)] border border-[var(--rf-border-accent-soft)] bg-[var(--rf-surface-subtle)] px-4 py-3 font-sans text-xs text-[var(--rf-text-primary)] shadow-[var(--rf-shadow-xs)]"
+            >
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="inline-flex items-center rounded-[var(--rf-radius-full)] bg-[var(--rf-accent-secondary)] px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase text-[var(--rf-accent-on-secondary)]">
+                  Demonstração
+                </span>
+                <span className="font-medium text-[var(--rf-text-heading)]">
+                  Demonstração · dados fictícios
+                </span>
+                <span className="text-[var(--rf-text-secondary)]">
+                  — somente leitura. Crie sua conta para salvar.
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href="/criar-conta"
+                  className="inline-flex min-h-[36px] items-center justify-center rounded-[var(--rf-radius-full)] bg-[var(--rf-accent-primary)] px-3.5 py-1.5 text-xs font-semibold text-[var(--rf-accent-on-primary)] transition-colors hover:bg-[var(--rf-accent-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)]"
+                >
+                  Criar minha estante
+                </Link>
+                <button
+                  type="button"
+                  disabled={isSigningOut}
+                  onClick={handleSignOut}
+                  className="inline-flex min-h-[36px] cursor-pointer items-center justify-center rounded-[var(--rf-radius-full)] border border-[var(--rf-border-default)] bg-[var(--rf-surface-elevated)] px-3.5 py-1.5 text-xs font-semibold text-[var(--rf-text-heading)] transition-colors hover:border-[var(--rf-border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rf-focus-ring-color)] disabled:opacity-60"
+                >
+                  {isSigningOut ? "Saindo..." : "Sair da demonstração"}
+                </button>
+              </div>
+            </aside>
+          ) : null}
           <UndoBanner undoInfo={undoInfo} />
           {children}
         </main>

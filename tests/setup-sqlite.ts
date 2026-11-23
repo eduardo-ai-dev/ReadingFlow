@@ -95,14 +95,17 @@ function createSqliteD1Adapter(sqlite: DatabaseSync): D1DatabaseLike {
   };
 }
 
-const migrationPath = path.resolve(
-  process.cwd(),
-  "migrations",
-  "0001_initial.sql"
-);
-const initialSql = fs.readFileSync(migrationPath, "utf8");
+const migrationsDir = path.resolve(process.cwd(), "migrations");
+const migrationFiles = fs
+  .readdirSync(migrationsDir)
+  .filter((f) => f.endsWith(".sql"))
+  .sort();
 
 const sqlite = new DatabaseSync(":memory:");
-sqlite.exec(initialSql);
+sqlite.exec("PRAGMA foreign_keys = ON;");
+for (const file of migrationFiles) {
+  const sql = fs.readFileSync(path.join(migrationsDir, file), "utf8");
+  sqlite.exec(sql);
+}
 
 registerTestDatabases(createSqliteD1Adapter(sqlite), sqlite);

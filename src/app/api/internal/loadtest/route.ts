@@ -33,8 +33,18 @@ const LOADTEST_EMAIL_RE = /^loadtest\+\d+@example\.test$/i;
 const ALLOWED_LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 function verifyLocalLoadtestGuard(request: NextRequest): NextResponse | null {
-  if (process.env.LOADTEST_ALLOW !== "1") {
+  if (
+    process.env.NODE_ENV === "production" ||
+    process.env.LOADTEST_ALLOW !== "1"
+  ) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const requiredToken = process.env.LOADTEST_TOKEN?.trim();
+  if (requiredToken) {
+    const provided = request.headers.get("x-loadtest-token") ?? "";
+    if (provided !== requiredToken) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
   }
   const hostname = request.nextUrl.hostname.toLowerCase();
   if (!ALLOWED_LOCAL_HOSTS.has(hostname)) {

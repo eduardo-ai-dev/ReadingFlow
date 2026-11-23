@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { DEMO_READONLY_CODE, DEMO_READONLY_ERROR } from "@/lib/auth-demo";
 import {
   ensureWorkspaceSettings,
   getAuthenticatedWorkspace,
+  isDemoWorkspace,
 } from "@/server/store/memory-repository";
 import { createPortableBackupJson } from "@/features/portability/rules";
 import { serializeRowsToSafeCsv } from "@/server/security/csv";
@@ -79,7 +81,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const ws = await getAuthenticatedWorkspace();
   if (!ws) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    return NextResponse.json(
+      { error: "Não autenticado." },
+      { status: 401, headers: { "Cache-Control": "private, no-store" } }
+    );
+  }
+  if (isDemoWorkspace(ws)) {
+    return NextResponse.json(
+      { error: DEMO_READONLY_ERROR, code: DEMO_READONLY_CODE },
+      { status: 403, headers: { "Cache-Control": "private, no-store" } }
+    );
   }
 
   const dateStamp = formatDateInTimezone(new Date(), ws.profile.timezone);

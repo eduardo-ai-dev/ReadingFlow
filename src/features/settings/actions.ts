@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
 import {
   ensureWorkspaceSettings,
   invalidateUserWorkspaceCache,
+  isDemoWorkspace,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
 } from "@/server/store/memory-repository";
@@ -43,6 +45,9 @@ export async function saveShelfCustomizationAction(
   | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = saveShelfCustomizationSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -139,6 +144,9 @@ export async function importLegacyLocalSettingsAction(
   { ok: true; settings: UserSettings } | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = importLegacyLocalSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Dados locais legados inválidos." };
@@ -188,6 +196,9 @@ export async function updateOnboardingGuideAction(
   | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = updateOnboardingGuideSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -254,6 +265,9 @@ export async function updateHapticsPreferenceAction(
   { ok: true; hapticsEnabled: boolean } | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = updateHapticsSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Preferência de vibração inválida." };

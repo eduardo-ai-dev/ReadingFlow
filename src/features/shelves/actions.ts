@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
 import {
   deleteEditionUploadedCovers,
   invalidateUserWorkspaceCache,
+  isDemoWorkspace,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
 } from "@/server/store/memory-repository";
@@ -23,6 +25,9 @@ export async function updateShelfSortModeAction(
   rawInput: unknown
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = updateShelfSortSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Ordenação inválida." };
@@ -44,6 +49,9 @@ export async function removeLibraryItemAction(
   { ok: true; undoId: string; undoLabel: string } | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = removeLibraryItemSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Exemplar inválido." };
@@ -84,6 +92,9 @@ export async function updateItemOwnershipAction(
   rawInput: unknown
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = updateItemOwnershipSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Situação de posse inválida." };
@@ -104,6 +115,9 @@ export async function reorderShelfBooksAction(
   rawInput: unknown
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = reorderShelfBooksSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Ordem dos livros inválida." };
@@ -144,6 +158,9 @@ export async function updateBookSpineColorAction(
   | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = updateBookSpineColorSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Cor de lombada inválida." };

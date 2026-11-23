@@ -2,8 +2,10 @@
 
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
 import {
   invalidateUserWorkspaceCache,
+  isDemoWorkspace,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
 } from "@/server/store/memory-repository";
@@ -23,6 +25,9 @@ export async function importCsvBatchAction(
   rawInput: unknown
 ): Promise<{ ok: true; job: ImportJob } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = importCsvBatchSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -73,6 +78,9 @@ export async function rollbackImportBatchAction(
   rawInput: unknown
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = rollbackImportSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Lote de importação inválido." };
@@ -113,6 +121,9 @@ export async function restoreBackupJsonAction(
   rawInput: unknown
 ): Promise<{ ok: true; restoredWorks: number } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = restoreBackupSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {

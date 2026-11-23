@@ -1,7 +1,12 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { isDemoSessionAllowed } from "@/lib/auth-demo";
+import {
+  DEMO_READONLY_CODE,
+  DEMO_READONLY_ERROR,
+  DEMO_SESSION_COOKIE_NAME,
+} from "@/lib/auth-demo";
+import { verifyDemoSessionToken } from "@/server/demo/demo-token";
 import type {
   Edition,
   ImportJob,
@@ -32,11 +37,15 @@ import {
 } from "@/lib/themes/themes.config";
 import { formatDateInTimezone, shiftYmdDays } from "@/lib/dates";
 import { createLiveCatalogPipeline } from "@/server/catalog/providers";
-import { ormSeedWorkspace } from "@/server/db/orm-repository";
-import { hashPassword } from "@/server/security/password";
+import {
+  ormFindSession,
+  ormFindUserByEmail,
+  ormLoadUserWorkspace,
+  type HydratedD1Workspace,
+} from "@/server/db/orm-repository";
 
 export const SESSION_COOKIE_NAME = "rf_session_id";
-export const DEMO_SESSION_COOKIE_NAME = "rf_demo_session";
+export { DEMO_SESSION_COOKIE_NAME };
 export const DEMO_USER_ID = "user-demo-acervo";
 
 export interface UserWorkspaceData {
@@ -893,7 +902,7 @@ function buildDemoWorkspace(): UserWorkspaceData {
   return {
     profile: {
       id: userId,
-      email: "demo@readingflow.local",
+      email: "demonstracao@exemplo.invalid",
       displayName: "Acervo Demonstrativo",
       locale: "pt-BR",
       timezone: "America/Sao_Paulo",
@@ -909,7 +918,7 @@ function buildDemoWorkspace(): UserWorkspaceData {
       acceptedTermsVersion: "1.0",
       acceptedTermsAt: "2026-01-01T10:00:00.000Z",
     },
-    passwordHashSim: hashPassword("demo1234"),
+    passwordHashSim: "",
     works,
     editions,
     shelves,
@@ -920,6 +929,27 @@ function buildDemoWorkspace(): UserWorkspaceData {
     goals,
     importJobs: [],
   };
+}
+
+let cachedDemoTemplate: UserWorkspaceData | null = null;
+
+/**
+ * Repositório demonstrativo 100% somente leitura baseado em fixtures estáticas.
+ * Zero acessos ao Cloudflare D1, zero hash de senha, zero vazamento entre sessões.
+ */
+export function getDemoWorkspaceSnapshot(): UserWorkspaceData {
+  if (!cachedDemoTemplate) {
+    const built = buildDemoWorkspace();
+    ensureWorkspaceSettings(built);
+    cachedDemoTemplate = built;
+  }
+  return structuredClone(cachedDemoTemplate);
+}
+
+export function isDemoWorkspace(
+  ws: Pick<UserWorkspaceData, "profile"> | null | undefined
+): boolean {
+  return Boolean(ws && ws.profile.id === DEMO_USER_ID);
 }
 
 export function createDefaultUserSettings(profile: UserProfile): UserSettings {
@@ -1080,27 +1110,87 @@ export function assertOwnedWorkspaceEntities(
   return { ok: true };
 }
 
-export function getMemoryStore(): GlobalStoreShape {
-  const allowDemoSeed = isDemoSessionAllowed();
-  if (!globalThis.__readingFlowMemoryStore) {
-    const usersById = new Map<string, UserWorkspaceData>();
-    const userIdByEmail = new Map<string, string>();
-    const sessions = new Map<string, string>();
-    const sessionCreatedAt = new Map<string, number>();
-    const passwordResetTokens = new Map<string, PasswordResetTokenRecord>();
-    if (allowDemoSeed) {
-      const demo = buildDemoWorkspace();
-      ensureWorkspaceSettings(demo);
-      usersById.set(DEMO_USER_ID, demo);
-      userIdByEmail.set(demo.profile.email.toLowerCase(), DEMO_USER_ID);
-      void ormSeedWorkspace(demo).catch(() => {});
+function mapHydratedD1Workspace(h: HydratedD1Workspace): UserWorkspaceData {
+  const profile: UserProfile = {
+    id: h.user.id,
+    email: h.user.email,
+    displayName: h.user.displayName,
+    locale: "pt-BR",
+    timezone: h.user.timezone || "America/Sao_Paulo",
+    defaultCurrency:
+      (h.user.defaultCurrency as UserProfile["defaultCurrency"]) || "BRL",
+    theme: (h.user.theme as UserProfile["theme"]) || DEFAULT_THEME_ID,
+    density: (h.user.density as UserProfile["density"]) || DEFAULT_DENSITY,
+    motion: (h.user.motion as UserProfile["motion"]) || DEFAULT_MOTION,
+    threeD: (h.user.threeD as UserProfile["threeD"]) || "auto",
+    goalsCountRereads: Boolean(h.user.goalsCountRereads),
+    maxSimultaneousReadings: h.user.maxSimultaneousReadings ?? 5,
+    telemetryOptOut: Boolean(h.user.telemetryOptOut),
+    onboardingCompleted: Boolean(h.user.onboardingCompleted),
+    preferredFormats: ["physical", "digital", "audio"],
+    acceptedTermsVersion: h.user.acceptedTermsVersion || "1.0",
+    acceptedTermsAt: h.user.acceptedTermsAt,
+  };
+
+  const ws: UserWorkspaceData = {
+    profile,
+    passwordHashSim: h.user.passwordHash,
+    emailConfirmed: true,
+    works: h.works,
+    editions: h.editions,
+    shelves: h.shelves.length > 0 ? h.shelves : createDefaultShelves(h.user.id),
+    items: h.items,
+    wishlist: h.wishlist,
+    readings: h.readings,
+    reviews: h.reviews,
+    goals: h.goals,
+    importJobs: [],
+  };
+
+  if (h.settingsRow) {
+    try {
+      const defaults = createDefaultUserSettings(profile);
+      ws.settings = {
+        ...defaults,
+        theme: (h.settingsRow.theme as UserSettings["theme"]) || defaults.theme,
+        density:
+          (h.settingsRow.density as UserSettings["density"]) ||
+          defaults.density,
+        motion:
+          (h.settingsRow.motion as UserSettings["motion"]) || defaults.motion,
+        fx: (h.settingsRow.fx as UserSettings["fx"]) || defaults.fx,
+        shelfLayout: h.settingsRow.shelfLayoutJson
+          ? JSON.parse(h.settingsRow.shelfLayoutJson)
+          : defaults.shelfLayout,
+        ambientPreferences: h.settingsRow.ambientPreferencesJson
+          ? JSON.parse(h.settingsRow.ambientPreferencesJson)
+          : defaults.ambientPreferences,
+        focusDefaultMode:
+          (h.settingsRow
+            .focusDefaultMode as UserSettings["focusDefaultMode"]) ||
+          defaults.focusDefaultMode,
+        onboardingGuide: h.settingsRow.onboardingGuideJson
+          ? JSON.parse(h.settingsRow.onboardingGuideJson)
+          : defaults.onboardingGuide,
+        updatedAt: h.settingsRow.updatedAt,
+      };
+    } catch {
+      ensureWorkspaceSettings(ws);
     }
+  } else {
+    ensureWorkspaceSettings(ws);
+  }
+  return ws;
+}
+
+export function getMemoryStore(): GlobalStoreShape {
+  if (!globalThis.__readingFlowMemoryStore) {
     globalThis.__readingFlowMemoryStore = {
-      usersById,
-      userIdByEmail,
-      sessions,
-      sessionCreatedAt,
-      passwordResetTokens,
+      usersById: new Map<string, UserWorkspaceData>(),
+      userIdByEmail: new Map<string, string>(),
+      sessions: new Map<string, string>(),
+      sessionCreatedAt: new Map<string, number>(),
+      passwordResetTokens: new Map<string, PasswordResetTokenRecord>(),
     };
   } else {
     if (!globalThis.__readingFlowMemoryStore.sessionCreatedAt) {
@@ -1109,50 +1199,81 @@ export function getMemoryStore(): GlobalStoreShape {
     if (!globalThis.__readingFlowMemoryStore.passwordResetTokens) {
       globalThis.__readingFlowMemoryStore.passwordResetTokens = new Map();
     }
-    if (
-      allowDemoSeed &&
-      !globalThis.__readingFlowMemoryStore.usersById.has(DEMO_USER_ID)
-    ) {
-      const demo = buildDemoWorkspace();
-      ensureWorkspaceSettings(demo);
-      globalThis.__readingFlowMemoryStore.usersById.set(DEMO_USER_ID, demo);
-      globalThis.__readingFlowMemoryStore.userIdByEmail.set(
-        demo.profile.email.toLowerCase(),
-        DEMO_USER_ID
-      );
-      globalThis.__readingFlowMemoryStore.usersById.delete("user-demo-helena");
-      void ormSeedWorkspace(demo).catch(() => {});
-    }
   }
   return globalThis.__readingFlowMemoryStore;
 }
 
+/**
+ * Reidrata uma conta real a partir do Cloudflare D1 quando ainda não estiver no cache do isolate.
+ */
+export async function hydrateUserFromD1ByEmail(
+  rawEmail: string
+): Promise<UserWorkspaceData | null> {
+  const email = rawEmail.trim().toLowerCase();
+  if (!email) return null;
+  const store = getMemoryStore();
+  const cachedId = store.userIdByEmail.get(email);
+  if (cachedId) {
+    const cachedWs = store.usersById.get(cachedId);
+    if (cachedWs) return cachedWs;
+  }
+  try {
+    const userRow = await ormFindUserByEmail(email);
+    if (!userRow) return null;
+    const hydrated = await ormLoadUserWorkspace(userRow.id);
+    if (!hydrated) return null;
+    const ws = mapHydratedD1Workspace(hydrated);
+    store.usersById.set(ws.profile.id, ws);
+    store.userIdByEmail.set(email, ws.profile.id);
+    return ws;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAuthenticatedWorkspace(): Promise<UserWorkspaceData | null> {
   const cookieStore = await cookies();
-  const store = getMemoryStore();
 
+  // 1. Conta real via rf_session_id (reidrata do Cloudflare D1 por token_hash em cold start)
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (token) {
-    const rawUserId = store.sessions.get(token);
-    const resolvedUserId =
-      rawUserId === "user-demo-helena" ? DEMO_USER_ID : rawUserId;
-    if (resolvedUserId) {
-      const ws = store.usersById.get(resolvedUserId);
+    const store = getMemoryStore();
+    const cachedUserId = store.sessions.get(token);
+    if (cachedUserId && cachedUserId !== DEMO_USER_ID) {
+      const ws = store.usersById.get(cachedUserId);
       if (ws) return ws;
+    }
+    try {
+      const sessionRow = await ormFindSession(token);
+      if (sessionRow && sessionRow.userId !== DEMO_USER_ID) {
+        const hydrated = await ormLoadUserWorkspace(sessionRow.userId);
+        if (hydrated) {
+          const ws = mapHydratedD1Workspace(hydrated);
+          store.usersById.set(ws.profile.id, ws);
+          store.userIdByEmail.set(
+            ws.profile.email.toLowerCase(),
+            ws.profile.id
+          );
+          store.sessions.set(token, ws.profile.id);
+          store.sessionCreatedAt.set(
+            token,
+            new Date(sessionRow.createdAt).getTime() || Date.now()
+          );
+          return ws;
+        }
+      }
+    } catch {
+      // Falha explícita de DB não concede sessão
     }
   }
 
-  // Fallback de sessão demonstrativa via cookie rf_demo_session=true (bloqueado em produção por padrão)
-  const isDemoCookie =
-    isDemoSessionAllowed() &&
-    cookieStore.get(DEMO_SESSION_COOKIE_NAME)?.value === "true";
-  if (isDemoCookie) {
-    let demoWs = store.usersById.get(DEMO_USER_ID);
-    if (!demoWs) {
-      demoWs = buildDemoWorkspace();
-      store.usersById.set(DEMO_USER_ID, demoWs);
+  // 2. Demonstração somente leitura stateless via cookie HMAC assinado (ZERO acessos ao D1)
+  const rawDemoCookie = cookieStore.get(DEMO_SESSION_COOKIE_NAME)?.value;
+  if (rawDemoCookie) {
+    const verified = verifyDemoSessionToken(rawDemoCookie);
+    if (verified.valid) {
+      return getDemoWorkspaceSnapshot();
     }
-    return demoWs;
   }
 
   return null;
@@ -1164,6 +1285,34 @@ export async function requireAuthenticatedWorkspace(): Promise<UserWorkspaceData
     redirect("/entrar");
   }
   return ws;
+}
+
+export async function requireWritableWorkspace(): Promise<
+  | { ok: true; ws: UserWorkspaceData }
+  | {
+      ok: false;
+      error: string;
+      code?: typeof DEMO_READONLY_CODE;
+      statusCode: 401 | 403;
+    }
+> {
+  const ws = await getAuthenticatedWorkspace();
+  if (!ws) {
+    return {
+      ok: false,
+      error: "Sessão expirada. Entre novamente.",
+      statusCode: 401,
+    };
+  }
+  if (isDemoWorkspace(ws)) {
+    return {
+      ok: false,
+      error: DEMO_READONLY_ERROR,
+      code: DEMO_READONLY_CODE,
+      statusCode: 403,
+    };
+  }
+  return { ok: true, ws };
 }
 
 interface WorkspaceQueryCacheEntry {

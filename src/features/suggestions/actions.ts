@@ -2,7 +2,9 @@
 
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
 import {
+  isDemoWorkspace,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
 } from "@/server/store/memory-repository";
@@ -44,6 +46,9 @@ export async function saveSuggestionToWishlistAction(
   | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = saveSuggestionToWishlistSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -193,6 +198,9 @@ export async function startReadingNewSuggestionAction(
   { ok: true; workId: string; readingId: string } | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = startReadingNewSuggestionSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {

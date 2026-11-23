@@ -2,8 +2,10 @@
 
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
 import {
   invalidateUserWorkspaceCache,
+  isDemoWorkspace,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
 } from "@/server/store/memory-repository";
@@ -23,6 +25,9 @@ export async function createGoalAction(
   rawInput: unknown
 ): Promise<{ ok: true; goalId: string } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = createGoalSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -71,6 +76,9 @@ export async function updateGoalAction(
   rawInput: unknown
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = updateGoalSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -114,6 +122,9 @@ export async function togglePauseGoalAction(
   rawInput: unknown
 ): Promise<{ ok: true; paused: boolean } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = togglePauseGoalSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Meta inválida." };
@@ -144,6 +155,9 @@ export async function deleteGoalAction(
   rawInput: unknown
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = deleteGoalSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Meta inválida." };

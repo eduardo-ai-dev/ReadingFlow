@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { DEMO_READONLY_CODE, DEMO_READONLY_ERROR } from "@/lib/auth-demo";
 import {
   getAuthenticatedWorkspace,
   invalidateUserWorkspaceCache,
+  isDemoWorkspace,
 } from "@/server/store/memory-repository";
 import {
   checkSlidingRateLimit,
@@ -26,6 +28,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const ws = await getAuthenticatedWorkspace();
   if (!ws) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+  if (isDemoWorkspace(ws)) {
+    return NextResponse.json(
+      { error: DEMO_READONLY_ERROR, code: DEMO_READONLY_CODE },
+      { status: 403, headers: { "Cache-Control": "private, no-store" } }
+    );
   }
 
   let body: unknown;

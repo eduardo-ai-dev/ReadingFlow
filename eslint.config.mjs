@@ -59,6 +59,29 @@ const eslintConfig = [
     },
   },
   {
+    // Isolamento de dados: impede acesso direto ao binding D1 fora da camada de repositório (`src/server/db/`).
+    files: [
+      "src/app/**/*.{ts,tsx}",
+      "src/features/**/*.{ts,tsx}",
+      "src/components/**/*.{ts,tsx}",
+    ],
+    ignores: ["src/app/api/internal/loadtest/route.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/server/db/connection",
+              message:
+                "Acesse o Cloudflare D1 exclusivamente pela camada de repositório escopado em src/server/db/.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     ignores: [
       ".next/**",
       ".open-next/**",

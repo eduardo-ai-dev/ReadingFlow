@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getAuthenticatedWorkspace } from "@/server/store/memory-repository";
+import { DEMO_READONLY_CODE, DEMO_READONLY_ERROR } from "@/lib/auth-demo";
+import {
+  getAuthenticatedWorkspace,
+  isDemoWorkspace,
+} from "@/server/store/memory-repository";
 import { getServerEnv } from "@/lib/env";
 import { checkSlidingRateLimit } from "@/server/security/sanitize";
 import {
@@ -20,6 +24,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       { ok: false, error: "Não autenticado." },
       { status: 401 }
+    );
+  }
+  if (isDemoWorkspace(ws)) {
+    return NextResponse.json(
+      { ok: false, error: DEMO_READONLY_ERROR, code: DEMO_READONLY_CODE },
+      { status: 403, headers: { "Cache-Control": "private, no-store" } }
     );
   }
 

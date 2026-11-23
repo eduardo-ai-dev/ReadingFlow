@@ -1,6 +1,8 @@
 import "server-only";
+import crypto from "node:crypto";
 import { eq, and, desc, asc } from "drizzle-orm";
-import { getOrmDb, getTestSqliteDatabase } from "./connection";
+import { getD1Database, getOrmDb, getTestSqliteDatabase } from "./connection";
+import { getAuthSecurityConfig } from "@/server/security/auth-config";
 import {
   usersTable,
   worksTable,
@@ -108,47 +110,107 @@ export async function ormUpdateUser(
   await db.update(usersTable).set(partial).where(eq(usersTable.id, id));
 }
 
-export async function ormDeleteUser(id: string) {
-  const db = getOrmDb();
-  await db.delete(userSettingsTable).where(eq(userSettingsTable.userId, id));
-  await db.delete(sessionsTable).where(eq(sessionsTable.userId, id));
-  await db.delete(wishlistTable).where(eq(wishlistTable.userId, id));
-  await db.delete(goalsTable).where(eq(goalsTable.userId, id));
-  await db.delete(reviewsTable).where(eq(reviewsTable.userId, id));
-  await db.delete(readingsTable).where(eq(readingsTable.userId, id));
-  await db.delete(libraryItemsTable).where(eq(libraryItemsTable.userId, id));
-  await db.delete(shelvesTable).where(eq(shelvesTable.userId, id));
-  await db.delete(editionsTable).where(eq(editionsTable.userId, id));
-  await db.delete(worksTable).where(eq(worksTable.userId, id));
-  await db.delete(usersTable).where(eq(usersTable.id, id));
+/**
+ * Gera o hash irreversível do token de sessão (HMAC-SHA256 com segredo do servidor).
+ * O banco D1 nunca armazena o token de sessão em texto puro.
+ */
+export function hashSessionToken(rawToken: string): string {
+  const secret = getAuthSecurityConfig().hmacSecret;
+  return crypto
+    .createHmac("sha256", secret)
+    .update(`rf-session-token:${rawToken}`)
+    .digest("hex");
 }
 
-export async function ormCreateSession(token: string, userId: string) {
+function assertNonEmptyUserId(userId: string | undefined | null): string {
+  const clean = typeof userId === "string" ? userId.trim() : "";
+  if (!clean || clean === "global") {
+    throw new Error("user_id obrigatório para operações no repositório.");
+  }
+  return clean;
+}
+
+export async function ormDeleteUser(id: string) {
+  const userId = assertNonEmptyUserId(id);
+  const d1 = getD1Database();
+  await d1.batch([
+    d1.prepare("DELETE FROM auth_secrets WHERE user_id = ?").bind(userId),
+    d1.prepare("DELETE FROM user_settings WHERE user_id = ?").bind(userId),
+    d1.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId),
+    d1.prepare("DELETE FROM wishlist WHERE user_id = ?").bind(userId),
+    d1.prepare("DELETE FROM goals WHERE user_id = ?").bind(userId),
+    d1.prepare("DELETE FROM reviews WHERE user_id = ?").bind(userId),
+    d1.prepare("DELETE FROM readings WHERE user_id = ?").bind(userId),
+    d1.prepare("DELETE FROM library_items WHERE user_id = ?").bind(userId),
+    d1.prepare("DELETE FROM shelves WHERE user_id = ?").bind(userId),
+    d1.prepare("DELETE FROM editions WHERE user_id = ?").bind(userId),
+    d1.prepare("DELETE FROM works WHERE user_id = ?").bind(userId),
+    d1.prepare("DELETE FROM users WHERE id = ?").bind(userId),
+  ]);
+}
+
+const DEFAULT_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+export async function ormCreateSession(
+  rawToken: string,
+  userId: string,
+  ttlMs = DEFAULT_SESSION_TTL_MS
+) {
+  const safeUserId = assertNonEmptyUserId(userId);
   const db = getOrmDb();
+  const now = Date.now();
+  const tokenHash = hashSessionToken(rawToken);
   await db.insert(sessionsTable).values({
-    token,
-    userId,
-    createdAt: new Date().toISOString(),
+    tokenHash,
+    userId: safeUserId,
+    expiresAt: new Date(now + ttlMs).toISOString(),
+    createdAt: new Date(now).toISOString(),
   });
 }
 
-export async function ormFindSession(token: string) {
+export async function ormFindSession(rawToken: string) {
+  if (!rawToken) return null;
   const db = getOrmDb();
+  const tokenHash = hashSessionToken(rawToken);
   const rows = await db
     .select()
     .from(sessionsTable)
-    .where(eq(sessionsTable.token, token));
-  return rows[0] ?? null;
+    .where(eq(sessionsTable.tokenHash, tokenHash));
+  const row = rows[0] ?? null;
+  if (!row) return null;
+  if (row.expiresAt && new Date(row.expiresAt).getTime() <= Date.now()) {
+    await db
+      .delete(sessionsTable)
+      .where(eq(sessionsTable.tokenHash, tokenHash))
+      .catch(() => {});
+    return null;
+  }
+  return row;
 }
 
-export async function ormDeleteSession(token: string) {
+export async function ormDeleteSession(rawToken: string, userId?: string) {
+  if (!rawToken) return;
   const db = getOrmDb();
-  await db.delete(sessionsTable).where(eq(sessionsTable.token, token));
+  const tokenHash = hashSessionToken(rawToken);
+  if (userId) {
+    await db
+      .delete(sessionsTable)
+      .where(
+        and(
+          eq(sessionsTable.tokenHash, tokenHash),
+          eq(sessionsTable.userId, assertNonEmptyUserId(userId))
+        )
+      );
+    return;
+  }
+  await db.delete(sessionsTable).where(eq(sessionsTable.tokenHash, tokenHash));
 }
 
 export async function ormDeleteSessionsByUserId(userId: string) {
   const db = getOrmDb();
-  await db.delete(sessionsTable).where(eq(sessionsTable.userId, userId));
+  await db
+    .delete(sessionsTable)
+    .where(eq(sessionsTable.userId, assertNonEmptyUserId(userId)));
 }
 
 // ============================================================================
@@ -212,7 +274,7 @@ export async function ormInsertWork(work: Work): Promise<void> {
   const db = getOrmDb();
   await db.insert(worksTable).values({
     id: work.id,
-    userId: work.ownerId ?? "global",
+    userId: assertNonEmptyUserId(work.ownerId),
     title: work.title,
     originalTitle: work.originalTitle,
     originalLanguage: work.originalLanguage,
@@ -263,7 +325,7 @@ export async function ormInsertEdition(edition: Edition): Promise<void> {
   await db.insert(editionsTable).values({
     id: edition.id,
     workId: edition.workId,
-    userId: edition.ownerId ?? "global",
+    userId: assertNonEmptyUserId(edition.ownerId),
     isbn13: edition.isbn13,
     isbn10: edition.isbn10,
     title: edition.title,
@@ -347,11 +409,21 @@ export async function ormGetLibraryItems(
   }));
 }
 
-export async function ormInsertLibraryItem(item: LibraryItem): Promise<void> {
+export async function ormInsertLibraryItem(
+  item: LibraryItem,
+  cover?: {
+    coverUrl?: string | null;
+    coverSource?: string | null;
+    coverLocked?: boolean;
+    coverSelectedAt?: string | null;
+    spineColor?: string | null;
+    spineAccent?: string | null;
+  }
+): Promise<void> {
   const db = getOrmDb();
   await db.insert(libraryItemsTable).values({
     id: item.id,
-    userId: item.userId,
+    userId: assertNonEmptyUserId(item.userId),
     editionId: item.editionId,
     shelfId: item.shelfId,
     shelfPosition: item.shelfPosition,
@@ -363,8 +435,55 @@ export async function ormInsertLibraryItem(item: LibraryItem): Promise<void> {
     condition: item.condition,
     notes: item.notes,
     favorite: false,
+    coverUrl: cover?.coverUrl ?? null,
+    coverSource: cover?.coverSource ?? null,
+    coverLocked: Boolean(cover?.coverLocked),
+    coverSelectedAt: cover?.coverSelectedAt ?? null,
+    spineColor: cover?.spineColor ?? null,
+    spineAccent: cover?.spineAccent ?? null,
     createdAt: item.createdAt,
   });
+}
+
+export async function ormUpdateLibraryItemCover(
+  itemId: string,
+  userId: string,
+  cover: {
+    coverUrl?: string | null;
+    coverSource?: string | null;
+    coverLocked?: boolean;
+    coverSelectedAt?: string | null;
+    spineColor?: string | null;
+    spineAccent?: string | null;
+  }
+): Promise<void> {
+  const db = getOrmDb();
+  await db
+    .update(libraryItemsTable)
+    .set({
+      ...(cover.coverUrl !== undefined ? { coverUrl: cover.coverUrl } : {}),
+      ...(cover.coverSource !== undefined
+        ? { coverSource: cover.coverSource }
+        : {}),
+      ...(cover.coverLocked !== undefined
+        ? { coverLocked: cover.coverLocked }
+        : {}),
+      ...(cover.coverSelectedAt !== undefined
+        ? { coverSelectedAt: cover.coverSelectedAt }
+        : {}),
+      ...(cover.spineColor !== undefined
+        ? { spineColor: cover.spineColor }
+        : {}),
+      ...(cover.spineAccent !== undefined
+        ? { spineAccent: cover.spineAccent }
+        : {}),
+    })
+    .where(
+      and(
+        eq(libraryItemsTable.id, itemId),
+        eq(libraryItemsTable.userId, assertNonEmptyUserId(userId))
+      )
+    );
 }
 
 // ============================================================================
@@ -752,8 +871,17 @@ export async function ormSeedWorkspace(ws: {
       await ormInsertEdition(ed);
     }
     await ormInsertShelves(ws.shelves);
+    const editionsById = new Map(ws.editions.map((e) => [e.id, e]));
     for (const it of ws.items) {
-      await ormInsertLibraryItem(it);
+      const ed = editionsById.get(it.editionId);
+      await ormInsertLibraryItem(it, {
+        coverUrl: ed?.coverUrl ?? null,
+        coverSource: ed?.coverSource ?? null,
+        coverLocked: Boolean(ed?.coverLocked),
+        coverSelectedAt: ed?.coverSelectedAt ?? null,
+        spineColor: ed?.coverColor ?? null,
+        spineAccent: ed?.coverAccentColor ?? null,
+      });
     }
     for (const r of ws.readings) {
       await ormInsertReading(r);
@@ -780,4 +908,205 @@ export async function ormSeedWorkspace(ws: {
     }
     throw err;
   }
+}
+
+export interface HydratedD1Workspace {
+  user: NonNullable<Awaited<ReturnType<typeof ormFindUserById>>>;
+  works: Work[];
+  editions: Edition[];
+  shelves: Shelf[];
+  items: LibraryItem[];
+  readings: Reading[];
+  reviews: Review[];
+  goals: ReadingGoal[];
+  wishlist: WishlistItem[];
+  settingsRow: Awaited<ReturnType<typeof ormGetUserSettings>>;
+}
+
+/**
+ * Reidrata o workspace completo de um usuário real a partir do Cloudflare D1,
+ * permitindo que qualquer isolate do Worker restaure a sessão após cold start.
+ * Aplica escolhas de capa/lombada gravadas por usuário em `library_items`.
+ */
+export async function ormLoadUserWorkspace(
+  userId: string
+): Promise<HydratedD1Workspace | null> {
+  const safeUserId = assertNonEmptyUserId(userId);
+  const user = await ormFindUserById(safeUserId);
+  if (!user) return null;
+
+  const db = getOrmDb();
+  const [
+    works,
+    editions,
+    shelves,
+    rawItemRows,
+    readings,
+    reviews,
+    goals,
+    wishlist,
+    settingsRow,
+  ] = await Promise.all([
+    ormGetWorks(safeUserId),
+    ormGetEditions(safeUserId),
+    ormGetShelves(safeUserId),
+    db
+      .select()
+      .from(libraryItemsTable)
+      .where(eq(libraryItemsTable.userId, safeUserId))
+      .orderBy(asc(libraryItemsTable.shelfPosition)),
+    ormGetReadings(safeUserId),
+    ormGetReviews(safeUserId),
+    ormGetGoals(safeUserId),
+    ormGetWishlist(safeUserId),
+    ormGetUserSettings(safeUserId),
+  ]);
+
+  const itemCoverByEditionId = new Map<
+    string,
+    {
+      coverUrl?: string;
+      coverSource?: Edition["coverSource"];
+      coverLocked: boolean;
+      coverSelectedAt?: string;
+      spineColor?: string;
+      spineAccent?: string;
+    }
+  >();
+
+  const items: LibraryItem[] = rawItemRows.map((r) => {
+    if (
+      r.coverUrl ||
+      r.coverLocked ||
+      r.spineColor ||
+      r.spineAccent ||
+      r.coverSource
+    ) {
+      itemCoverByEditionId.set(r.editionId, {
+        coverUrl: r.coverUrl ?? undefined,
+        coverSource: (r.coverSource as Edition["coverSource"]) ?? null,
+        coverLocked: Boolean(r.coverLocked),
+        coverSelectedAt: r.coverSelectedAt ?? undefined,
+        spineColor: r.spineColor ?? undefined,
+        spineAccent: r.spineAccent ?? undefined,
+      });
+    }
+    return {
+      id: r.id,
+      userId: r.userId,
+      editionId: r.editionId,
+      shelfId: r.shelfId,
+      shelfPosition: r.shelfPosition,
+      status: r.status as OwnershipStatus,
+      pricePaid: r.pricePaid ?? undefined,
+      currency: r.currency,
+      acquiredOn: r.acquiredOn ?? undefined,
+      store: r.store ?? undefined,
+      condition: (r.condition as LibraryItem["condition"]) ?? undefined,
+      notes: r.notes ?? undefined,
+      createdAt: r.createdAt,
+    };
+  });
+
+  // Prioriza escolha de capa/lombada salva por usuário em `library_items`
+  const scopedEditions = editions.map((ed) => {
+    const override = itemCoverByEditionId.get(ed.id);
+    if (!override) return ed;
+    return {
+      ...ed,
+      coverUrl: override.coverUrl ?? ed.coverUrl,
+      coverSource: override.coverSource ?? ed.coverSource,
+      coverLocked: override.coverLocked || Boolean(ed.coverLocked),
+      coverSelectedAt: override.coverSelectedAt ?? ed.coverSelectedAt,
+      coverColor: override.spineColor ?? ed.coverColor,
+      coverAccentColor: override.spineAccent ?? ed.coverAccentColor,
+    };
+  });
+
+  return {
+    user,
+    works,
+    editions: scopedEditions,
+    shelves,
+    items,
+    readings,
+    reviews,
+    goals,
+    wishlist,
+    settingsRow,
+  };
+}
+
+/**
+ * Fábrica de repositório D1 estritamente escopada a um único `userId` (`repo(userId)`).
+ * Toda leitura e mutação fixa o `userId` no servidor, bloqueando acesso cruzado entre contas.
+ */
+export function createUserRepository(rawUserId: string) {
+  const userId = assertNonEmptyUserId(rawUserId);
+
+  return {
+    userId,
+    getUser: () => ormFindUserById(userId),
+    updateUser: (partial: Parameters<typeof ormUpdateUser>[1]) =>
+      ormUpdateUser(userId, partial),
+    deleteUser: () => ormDeleteUser(userId),
+
+    createSession: (rawToken: string, ttlMs?: number) =>
+      ormCreateSession(rawToken, userId, ttlMs),
+    deleteSession: (rawToken: string) => ormDeleteSession(rawToken, userId),
+    deleteAllSessions: () => ormDeleteSessionsByUserId(userId),
+
+    getWorks: () => ormGetWorks(userId),
+    getWorkById: (workId: string) => ormGetWorkById(workId, userId),
+    insertWork: (work: Omit<Work, "ownerId">) =>
+      ormInsertWork({ ...work, ownerId: userId }),
+
+    getEditions: () => ormGetEditions(userId),
+    insertEdition: (edition: Omit<Edition, "ownerId">) =>
+      ormInsertEdition({ ...edition, ownerId: userId }),
+
+    getShelves: () => ormGetShelves(userId),
+    insertShelves: (shelves: Array<Omit<Shelf, "userId">>) =>
+      ormInsertShelves(shelves.map((s) => ({ ...s, userId }))),
+
+    getLibraryItems: () => ormGetLibraryItems(userId),
+    insertLibraryItem: (
+      item: Omit<LibraryItem, "userId">,
+      cover?: Parameters<typeof ormInsertLibraryItem>[1]
+    ) => ormInsertLibraryItem({ ...item, userId }, cover),
+    updateLibraryItemCover: (
+      itemId: string,
+      cover: Parameters<typeof ormUpdateLibraryItemCover>[2]
+    ) => ormUpdateLibraryItemCover(itemId, userId, cover),
+
+    getReadings: () => ormGetReadings(userId),
+    insertReading: (reading: Omit<Reading, "userId">) =>
+      ormInsertReading({ ...reading, userId }),
+    updateReading: (readingId: string, data: Partial<Reading>) =>
+      ormUpdateReading(readingId, userId, data),
+
+    getReviews: () => ormGetReviews(userId),
+    upsertReview: (review: Omit<Review, "userId">) =>
+      ormUpsertReview({ ...review, userId }),
+
+    getGoals: () => ormGetGoals(userId),
+    insertGoal: (goal: Omit<ReadingGoal, "userId">) =>
+      ormInsertGoal({ ...goal, userId }),
+    updateGoal: (goalId: string, data: Parameters<typeof ormUpdateGoal>[2]) =>
+      ormUpdateGoal(goalId, userId, data),
+    deleteGoal: (goalId: string) => ormDeleteGoal(goalId, userId),
+
+    getWishlist: () => ormGetWishlist(userId),
+    insertWishlistItem: (item: Omit<WishlistItem, "userId">) =>
+      ormInsertWishlistItem({ ...item, userId }),
+    deleteWishlistItem: (wishId: string) =>
+      ormDeleteWishlistItem(wishId, userId),
+
+    getUserSettings: () => ormGetUserSettings(userId),
+    upsertUserSettings: (
+      settings: Omit<Parameters<typeof ormUpsertUserSettings>[0], "userId">
+    ) => ormUpsertUserSettings({ ...settings, userId }),
+
+    loadWorkspace: () => ormLoadUserWorkspace(userId),
+  };
 }

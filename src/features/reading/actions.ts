@@ -2,8 +2,10 @@
 
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
 import {
   invalidateUserWorkspaceCache,
+  isDemoWorkspace,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
 } from "@/server/store/memory-repository";
@@ -33,6 +35,9 @@ export async function startReadingAction(
   rawInput: unknown
 ): Promise<{ ok: true; readingId: string } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = startReadingSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Dados inválidos para iniciar leitura." };
@@ -112,6 +117,9 @@ export async function updateReadingProgressAction(rawInput: unknown): Promise<
   | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = updateReadingProgressSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Progresso informado é inválido." };
@@ -273,6 +281,9 @@ export async function togglePauseReadingAction(
   rawInput: unknown
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = togglePauseReadingSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Leitura inválida." };
@@ -314,6 +325,9 @@ export async function finishReadingAction(rawInput: unknown): Promise<
   | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = finishReadingSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Dados de conclusão inválidos." };
@@ -459,6 +473,9 @@ export async function abandonReadingAction(
   rawInput: unknown
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = abandonReadingSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Dados de abandono inválidos." };

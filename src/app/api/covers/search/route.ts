@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getAuthenticatedWorkspace } from "@/server/store/memory-repository";
+import { DEMO_READONLY_CODE, DEMO_READONLY_ERROR } from "@/lib/auth-demo";
+import {
+  getAuthenticatedWorkspace,
+  isDemoWorkspace,
+} from "@/server/store/memory-repository";
 import { getServerEnv } from "@/lib/env";
 import {
   checkSlidingRateLimit,
@@ -52,6 +56,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { error: "Sessão não autenticada." },
       { status: 401, headers: PRIVATE_NO_STORE }
+    );
+  }
+  if (isDemoWorkspace(ws)) {
+    return NextResponse.json(
+      { error: DEMO_READONLY_ERROR, code: DEMO_READONLY_CODE },
+      { status: 403, headers: PRIVATE_NO_STORE }
     );
   }
 
@@ -157,6 +167,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { ok: false, error: "Sessão não autenticada." },
       { status: 401, headers: PRIVATE_NO_STORE }
+    );
+  }
+  if (isDemoWorkspace(ws)) {
+    return NextResponse.json(
+      { ok: false, error: DEMO_READONLY_ERROR, code: DEMO_READONLY_CODE },
+      { status: 403, headers: PRIVATE_NO_STORE }
     );
   }
 

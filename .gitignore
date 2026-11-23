@@ -19,6 +19,8 @@ node_modules/
 .env
 .env.*
 !.env.example
+.dev.vars
+.dev.vars.*
 
 # SQLite local database & WAL/SHM artifacts
 *.db

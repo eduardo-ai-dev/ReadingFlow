@@ -72,6 +72,20 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: securityHeaders,
       },
+      {
+        source:
+          "/(painel|estantes|estante-3d|livros|adicionar|desejos|leitura|metas|estatisticas|evolucao|explorar|configuracoes|generos|onboarding)(.*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-store",
+          },
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow",
+          },
+        ],
+      },
     ];
   },
 };

@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { ptBR } from "@/lib/i18n/pt-BR";
+import { isDemoEnabled } from "@/lib/auth-demo";
+import { AuthDemoFlagProvider } from "@/components/AuthDemoFlagContext";
 import { LibraryBackdrop } from "@/components/layout/LibraryBackdrop";
+
+export const dynamic = "force-dynamic";
 
 export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const demoEnabled = isDemoEnabled();
   return (
     <div className="relative flex min-h-dvh flex-col bg-[var(--rf-surface-canvas)] text-[var(--rf-text-primary)]">
       <a href="#conteudo-auth" className="skip-link">
@@ -45,7 +50,11 @@ export default function AuthLayout({
         tabIndex={-1}
         className="relative z-10 flex flex-1 items-center justify-center px-4 py-8 sm:py-10"
       >
-        <div className="w-full max-w-[456px]">{children}</div>
+        <div className="w-full max-w-[456px]">
+          <AuthDemoFlagProvider demoEnabled={demoEnabled}>
+            {children}
+          </AuthDemoFlagProvider>
+        </div>
       </main>
 
       {/* 6. Rodapé Discreto */}

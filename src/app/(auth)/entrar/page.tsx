@@ -7,10 +7,12 @@ import { AlertCircle, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { signInWithEmailAction } from "@/features/auth/actions";
 import { resolveSafeRedirectTarget } from "@/features/auth/rules";
 import { DemoLoginButton } from "@/components/DemoLoginButton";
+import { useDemoEnabled } from "@/components/AuthDemoFlagContext";
 import { ExLibrisEmblem } from "@/components/ExLibrisEmblem";
 
 function SignInPageContent() {
   const router = useRouter();
+  const demoEnabled = useDemoEnabled();
   const searchParams = useSearchParams();
   const nextTarget = resolveSafeRedirectTarget(searchParams.get("next"));
   const [email, setEmail] = useState("");
@@ -33,32 +35,40 @@ function SignInPageContent() {
           Entrar na sua biblioteca
         </h1>
         <p className="mt-1 font-sans text-sm text-[#2C221E]">
-          Acesse seu acervo privado ou experimente a conta demonstrativa.
+          {demoEnabled
+            ? "Acesse seu acervo privado ou experimente a conta demonstrativa."
+            : "Acesse seu acervo privado com seu e-mail e senha."}
         </p>
       </header>
 
-      {/* Botão Secundário/Editorial "Explorar Biblioteca Demonstrativa" em font-sans */}
-      <div className="mt-5">
-        <DemoLoginButton
-          variant="secondary"
-          label="Explorar Biblioteca Demonstrativa"
-          loadingLabel="Abrindo acervo demo..."
-          redirectTo={nextTarget}
-          disabled={isBusy}
-          onBeforeStart={() => {
-            setEmailError(null);
-            setPasswordError(null);
-            setFormError(null);
-          }}
-          className="w-full"
-        />
-      </div>
+      {/* Botão Secundário/Editorial "Explorar Biblioteca Demonstrativa" (oculto quando DEMO_ENABLED=false) */}
+      {demoEnabled ? (
+        <>
+          <div className="mt-5">
+            <DemoLoginButton
+              variant="secondary"
+              label="Explorar Biblioteca Demonstrativa"
+              loadingLabel="Abrindo acervo demo..."
+              redirectTo={nextTarget}
+              disabled={isBusy}
+              onBeforeStart={() => {
+                setEmailError(null);
+                setPasswordError(null);
+                setFormError(null);
+              }}
+              className="w-full"
+            />
+          </div>
 
-      <div className="my-5 flex items-center gap-3 font-sans text-xs text-[#4A433C]">
-        <span className="h-[1px] flex-1 bg-[#2C221E]/20" />
-        <span>ou com e-mail e senha</span>
-        <span className="h-[1px] flex-1 bg-[#2C221E]/20" />
-      </div>
+          <div className="my-5 flex items-center gap-3 font-sans text-xs text-[#4A433C]">
+            <span className="h-[1px] flex-1 bg-[#2C221E]/20" />
+            <span>ou com e-mail e senha</span>
+            <span className="h-[1px] flex-1 bg-[#2C221E]/20" />
+          </div>
+        </>
+      ) : (
+        <div className="mt-5" />
+      )}
 
       <form
         noValidate

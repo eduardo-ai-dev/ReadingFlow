@@ -98,6 +98,14 @@ export const libraryItemsTable = sqliteTable("library_items", {
   condition: text("condition"),
   notes: text("notes"),
   favorite: integer("favorite", { mode: "boolean" }).notNull().default(false),
+  coverUrl: text("cover_url"),
+  coverSource: text("cover_source"),
+  coverLocked: integer("cover_locked", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  coverSelectedAt: text("cover_selected_at"),
+  spineColor: text("spine_color"),
+  spineAccent: text("spine_accent"),
   createdAt: text("created_at").notNull(),
 });
 
@@ -167,8 +175,9 @@ export const wishlistTable = sqliteTable("wishlist", {
 });
 
 export const sessionsTable = sqliteTable("sessions", {
-  token: text("token").primaryKey(),
+  tokenHash: text("token_hash").primaryKey(),
   userId: text("user_id").notNull(),
+  expiresAt: text("expires_at").notNull(),
   createdAt: text("created_at").notNull(),
 });
 

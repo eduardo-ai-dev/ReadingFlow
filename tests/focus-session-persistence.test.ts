@@ -19,15 +19,27 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-import { signInDemoAction } from "@/features/auth/actions";
 import { updateReadingProgressAction } from "@/features/reading/actions";
-import { DEMO_USER_ID, getMemoryStore } from "@/server/store/memory-repository";
+import {
+  SESSION_COOKIE_NAME,
+  getDemoWorkspaceSnapshot,
+  getMemoryStore,
+} from "@/server/store/memory-repository";
+
+const TEST_USER_ID = "user-test-focus";
 
 describe("Canto de Foco — persistência do cronômetro e salvamento das anotações da sessão", () => {
   beforeEach(async () => {
     cookieJar.clear();
-    await signInDemoAction();
-    const ws = getMemoryStore().usersById.get(DEMO_USER_ID)!;
+    const store = getMemoryStore();
+    const ws = getDemoWorkspaceSnapshot();
+    ws.profile.id = TEST_USER_ID;
+    ws.profile.email = "focus@teste.local";
+    for (const r of ws.readings) r.userId = TEST_USER_ID;
+    store.usersById.set(TEST_USER_ID, ws);
+    store.sessions.set("tok-focus", TEST_USER_ID);
+    cookieJar.set(SESSION_COOKIE_NAME, "tok-focus");
+
     const r = ws.readings.find((item) => item.id === "read-grande-sertao")!;
     r.progressUnit = "pages";
     r.progressValue = 248;
@@ -94,7 +106,7 @@ describe("Canto de Foco — persistência do cronômetro e salvamento das anota�
     });
     expect(res.ok).toBe(true);
 
-    const ws = getMemoryStore().usersById.get(DEMO_USER_ID)!;
+    const ws = getMemoryStore().usersById.get(TEST_USER_ID)!;
     const r = ws.readings.find((item) => item.id === "read-grande-sertao")!;
     expect(r.progressValue).toBe(268);
     expect(r.notes).toContain("Passagem sobre o sertão");

@@ -2,7 +2,9 @@
 
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
 import {
+  isDemoWorkspace,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
 } from "@/server/store/memory-repository";
@@ -12,7 +14,10 @@ import {
   purchaseWishlistSchema,
 } from "@/features/wishlist/schema";
 import { applyWishlistPurchase } from "@/features/wishlist/rules";
-import { canStartActiveReading, startRereadRecord } from "@/features/reading/rules";
+import {
+  canStartActiveReading,
+  startRereadRecord,
+} from "@/features/reading/rules";
 import {
   classifyBookDuplication,
   computeWorkFingerprint,
@@ -27,6 +32,9 @@ export async function addWishlistItemAction(
   rawInput: unknown
 ): Promise<{ ok: true; wishId: string } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = addWishlistItemSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -130,6 +138,9 @@ export async function purchaseWishlistItemAction(
   rawInput: unknown
 ): Promise<{ ok: true; itemId: string } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = purchaseWishlistSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Dados da compra inválidos." };
@@ -205,6 +216,9 @@ export async function dropWishlistItemAction(
   rawInput: unknown
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = dropWishlistSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Item inválido." };
@@ -229,6 +243,9 @@ export async function startReadingFromWishlistAction(
   { ok: true; workId: string; readingId: string } | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = dropWishlistSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: "Identificador de desejo inválido." };

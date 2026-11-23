@@ -3,7 +3,11 @@
 import crypto from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { isDemoSessionAllowed } from "@/lib/auth-demo";
+import { DEMO_READONLY_ERROR, isDemoEnabled } from "@/lib/auth-demo";
+import {
+  checkDemoCreationRateLimit,
+  signDemoSessionToken,
+} from "@/server/demo/demo-token";
 import {
   DEMO_SESSION_COOKIE_NAME,
   DEMO_USER_ID,
@@ -13,7 +17,9 @@ import {
   ensureWorkspaceSettings,
   getAuthenticatedWorkspace,
   getMemoryStore,
+  hydrateUserFromD1ByEmail,
   invalidateUserWorkspaceCache,
+  isDemoWorkspace,
   requireAuthenticatedWorkspace,
 } from "@/server/store/memory-repository";
 import {
@@ -90,6 +96,7 @@ import {
   ormDeleteSession,
   ormDeleteSessionsByUserId,
   ormCreateUser,
+  ormFindUserByEmail,
   ormInsertShelves,
   ormUpdateUser,
   ormDeleteUser,
@@ -201,14 +208,20 @@ async function createSessionCookie(
   rememberMe = true,
   existingKnownDeviceId?: string | null
 ): Promise<string> {
+  if (userId === DEMO_USER_ID) {
+    throw new Error(
+      "Sessões reais não podem ser emitidas para o modo demonstração."
+    );
+  }
+
   const token = crypto.randomBytes(24).toString("hex");
+  const maxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24;
   const store = getMemoryStore();
   store.sessions.set(token, userId);
   store.sessionCreatedAt.set(token, Date.now());
-  await ormCreateSession(token, userId).catch(() => {});
+  await ormCreateSession(token, userId, maxAge * 1000).catch(() => {});
 
   const cookieStore = await cookies();
-  const maxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24;
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -218,31 +231,20 @@ async function createSessionCookie(
     maxAge,
   });
 
-  // Emite ou renova cookie assinado de dispositivo conhecido apenas para contas reais
-  if (userId !== DEMO_USER_ID) {
-    const deviceCookie = signKnownDeviceCookie(
-      existingKnownDeviceId ?? undefined
-    );
-    cookieStore.set(KNOWN_DEVICE_COOKIE_NAME, deviceCookie, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 90,
-    });
-  }
+  // Emite ou renova cookie assinado de dispositivo conhecido para contas reais
+  const deviceCookie = signKnownDeviceCookie(
+    existingKnownDeviceId ?? undefined
+  );
+  cookieStore.set(KNOWN_DEVICE_COOKIE_NAME, deviceCookie, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 90,
+  });
 
-  if (userId === DEMO_USER_ID) {
-    cookieStore.set(DEMO_SESSION_COOKIE_NAME, "true", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge,
-    });
-  } else {
-    cookieStore.delete(DEMO_SESSION_COOKIE_NAME);
-  }
+  // Garante isolamento: login real sempre remove eventual cookie de demonstração
+  cookieStore.delete(DEMO_SESSION_COOKIE_NAME);
 
   // Sincroniza os cookies com as preferências salvas no perfil do usuário (valendo entre dispositivos)
   const ws = store.usersById.get(userId);
@@ -259,41 +261,57 @@ async function createSessionCookie(
   return token;
 }
 
+/**
+ * Inicia a demonstração 100% somente leitura e stateless via cookie assinado HMAC.
+ * Zero acessos ao Cloudflare D1, zero hash de senha, zero conta demo real.
+ */
 export async function signInDemoAction(): Promise<
   { ok: true; redirectTo: string } | { ok: false; error: string }
 > {
-  if (!isDemoSessionAllowed()) {
+  if (!isDemoEnabled()) {
     return {
       ok: false,
-      error: "Sessão demonstrativa desativada em produção.",
+      error: "A biblioteca demonstrativa está desativada no momento.",
     };
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (supabaseUrl && supabaseAnonKey) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 2500);
-      await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: supabaseAnonKey,
-        },
-        body: JSON.stringify({
-          email: "demo@readingflow.local",
-          password: process.env.DEMO_USER_PASSWORD ?? "demo1234",
-        }),
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timeout));
-    } catch {
-      // Fallback automático para a sessão demonstrativa local via cookie rf_demo_session=true
-    }
+  let hdrs: Awaited<ReturnType<typeof headers>> | null = null;
+  try {
+    hdrs = await headers();
+  } catch {
+    hdrs = null;
+  }
+  const clientIp = extractTrustedClientIp(hdrs);
+  const rateCheck = checkDemoCreationRateLimit(clientIp);
+  if (!rateCheck.allowed) {
+    return {
+      ok: false,
+      error:
+        "Muitas tentativas de acesso à demonstração. Aguarde alguns instantes e tente novamente.",
+    };
   }
 
-  await createSessionCookie(DEMO_USER_ID, true);
+  let signed: ReturnType<typeof signDemoSessionToken>;
+  try {
+    signed = signDemoSessionToken();
+  } catch {
+    return {
+      ok: false,
+      error: "A biblioteca demonstrativa está temporariamente indisponível.",
+    };
+  }
+
+  const cookieStore = await cookies();
+  // Isolamento: entrar na demonstração limpa eventual sessão real para evitar mistura de contextos
+  cookieStore.delete(SESSION_COOKIE_NAME);
+  cookieStore.set(DEMO_SESSION_COOKIE_NAME, signed.token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: signed.maxAgeSeconds,
+  });
+
   revalidatePath("/", "layout");
   return { ok: true, redirectTo: "/painel" };
 }
@@ -408,10 +426,13 @@ export async function signInWithEmailAction(
         }
       }
 
-      // 3. Verificação em tempo equalizado (sempre executa scrypt, mesmo para e-mails inexistentes)
+      // 3. Verificação em tempo equalizado (sempre executa PBKDF2, mesmo para e-mails inexistentes)
       const store = getMemoryStore();
       const userId = store.userIdByEmail.get(normalizedEmail);
-      const ws = userId ? store.usersById.get(userId) : undefined;
+      const ws =
+        (userId ? store.usersById.get(userId) : undefined) ??
+        (await hydrateUserFromD1ByEmail(normalizedEmail)) ??
+        undefined;
 
       const targetHash = ws ? ws.passwordHashSim : DUMMY_PASSWORD_HASH;
       const passwordValid = await verifyPasswordAsync(
@@ -669,9 +690,12 @@ export async function signUpAction(
   }
 
   const store = getMemoryStore();
-  // Anti-enumeração: se o e-mail já existe, NÃO informa erro nem sobrescreve a conta.
+  // Anti-enumeração: se o e-mail já existe (memória ou D1), NÃO informa erro nem sobrescreve a conta.
   // Executa trabalho equivalente de hash, envia aviso silencioso ao dono e retorna resposta uniforme.
-  if (store.userIdByEmail.has(emailKey)) {
+  const existsInDb =
+    store.userIdByEmail.has(emailKey) ||
+    Boolean(await ormFindUserByEmail(emailKey).catch(() => null));
+  if (existsInDb) {
     await hashPasswordAsync(parsed.data.password);
     await dispatchAuthEmail({
       kind: "signup_existing_account_notice",
@@ -1096,6 +1120,9 @@ export async function changePasswordAction(
   const startedAtMs = performance.now();
   const ctx = await readSafeRequestContext(internalContext);
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR, statusCode: 403 };
+  }
 
   const parsed = changePasswordSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -1419,6 +1446,9 @@ export async function completeOnboardingAction(rawInput: {
   annualTargetBooks?: number;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = onboardingSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -1504,7 +1534,7 @@ export async function updateThemePreferencesAction(rawInput: {
   });
 
   const ws = await getAuthenticatedWorkspace();
-  if (ws) {
+  if (ws && !isDemoWorkspace(ws)) {
     ws.profile = {
       ...ws.profile,
       ...(nextTheme ? { theme: nextTheme } : {}),
@@ -1533,7 +1563,7 @@ export async function updateThemePreferencesAction(rawInput: {
     density: nextDensity,
     motion: nextMotion,
     fx: nextFx,
-    persistedToProfile: Boolean(ws),
+    persistedToProfile: Boolean(ws && !isDemoWorkspace(ws)),
   };
 }
 
@@ -1554,6 +1584,9 @@ export async function updateAmbientPreferencesAction(
 
   const normalized = normalizeAmbientPreferences(parsed.data);
   const ws = await getAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   if (ws) {
     ws.profile = {
       ...ws.profile,
@@ -1581,6 +1614,9 @@ export async function updateProfileAction(rawInput: {
   telemetryOptOut?: boolean;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = updateProfileSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -1692,6 +1728,9 @@ export async function deleteMyAccountAction(rawInput: {
   { ok: true; retentionNotice: string } | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = deleteAccountSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -1736,6 +1775,9 @@ export async function undoLastAction(): Promise<
   { ok: true; message: string } | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   if (!ws.lastUndoAction) {
     return {
       ok: false,

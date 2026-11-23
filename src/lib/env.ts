@@ -4,7 +4,7 @@ const serverEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
-  NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   GOOGLE_BOOKS_API_KEY: z.string().optional(),
   HARDCOVER_API_TOKEN: z.string().optional(),
   /** Feature flag para Apple Books / iTunes Search (desligado por padrão). */

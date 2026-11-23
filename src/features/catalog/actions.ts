@@ -2,10 +2,12 @@
 
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
 import {
   deleteEditionUploadedCovers,
   getCatalogPipelineForWorkspace,
   invalidateUserWorkspaceCache,
+  isDemoWorkspace,
   requireAuthenticatedWorkspace,
   saveUndoSnapshot,
   saveUserUploadedCover,
@@ -73,6 +75,9 @@ export async function lookupBookByIsbnAction(rawInput: {
   { ok: true; result: CatalogLookupResult } | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = isbnLookupSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -151,6 +156,9 @@ export async function addBookToLibraryAction(rawInput: unknown): Promise<
     }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = addBookSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -438,6 +446,9 @@ export async function updateBookMetadataAction(
   rawInput: unknown
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = updateBookMetadataSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
@@ -616,6 +627,9 @@ export async function updateEditionCoverAction(rawInput: unknown): Promise<
   | { ok: false; error: string }
 > {
   const ws = await requireAuthenticatedWorkspace();
+  if (isDemoWorkspace(ws)) {
+    return { ok: false, error: DEMO_READONLY_ERROR };
+  }
   const parsed = updateEditionCoverSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
