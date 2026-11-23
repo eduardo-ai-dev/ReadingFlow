@@ -47,7 +47,10 @@ import { updateReadingProgressAction } from "@/features/reading/actions";
 import { upsertReviewAction } from "@/features/ratings/actions";
 import { addWishlistItemAction } from "@/features/wishlist/actions";
 import { GET as getExportRoute } from "@/app/api/export/route";
-import { GET as getCoversSearchRoute } from "@/app/api/covers/search/route";
+import {
+  GET as getCoversSearchRoute,
+  POST as postCoversSearchRoute,
+} from "@/app/api/covers/search/route";
 import { GET as getCatalogSearchRoute } from "@/app/api/catalog/search/route";
 
 describe("Demonstração segura somente leitura e stateless (zero D1)", () => {
@@ -137,16 +140,45 @@ describe("Demonstração segura somente leitura e stateless (zero D1)", () => {
       }
     }
 
-    // Rotas API de export e busca de terceiros também retornam 403 na demo
+    // Exportação e busca de catálogo de escrita continuam retornando 403 na demo;
+    // GET /api/covers/search funciona em modo somente leitura (ignorando nocache=1, zero D1),
+    // enquanto POST /api/covers/search (mutação) permanece bloqueado com 403.
     const exportRes = await getExportRoute(
       new NextRequest("https://example.test/api/export?format=json")
     );
     expect(exportRes.status).toBe(403);
 
-    const coverSearchRes = await getCoversSearchRoute(
-      new NextRequest("https://example.test/api/covers/search?title=Dom")
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ items: [], docs: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
     );
-    expect(coverSearchRes.status).toBe(403);
+    const coverSearchRes = await getCoversSearchRoute(
+      new NextRequest(
+        "https://example.test/api/covers/search?title=Dom&nocache=1"
+      )
+    );
+    fetchSpy.mockRestore();
+    expect(coverSearchRes.status).toBe(200);
+    const coverBody = (await coverSearchRes.json()) as {
+      candidates: unknown[];
+      code?: string;
+    };
+    expect(Array.isArray(coverBody.candidates)).toBe(true);
+    expect(coverBody.code).not.toBe("DEMO_READONLY");
+
+    const postCoverRes = await postCoversSearchRoute(
+      new NextRequest("https://example.test/api/covers/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: "https://covers.openlibrary.org/b/id/1-L.jpg",
+        }),
+      })
+    );
+    expect(postCoverRes.status).toBe(403);
 
     const catalogSearchRes = await getCatalogSearchRoute(
       new NextRequest("https://example.test/api/catalog/search?q=Dom")

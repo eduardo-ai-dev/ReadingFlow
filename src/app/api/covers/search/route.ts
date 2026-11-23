@@ -70,12 +70,7 @@ export async function GET(request: NextRequest) {
         { status: 401, headers: PRIVATE_NO_STORE }
       );
     }
-    if (isDemoWorkspace(ws)) {
-      return NextResponse.json(
-        { error: DEMO_READONLY_ERROR, code: DEMO_READONLY_CODE },
-        { status: 403, headers: PRIVATE_NO_STORE }
-      );
-    }
+    const isDemo = isDemoWorkspace(ws);
 
     const rawParams = {
       title: request.nextUrl.searchParams.get("title") ?? undefined,
@@ -133,21 +128,24 @@ export async function GET(request: NextRequest) {
       ? sanitizePlainText(parsed.data.isbn, 24)
       : undefined;
 
+    // Sessões demonstrativas executam busca em modo estritamente somente leitura:
+    // ignoram `nocache=1` e não gravam no cache nem no D1.
+    const bypassCache = isDemo ? false : parsed.data.nocache === "1";
+
     const result = await searchBookCovers({
       title: cleanTitle,
       author: cleanAuthor,
       isbn: cleanIsbn,
       format: parsed.data.format ?? "book",
-      bypassCache: parsed.data.nocache === "1",
+      bypassCache,
+      skipCacheWrite: isDemo,
     });
 
     return NextResponse.json(result, {
       status: 200,
       headers: {
         "Cache-Control":
-          parsed.data.nocache === "1" ||
-          result.degraded ||
-          result.apiUnavailable
+          bypassCache || result.degraded || result.apiUnavailable
             ? "private, no-store"
             : "private, max-age=120, stale-while-revalidate=600",
       },

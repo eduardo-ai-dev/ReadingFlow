@@ -16,6 +16,7 @@ import {
 import { GlobalSearchBar } from "@/components/GlobalSearchBar";
 import { Button } from "@/components/ui/Button";
 import { LibraryBackdrop } from "@/components/layout/LibraryBackdrop";
+import { DemoSessionProvider } from "@/components/DemoSessionContext";
 import { Plus, User, Settings, LogOut, Menu, X } from "lucide-react";
 
 const MOBILE_BOTTOM_NAV = [
@@ -371,7 +372,7 @@ export function AppShell({
             </aside>
           ) : null}
           <UndoBanner undoInfo={undoInfo} />
-          {children}
+          <DemoSessionProvider isDemo={isDemo}>{children}</DemoSessionProvider>
         </main>
       </div>
 

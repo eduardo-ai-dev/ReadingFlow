@@ -21,7 +21,9 @@ import {
   CoverEditionPicker,
   type CoverSelectionPayload,
 } from "@/components/CoverEditionPicker";
+import { useIsDemoSession } from "@/components/DemoSessionContext";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 
 export interface BackfillBookTarget {
@@ -70,6 +72,7 @@ export function BackfillCoversModal({
   variant?: "pill" | "button";
 }) {
   const router = useRouter();
+  const isDemoSession = useIsDemoSession();
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<"idle" | "scanning" | "review" | "done">(
     "idle"
@@ -214,13 +217,13 @@ export function BackfillCoversModal({
           break;
         }
 
-        // Só aplica automático quando a correspondência for inequívoca (título e autor batem ou ISBN exato)
+        // Só aplica automático quando a correspondência for inequívoca e fora da demonstração somente leitura
         const unambiguous = isUnambiguousCoverMatch(
           { title: book.title, author: book.author, isbn: book.isbn },
           candidates
         );
 
-        if (unambiguous) {
+        if (unambiguous && !isDemoSession) {
           const saved = await updateEditionCoverAction({
             editionId: book.editionId,
             coverUrl: unambiguous.coverUrl,
@@ -246,7 +249,7 @@ export function BackfillCoversModal({
             candidates,
             diagnostic,
             apiUnavailable,
-            notice,
+            notice: isDemoSession && unambiguous ? DEMO_READONLY_ERROR : notice,
           });
         }
 
@@ -287,6 +290,11 @@ export function BackfillCoversModal({
     if (!payload.coverUrl) {
       setSkippedCount((c) => c + 1);
       advanceReview();
+      return;
+    }
+
+    if (isDemoSession) {
+      setErrorMessage(DEMO_READONLY_ERROR);
       return;
     }
 

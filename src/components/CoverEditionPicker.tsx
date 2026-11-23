@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { BookCover } from "@/components/BookCover";
+import { useIsDemoSession } from "@/components/DemoSessionContext";
 import { processCoverFile } from "@/features/catalog/cover-upload";
 import {
   isUnambiguousCoverMatch,
@@ -60,6 +61,8 @@ export interface CoverEditionPickerProps {
   confirmLabel?: string;
   /** Em fluxos de edição ("Trocar capa"), mostra estado de salvamento externo. */
   isSaving?: boolean;
+  /** Sobrescreve detecção de modo demonstração somente leitura (padrão: contexto do AppShell). */
+  isDemo?: boolean;
   onApply: (selection: CoverEditionPickerSelection) => void;
 }
 
@@ -90,8 +93,11 @@ export function CoverEditionPicker({
   autoSearch = true,
   confirmLabel = "Usar esta capa",
   isSaving = false,
+  isDemo,
   onApply,
 }: CoverEditionPickerProps) {
+  const isDemoContext = useIsDemoSession();
+  const isDemoReadOnly = isDemo ?? isDemoContext;
   const fileInputId = useId();
   const titleInputId = useId();
   const authorInputId = useId();
@@ -219,7 +225,11 @@ export function CoverEditionPicker({
       if (cleanTitle) params.set("title", cleanTitle);
       if (cleanAuthor) params.set("author", cleanAuthor);
       if (cleanIsbn) params.set("isbn", cleanIsbn);
-      if (opts?.bypassCache && serverErrorLockedKey !== queryKey) {
+      if (
+        opts?.bypassCache &&
+        !isDemoReadOnly &&
+        serverErrorLockedKey !== queryKey
+      ) {
         params.set("nocache", "1");
       }
 
@@ -297,7 +307,8 @@ export function CoverEditionPicker({
         }
 
         // Se não há capa salva e o resultado trouxe match inequívoco (ex.: "ol: 1 ok"),
-        // persiste automaticamente via onApply para não ficar em fallback.
+        // persiste automaticamente via onApply em contas reais. Na demonstração somente leitura,
+        // apenas pré-seleciona o card sem disparar gravação no banco.
         const unambiguous = !selectedCoverUrl
           ? isUnambiguousCoverMatch(
               {
@@ -311,13 +322,15 @@ export function CoverEditionPicker({
 
         if (unambiguous) {
           setSelectedId(unambiguous.id);
-          onApply({
-            coverUrl: unambiguous.coverUrl,
-            coverSource: unambiguous.source,
-            candidate: unambiguous,
-            pageCount:
-              unambiguous.pageCount ?? safePayload.pageCount ?? undefined,
-          });
+          if (!isDemoReadOnly) {
+            onApply({
+              coverUrl: unambiguous.coverUrl,
+              coverSource: unambiguous.source,
+              candidate: unambiguous,
+              pageCount:
+                unambiguous.pageCount ?? safePayload.pageCount ?? undefined,
+            });
+          }
         } else {
           // "Usar esta capa" só habilita com uma candidata selecionada:
           // só mantém seleção se a candidata já selecionada continuar na lista
@@ -342,6 +355,7 @@ export function CoverEditionPicker({
       searchTitle,
       searchAuthor,
       searchIsbn,
+      isDemoReadOnly,
       serverErrorLockedKey,
       effectiveSeed,
       title,

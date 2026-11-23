@@ -77,6 +77,8 @@ export interface CoverSearchOptions {
   pauseBetweenCallsMs?: number;
   /** Ignora cache em memória e cooldown de provedor. */
   bypassCache?: boolean;
+  /** Quando true (ex.: sessão demonstrativa), não grava novos resultados no cache em memória. */
+  skipCacheWrite?: boolean;
 }
 
 /* ============================================================================
@@ -2811,7 +2813,7 @@ export async function searchBookCovers(
     ...(isDev ? { diagnostic } : {}),
   };
 
-  if (!params.bypassCache) {
+  if (!params.bypassCache && !params.skipCacheWrite) {
     writeCache(cacheKey, response);
   }
   return response;

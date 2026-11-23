@@ -2,11 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mockGetAuthenticatedWorkspace = vi.fn();
+const mockIsDemoWorkspace = vi.fn();
 const mockSearchBookCovers = vi.fn();
 
 vi.mock("@/server/store/memory-repository", () => ({
   getAuthenticatedWorkspace: () => mockGetAuthenticatedWorkspace(),
-  isDemoWorkspace: () => false,
+  isDemoWorkspace: (ws: unknown) => mockIsDemoWorkspace(ws),
 }));
 
 vi.mock("@/server/catalog/cover-search", async (importOriginal) => {
@@ -23,10 +24,12 @@ import { GET } from "@/app/api/covers/search/route";
 describe("Degradação graciosa da rota GET /api/covers/search (sem HTTP 500)", () => {
   beforeEach(() => {
     mockGetAuthenticatedWorkspace.mockReset();
+    mockIsDemoWorkspace.mockReset();
     mockSearchBookCovers.mockReset();
     mockGetAuthenticatedWorkspace.mockResolvedValue({
       profile: { id: "user-route-test-1" },
     });
+    mockIsDemoWorkspace.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -106,6 +109,34 @@ describe("Degradação graciosa da rota GET /api/covers/search (sem HTTP 500)", 
     expect(errSpy).toHaveBeenCalledWith(
       "[covers/search]",
       expect.objectContaining({ method: "GET" })
+    );
+  });
+
+  it("permite GET /api/covers/search em sessão demonstrativa em modo somente leitura, ignorando nocache=1 e sem gravar cache", async () => {
+    mockGetAuthenticatedWorkspace.mockResolvedValueOnce({
+      profile: { id: "user-demo-acervo" },
+    });
+    mockIsDemoWorkspace.mockReturnValueOnce(true);
+    mockSearchBookCovers.mockResolvedValueOnce({
+      candidates: [],
+      degraded: false,
+      googleRateLimited: false,
+      apiUnavailable: false,
+      fallbackToManualUpload: true,
+    });
+
+    const req = new NextRequest(
+      "https://readingflow.app/api/covers/search?title=Dom%20Casmurro&nocache=1"
+    );
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(mockSearchBookCovers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Dom Casmurro",
+        bypassCache: false,
+        skipCacheWrite: true,
+      })
     );
   });
 });
