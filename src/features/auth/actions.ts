@@ -218,17 +218,19 @@ async function createSessionCookie(
     maxAge,
   });
 
-  // Emite ou renova cookie assinado de dispositivo conhecido para mitigar DoS contra a vítima
-  const deviceCookie = signKnownDeviceCookie(
-    existingKnownDeviceId ?? undefined
-  );
-  cookieStore.set(KNOWN_DEVICE_COOKIE_NAME, deviceCookie, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 90,
-  });
+  // Emite ou renova cookie assinado de dispositivo conhecido apenas para contas reais
+  if (userId !== DEMO_USER_ID) {
+    const deviceCookie = signKnownDeviceCookie(
+      existingKnownDeviceId ?? undefined
+    );
+    cookieStore.set(KNOWN_DEVICE_COOKIE_NAME, deviceCookie, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 90,
+    });
+  }
 
   if (userId === DEMO_USER_ID) {
     cookieStore.set(DEMO_SESSION_COOKIE_NAME, "true", {
