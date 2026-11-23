@@ -61,5 +61,10 @@
     "typescript": "~5.9.3",
     "vitest": "^5.1.0",
     "wrangler": "^4.166.0"
+  },
+  "overrides": {
+    "@opennextjs/aws": {
+      "cookie": "^0.7.2"
+    }
   }
 }
