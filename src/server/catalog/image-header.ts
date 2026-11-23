@@ -183,17 +183,19 @@ function parseJpeg(bytes: Uint8Array): ParsedImageHeader | null {
 /**
  * Inspeciona magic bytes e cabeçalho de uma imagem raster (PNG, JPEG, WebP ou GIF).
  * Retorna `null` para payloads corrompidos, SVG, HTML ou formatos não suportados.
+ * Nunca lança exceção em payloads truncados ou malformados.
  */
 export function inspectImageHeader(
-  input: Uint8Array | Buffer
+  input: Uint8Array | ArrayBuffer
 ): ParsedImageHeader | null {
-  const bytes =
-    input instanceof Uint8Array
-      ? input
-      : new Uint8Array(input as ArrayBufferLike);
-  if (bytes.byteLength < 10) return null;
+  try {
+    const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+    if (bytes.byteLength < 10) return null;
 
-  return (
-    parsePng(bytes) ?? parseWebp(bytes) ?? parseJpeg(bytes) ?? parseGif(bytes)
-  );
+    return (
+      parsePng(bytes) ?? parseWebp(bytes) ?? parseJpeg(bytes) ?? parseGif(bytes)
+    );
+  } catch {
+    return null;
+  }
 }

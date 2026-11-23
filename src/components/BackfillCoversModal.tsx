@@ -146,31 +146,39 @@ export function BackfillCoversModal({
         let apiUnavailable = false;
         let notice: string | null = null;
 
+        let abortedByServerError = false;
         try {
           const res = await fetch(`/api/covers/search?${sp.toString()}`, {
             signal: controller.signal,
             headers: { Accept: "application/json" },
           });
-          const data = (await res.json()) as {
-            candidates?: CoverSearchCandidate[];
-            pageCount?: number;
-            degraded?: boolean;
-            apiUnavailable?: boolean;
-            notice?: string;
-            diagnostic?: CoverSearchDiagnostic;
-          };
-          candidates = Array.isArray(data.candidates)
-            ? data.candidates.slice(0, 8)
-            : [];
-          resolvedPageCount = data.pageCount;
-          diagnostic = data.diagnostic ?? null;
-          notice = data.notice ?? null;
-          apiUnavailable = Boolean(
-            data.apiUnavailable ||
-            res.status === 429 ||
-            res.status === 403 ||
-            (data.degraded && candidates.length === 0)
-          );
+          if (res.status >= 500) {
+            abortedByServerError = true;
+            setErrorMessage(
+              "O serviço de busca de capas está temporariamente indisponível. A varredura foi interrompida para evitar falhas repetidas."
+            );
+          } else {
+            const data = (await res.json()) as {
+              candidates?: CoverSearchCandidate[];
+              pageCount?: number;
+              degraded?: boolean;
+              apiUnavailable?: boolean;
+              notice?: string;
+              diagnostic?: CoverSearchDiagnostic;
+            };
+            candidates = Array.isArray(data.candidates)
+              ? data.candidates.slice(0, 8)
+              : [];
+            resolvedPageCount = data.pageCount;
+            diagnostic = data.diagnostic ?? null;
+            notice = data.notice ?? null;
+            apiUnavailable = Boolean(
+              data.apiUnavailable ||
+              res.status === 429 ||
+              res.status === 403 ||
+              (data.degraded && candidates.length === 0)
+            );
+          }
 
           const badge =
             diagnostic?.badgePtBr?.trim() || diagnostic?.reasonPtBr?.trim();
@@ -199,6 +207,11 @@ export function BackfillCoversModal({
           candidates = [];
           apiUnavailable = true;
           notice = "Serviço indisponível, tentar de novo.";
+        }
+
+        if (abortedByServerError) {
+          setProcessedCount(i + 1);
+          break;
         }
 
         // Só aplica automático quando a correspondência for inequívoca (título e autor batem ou ISBN exato)

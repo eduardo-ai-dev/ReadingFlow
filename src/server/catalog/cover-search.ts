@@ -214,13 +214,71 @@ async function pausePolite(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+function formatSafeCoverError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  return raw
+    .replace(/([?&]key=)[^&\s]+/gi, "$1[redacted]")
+    .replace(/(Bearer\s+)\S+/gi, "$1[redacted]")
+    .slice(0, 300);
+}
+
+function logCoverSearchError(
+  context: Record<string, unknown>,
+  err: unknown
+): void {
+  console.error("[covers/search]", {
+    ...context,
+    message: formatSafeCoverError(err),
+  });
+}
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    out[i] = binary.charCodeAt(i);
+  }
+  return out;
+}
+
+function createTimeoutController(
+  timeoutMs: number,
+  externalSignal?: AbortSignal
+): { signal: AbortSignal; cleanup: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new Error(`Timeout after ${timeoutMs}ms`));
+  }, timeoutMs);
+
+  const onExternalAbort = () => {
+    controller.abort(externalSignal?.reason);
+  };
+
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      clearTimeout(timer);
+      controller.abort(externalSignal.reason);
+    } else {
+      externalSignal.addEventListener("abort", onExternalAbort, { once: true });
+    }
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      clearTimeout(timer);
+      externalSignal?.removeEventListener("abort", onExternalAbort);
+    },
+  };
+}
+
 /**
  * Executa fetch com retry e exponential backoff leve para erros transitórios (429/502/503/504)
  * quando `enableRetry` está ativo (desativado apenas quando `pauseBetweenCallsMs === 0` em mocks).
  */
 async function fetchWithRetry(
   url: URL | string,
-  init: RequestInit & { next?: { revalidate?: number } },
+  init: RequestInit,
   options: {
     fetchImpl: typeof fetch;
     signal: AbortSignal;
@@ -282,7 +340,6 @@ export async function probeCoverImageDimensions(
       headers: {
         Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
       },
-      next: { revalidate: 86400 },
     });
 
     if (!res.ok) {
@@ -304,7 +361,13 @@ export async function probeCoverImageDimensions(
       return { ok: false, url: safeUrl, reason: "quality_filter" };
     }
 
-    const meta = inspectImageHeader(new Uint8Array(arrayBuf));
+    let meta: ReturnType<typeof inspectImageHeader> = null;
+    try {
+      meta = inspectImageHeader(new Uint8Array(arrayBuf));
+    } catch (err) {
+      logCoverSearchError({ stage: "probe_image_header" }, err);
+      meta = null;
+    }
     const width = meta?.width;
     const height = meta?.height;
 
@@ -343,13 +406,14 @@ export async function probeCoverImageDimensions(
       width,
       height,
     };
-  } catch {
+  } catch (err) {
+    logCoverSearchError({ stage: "probe_cover" }, err);
     return { ok: false, url: safeUrl, reason: "http_error" };
   }
 }
 
 /**
- * Valida a dimensão com `sharp` APENAS da candidata escolhida pelo usuário (ou pelo backfill).
+ * Valida a dimensão da imagem APENAS da candidata escolhida pelo usuário (ou pelo backfill).
  * Garante que a imagem escolhida existe, não é um pixel 1x1 nem um placeholder corrompido.
  */
 export async function validateChosenCoverWithSharp(
@@ -373,8 +437,8 @@ export async function validateChosenCoverWithSharp(
     try {
       const commaIdx = trimmed.indexOf(",");
       if (commaIdx < 0) return { ok: false, error: "Data URL inválida." };
-      const buf = Buffer.from(trimmed.slice(commaIdx + 1), "base64");
-      const meta = inspectImageHeader(buf);
+      const bytes = base64ToUint8Array(trimmed.slice(commaIdx + 1));
+      const meta = inspectImageHeader(bytes);
       if (!meta || meta.width <= 10 || meta.height <= 10) {
         return {
           ok: false,
@@ -382,7 +446,8 @@ export async function validateChosenCoverWithSharp(
         };
       }
       return { ok: true, width: meta.width, height: meta.height };
-    } catch {
+    } catch (err) {
+      logCoverSearchError({ stage: "validate_data_url_header" }, err);
       return { ok: false, error: "Não foi possível validar a imagem enviada." };
     }
   }
@@ -398,11 +463,11 @@ export async function validateChosenCoverWithSharp(
   // Em ambiente de teste unitário sem rede real, não bloqueia URLs sintéticas se o fetch falhar
   const isTestEnv = process.env.NODE_ENV === "test";
   const fetchImpl = options?.fetchImpl ?? fetch;
-  const signal = options?.signal ?? AbortSignal.timeout(4500);
+  const timeoutCtx = createTimeoutController(4500, options?.signal);
 
   try {
     const res = await fetchImpl(safeUrl, {
-      signal,
+      signal: timeoutCtx.signal,
       headers: {
         Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
       },
@@ -415,15 +480,21 @@ export async function validateChosenCoverWithSharp(
       };
     }
 
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.byteLength === 0 || buf.byteLength > PROBE_MAX_BYTES) {
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.byteLength === 0 || bytes.byteLength > PROBE_MAX_BYTES) {
       return {
         ok: false,
         error: "A imagem da capa escolhida está vazia ou excede 5 MB.",
       };
     }
 
-    const meta = inspectImageHeader(buf);
+    let meta: ReturnType<typeof inspectImageHeader> = null;
+    try {
+      meta = inspectImageHeader(bytes);
+    } catch (err) {
+      logCoverSearchError({ stage: "validate_remote_header" }, err);
+      meta = null;
+    }
     if (!meta || meta.width <= 10 || meta.height <= 10) {
       return {
         ok: false,
@@ -433,9 +504,12 @@ export async function validateChosenCoverWithSharp(
     }
 
     return { ok: true, width: meta.width, height: meta.height };
-  } catch {
+  } catch (err) {
+    logCoverSearchError({ stage: "validate_chosen_cover" }, err);
     if (isTestEnv) return { ok: true };
     return { ok: true };
+  } finally {
+    timeoutCtx.cleanup();
   }
 }
 
@@ -508,7 +582,6 @@ async function fetchBrasilApiByIsbn(params: {
       `https://brasilapi.com.br/api/isbn/v1/${params.isbn}`,
       {
         headers: { Accept: "application/json" },
-        next: { revalidate: 86400 },
       },
       {
         fetchImpl: params.fetchImpl,
@@ -691,7 +764,8 @@ async function fetchBrasilApiByIsbn(params: {
         pageCountFound: pageCount,
       },
     };
-  } catch {
+  } catch (err) {
+    logCoverSearchError({ provider: "brasilapi", strategy: "isbn" }, err);
     return {
       candidates: [],
       attempt: {
@@ -833,7 +907,6 @@ async function fetchGoogleCoverCandidates(params: {
       url,
       {
         headers: { Accept: "application/json" },
-        next: { revalidate: 86400 },
       },
       {
         fetchImpl: params.fetchImpl,
@@ -1029,7 +1102,8 @@ async function fetchGoogleCoverCandidates(params: {
         pageCountFound: firstPageCount,
       },
     };
-  } catch {
+  } catch (err) {
+    logCoverSearchError({ provider: "google", strategy: params.strategy }, err);
     return {
       candidates: [],
       rateLimited: false,
@@ -1120,7 +1194,6 @@ async function fetchOpenLibraryByIsbn(params: {
           Accept: "application/json",
           "User-Agent": params.userAgent,
         },
-        next: { revalidate: 86400 },
       },
       {
         fetchImpl: params.fetchImpl,
@@ -1150,7 +1223,11 @@ async function fetchOpenLibraryByIsbn(params: {
         docCoverId = doc.cover_i;
       }
     }
-  } catch {
+  } catch (err) {
+    logCoverSearchError(
+      { provider: "openlibrary", strategy: "isbn_meta" },
+      err
+    );
     // Segue com URL direta por ISBN
   }
 
@@ -1303,7 +1380,6 @@ async function fetchOpenLibraryByTitleAuthor(params: {
           Accept: "application/json",
           "User-Agent": params.userAgent,
         },
-        next: { revalidate: 86400 },
       },
       {
         fetchImpl: params.fetchImpl,
@@ -1596,7 +1672,11 @@ async function fetchOpenLibraryByTitleAuthor(params: {
         queries: queryLogs,
       },
     };
-  } catch {
+  } catch (err) {
+    logCoverSearchError(
+      { provider: "openlibrary", strategy: "openlibrary_search" },
+      err
+    );
     return {
       candidates: [],
       attempt: {
@@ -1782,7 +1862,6 @@ async function fetchHardcoverCovers(params: {
           Authorization: buildHardcoverAuthHeader(params.token),
         },
         body: JSON.stringify({ query, variables }),
-        next: { revalidate: 86400 },
       },
       {
         fetchImpl: params.fetchImpl,
@@ -2015,7 +2094,11 @@ async function fetchHardcoverCovers(params: {
         pageCountFound: firstPageCount,
       },
     };
-  } catch {
+  } catch (err) {
+    logCoverSearchError(
+      { provider: "hardcover", strategy: isByIsbn ? "isbn" : "hardcover" },
+      err
+    );
     return {
       candidates: [],
       attempt: {
@@ -2095,7 +2178,6 @@ async function fetchAppleItunesCovers(params: {
       url,
       {
         headers: { Accept: "application/json" },
-        next: { revalidate: 86400 },
       },
       {
         fetchImpl: params.fetchImpl,
@@ -2249,7 +2331,8 @@ async function fetchAppleItunesCovers(params: {
         rejectedByMissingImageLinks,
       },
     };
-  } catch {
+  } catch (err) {
+    logCoverSearchError({ provider: "apple", strategy: "apple" }, err);
     return {
       candidates: [],
       attempt: {
@@ -2325,12 +2408,11 @@ export async function searchBookCovers(
     if (cached) return cached;
   }
 
-  const timeoutSignal = AbortSignal.timeout(
-    Math.max(9000, env.CATALOG_LOOKUP_TIMEOUT_MS * 2.5)
+  const timeoutCtx = createTimeoutController(
+    Math.max(9000, env.CATALOG_LOOKUP_TIMEOUT_MS * 2.5),
+    params.signal
   );
-  const signal = params.signal
-    ? AbortSignal.any([params.signal, timeoutSignal])
-    : timeoutSignal;
+  const signal = timeoutCtx.signal;
 
   const collected: CoverSearchCandidate[] = [];
   const attempts: CoverProviderAttemptDiagnostic[] = [];
@@ -2345,215 +2427,305 @@ export async function searchBookCovers(
     callsMade += 1;
   };
 
-  // =========================================================================
-  // ESTRATÉGIA 1 — COM ISBN:
-  // BrasilAPI -> Google Books -> Open Library (?default=false) -> Hardcover
-  // =========================================================================
-  if (normalizedIsbn) {
-    await politeStep();
-    const br = await fetchBrasilApiByIsbn({
-      isbn: normalizedIsbn,
-      requestedAuthor: cleanAuthor || undefined,
-      fetchImpl,
-      customProbe,
-      enableRetry,
-      signal,
-    });
-    attempts.push(br.attempt);
-    if (br.pageCount && !resolvedPageCount) resolvedPageCount = br.pageCount;
-    collected.push(...br.candidates);
-
-    if (collected.length === 0) {
-      await politeStep();
-      const gbIsbn = await fetchGoogleCoverCandidates({
-        query: `isbn:${normalizedIsbn}`,
-        strategy: "isbn",
-        langRestrictPt: false,
-        requestedAuthor: cleanAuthor || undefined,
-        apiKey: env.GOOGLE_BOOKS_API_KEY,
-        maxVolumes: 4,
-        fetchImpl,
-        customProbe,
-        enableRetry,
-        bypassCooldown,
-        signal,
-      });
-      attempts.push(gbIsbn.attempt);
-      if (gbIsbn.rateLimited) googleRateLimited = true;
-      if (gbIsbn.pageCount && !resolvedPageCount) {
-        resolvedPageCount = gbIsbn.pageCount;
-      }
-      collected.push(...gbIsbn.candidates);
+  const runProviderSafely = async <
+    T extends {
+      candidates: CoverSearchCandidate[];
+      pageCount?: number;
+      rateLimited?: boolean;
+      attempt: CoverProviderAttemptDiagnostic;
+    },
+  >(
+    provider: CoverProviderSource,
+    strategy: CoverProviderAttemptDiagnostic["strategy"],
+    query: string,
+    fn: () => Promise<T>
+  ): Promise<{
+    candidates: CoverSearchCandidate[];
+    pageCount?: number;
+    rateLimited?: boolean;
+    attempt: CoverProviderAttemptDiagnostic;
+  }> => {
+    try {
+      return await fn();
+    } catch (err) {
+      logCoverSearchError({ provider, strategy }, err);
+      return {
+        candidates: [],
+        rateLimited: false,
+        attempt: {
+          provider,
+          status: "api_error",
+          strategy,
+          query,
+          detail: "falha inesperada ao consultar provedor de capa",
+          totalResults: 0,
+          candidatesFound: 0,
+        },
+      };
     }
+  };
 
-    if (collected.length === 0) {
+  try {
+    // =========================================================================
+    // ESTRATÉGIA 1 — COM ISBN:
+    // BrasilAPI -> Google Books -> Open Library (?default=false) -> Hardcover
+    // =========================================================================
+    if (normalizedIsbn) {
       await politeStep();
-      const olIsbn = await fetchOpenLibraryByIsbn({
-        isbn: normalizedIsbn,
-        title: cleanTitle || undefined,
-        author: cleanAuthor || undefined,
-        userAgent: env.OPEN_LIBRARY_USER_AGENT,
-        fetchImpl,
-        probe: openLibraryIsbnProbe,
-        enableRetry,
-        bypassCooldown,
-        signal,
-      });
-      attempts.push(olIsbn.attempt);
-      if (olIsbn.pageCount && !resolvedPageCount) {
-        resolvedPageCount = olIsbn.pageCount;
-      }
-      collected.push(...olIsbn.candidates);
-    }
+      const br = await runProviderSafely(
+        "brasilapi",
+        "isbn",
+        `isbn=${normalizedIsbn}`,
+        () =>
+          fetchBrasilApiByIsbn({
+            isbn: normalizedIsbn,
+            requestedAuthor: cleanAuthor || undefined,
+            fetchImpl,
+            customProbe,
+            enableRetry,
+            signal,
+          })
+      );
+      attempts.push(br.attempt);
+      if (br.pageCount && !resolvedPageCount) resolvedPageCount = br.pageCount;
+      collected.push(...br.candidates);
 
-    if (collected.length === 0) {
-      if (hardcoverEnabled) {
+      if (collected.length === 0) {
         await politeStep();
+        const gbIsbn = await runProviderSafely(
+          "google",
+          "isbn",
+          `isbn:${normalizedIsbn}`,
+          () =>
+            fetchGoogleCoverCandidates({
+              query: `isbn:${normalizedIsbn}`,
+              strategy: "isbn",
+              langRestrictPt: false,
+              requestedAuthor: cleanAuthor || undefined,
+              apiKey: env.GOOGLE_BOOKS_API_KEY,
+              maxVolumes: 4,
+              fetchImpl,
+              customProbe,
+              enableRetry,
+              bypassCooldown,
+              signal,
+            })
+        );
+        attempts.push(gbIsbn.attempt);
+        if (gbIsbn.rateLimited) googleRateLimited = true;
+        if (gbIsbn.pageCount && !resolvedPageCount) {
+          resolvedPageCount = gbIsbn.pageCount;
+        }
+        collected.push(...gbIsbn.candidates);
       }
-      const hcIsbn = await fetchHardcoverCovers({
-        isbn: normalizedIsbn,
-        title: cleanTitle || undefined,
-        author: cleanAuthor || undefined,
-        token: env.HARDCOVER_API_TOKEN,
-        maxResults: 4,
-        fetchImpl,
-        customProbe,
-        enableRetry,
-        bypassCooldown,
-        signal,
-      });
-      attempts.push(hcIsbn.attempt);
-      if (hcIsbn.pageCount && !resolvedPageCount) {
-        resolvedPageCount = hcIsbn.pageCount;
-      }
-      collected.push(...hcIsbn.candidates);
-    }
-  }
 
-  // =========================================================================
-  // ESTRATÉGIA 2 — CASCATA POR TÍTULO / AUTOR / SOBRENOME / SÓ TÍTULO:
-  // Google Books (frases entre aspas -> sem operadores sem langRestrict -> só título)
-  // -> Open Library (`search.json`) -> Hardcover
-  // =========================================================================
-  if (cleanTitle && (!normalizedIsbn || collected.length === 0)) {
-    const googlePlans = buildGoogleBooksQueryPlan({
-      title: cleanTitle,
-      author: cleanAuthor,
-    });
-
-    for (let idx = 0; idx < googlePlans.length; idx += 1) {
-      if (googleRateLimited) break;
-      const plan = googlePlans[idx]!;
-
-      // A 1ª tentativa roda sempre; a 2ª tentativa (sem operadores e sem langRestrict=pt)
-      // e as demais rodam quando as anteriores não trouxeram candidatas suficientes.
-      if (idx >= 1 && collected.length >= 2) break;
-      if (idx >= 2 && collected.length > 0) break;
-
-      await politeStep();
-      const gbRes = await fetchGoogleCoverCandidates({
-        query: plan.query,
-        strategy: plan.strategy,
-        langRestrictPt: plan.langRestrictPt,
-        requestedAuthor: cleanAuthor || undefined,
-        apiKey: env.GOOGLE_BOOKS_API_KEY,
-        maxVolumes: 8,
-        fetchImpl,
-        customProbe,
-        enableRetry,
-        bypassCooldown: bypassCooldown && idx === 0,
-        signal,
-      });
-      attempts.push(gbRes.attempt);
-      if (gbRes.rateLimited) googleRateLimited = true;
-      if (gbRes.pageCount && !resolvedPageCount) {
-        resolvedPageCount = gbRes.pageCount;
-      }
-      collected.push(...gbRes.candidates);
-    }
-
-    // Open Library (`search.json`: título+autor -> título+sobrenome -> só título -> autor)
-    if (collected.length < COVER_MAX_CANDIDATES) {
-      await politeStep();
-      const olSearch = await fetchOpenLibraryByTitleAuthor({
-        title: cleanTitle,
-        author: cleanAuthor || undefined,
-        userAgent: env.OPEN_LIBRARY_USER_AGENT,
-        maxResults: 8,
-        fetchImpl,
-        customProbe,
-        enableRetry,
-        bypassCooldown,
-        signal,
-      });
-      attempts.push(olSearch.attempt);
-      if (olSearch.pageCount && !resolvedPageCount) {
-        resolvedPageCount = olSearch.pageCount;
-      }
-      collected.push(...olSearch.candidates);
-    }
-
-    // Hardcover (GraphQL, token só no servidor)
-    if (collected.length < COVER_MAX_CANDIDATES) {
-      if (hardcoverEnabled) {
+      if (collected.length === 0) {
         await politeStep();
+        const olIsbn = await runProviderSafely(
+          "openlibrary",
+          "isbn",
+          `isbn=${normalizedIsbn}`,
+          () =>
+            fetchOpenLibraryByIsbn({
+              isbn: normalizedIsbn,
+              title: cleanTitle || undefined,
+              author: cleanAuthor || undefined,
+              userAgent: env.OPEN_LIBRARY_USER_AGENT,
+              fetchImpl,
+              probe: openLibraryIsbnProbe,
+              enableRetry,
+              bypassCooldown,
+              signal,
+            })
+        );
+        attempts.push(olIsbn.attempt);
+        if (olIsbn.pageCount && !resolvedPageCount) {
+          resolvedPageCount = olIsbn.pageCount;
+        }
+        collected.push(...olIsbn.candidates);
       }
-      const hcTitle = await fetchHardcoverCovers({
-        title: cleanTitle,
-        author: cleanAuthor || undefined,
-        token: env.HARDCOVER_API_TOKEN,
-        maxResults: 6,
-        fetchImpl,
-        customProbe,
-        enableRetry,
-        bypassCooldown,
-        signal,
-      });
-      if (!(
-        normalizedIsbn &&
-        hcTitle.attempt.status === "skipped" &&
-        attempts.some(
-          (a) => a.provider === "hardcover" && a.status === "skipped"
-        )
-      )) {
-        attempts.push(hcTitle.attempt);
-      }
-      if (hcTitle.pageCount && !resolvedPageCount) {
-        resolvedPageCount = hcTitle.pageCount;
-      }
-      collected.push(...hcTitle.candidates);
-    }
-  }
 
-  // =========================================================================
-  // PROVEDOR OPCIONAL — APPLE (iTunes Search, country=br, ebook | audiobook)
-  // Atrás de feature flag (`ENABLE_APPLE_BOOKS_COVERS`), DESLIGADO por padrão
-  // =========================================================================
-  if (appleEnabled && collected.length < COVER_MAX_CANDIDATES) {
-    const cleanMainTitle = stripBookTitleSubtitle(cleanTitle);
-    const appleTerm = normalizedIsbn
-      ? cleanMainTitle
-        ? `${cleanMainTitle} ${cleanAuthor}`.trim()
-        : normalizedIsbn
-      : `${cleanMainTitle} ${cleanAuthor}`.trim();
-    if (appleTerm) {
-      await politeStep();
-      const appleEntity: "ebook" | "audiobook" =
-        format === "audiobook" ? "audiobook" : "ebook";
-      const appleRes = await fetchAppleItunesCovers({
-        term: appleTerm,
-        author: cleanAuthor || undefined,
-        entity: appleEntity,
-        maxResults: 6,
-        fetchImpl,
-        customProbe,
-        enableRetry,
-        bypassCooldown,
-        signal,
-      });
-      attempts.push(appleRes.attempt);
-      collected.push(...appleRes.candidates);
+      if (collected.length === 0) {
+        if (hardcoverEnabled) {
+          await politeStep();
+        }
+        const hcIsbn = await runProviderSafely(
+          "hardcover",
+          "isbn",
+          `isbn=${normalizedIsbn}`,
+          () =>
+            fetchHardcoverCovers({
+              isbn: normalizedIsbn,
+              title: cleanTitle || undefined,
+              author: cleanAuthor || undefined,
+              token: env.HARDCOVER_API_TOKEN,
+              maxResults: 4,
+              fetchImpl,
+              customProbe,
+              enableRetry,
+              bypassCooldown,
+              signal,
+            })
+        );
+        attempts.push(hcIsbn.attempt);
+        if (hcIsbn.pageCount && !resolvedPageCount) {
+          resolvedPageCount = hcIsbn.pageCount;
+        }
+        collected.push(...hcIsbn.candidates);
+      }
     }
+
+    // =========================================================================
+    // ESTRATÉGIA 2 — CASCATA POR TÍTULO / AUTOR / SOBRENOME / SÓ TÍTULO:
+    // Google Books (frases entre aspas -> sem operadores sem langRestrict -> só título)
+    // -> Open Library (`search.json`) -> Hardcover
+    // =========================================================================
+    if (cleanTitle && (!normalizedIsbn || collected.length === 0)) {
+      const googlePlans = buildGoogleBooksQueryPlan({
+        title: cleanTitle,
+        author: cleanAuthor,
+      });
+
+      for (let idx = 0; idx < googlePlans.length; idx += 1) {
+        if (googleRateLimited) break;
+        const plan = googlePlans[idx]!;
+
+        // A 1ª tentativa roda sempre; a 2ª tentativa (sem operadores e sem langRestrict=pt)
+        // e as demais rodam quando as anteriores não trouxeram candidatas suficientes.
+        if (idx >= 1 && collected.length >= 2) break;
+        if (idx >= 2 && collected.length > 0) break;
+
+        await politeStep();
+        const gbRes = await runProviderSafely(
+          "google",
+          plan.strategy,
+          plan.query,
+          () =>
+            fetchGoogleCoverCandidates({
+              query: plan.query,
+              strategy: plan.strategy,
+              langRestrictPt: plan.langRestrictPt,
+              requestedAuthor: cleanAuthor || undefined,
+              apiKey: env.GOOGLE_BOOKS_API_KEY,
+              maxVolumes: 8,
+              fetchImpl,
+              customProbe,
+              enableRetry,
+              bypassCooldown: bypassCooldown && idx === 0,
+              signal,
+            })
+        );
+        attempts.push(gbRes.attempt);
+        if (gbRes.rateLimited) googleRateLimited = true;
+        if (gbRes.pageCount && !resolvedPageCount) {
+          resolvedPageCount = gbRes.pageCount;
+        }
+        collected.push(...gbRes.candidates);
+      }
+
+      // Open Library (`search.json`: título+autor -> título+sobrenome -> só título -> autor)
+      if (collected.length < COVER_MAX_CANDIDATES) {
+        await politeStep();
+        const olSearch = await runProviderSafely(
+          "openlibrary",
+          "openlibrary_search",
+          `title="${cleanTitle}"`,
+          () =>
+            fetchOpenLibraryByTitleAuthor({
+              title: cleanTitle,
+              author: cleanAuthor || undefined,
+              userAgent: env.OPEN_LIBRARY_USER_AGENT,
+              maxResults: 8,
+              fetchImpl,
+              customProbe,
+              enableRetry,
+              bypassCooldown,
+              signal,
+            })
+        );
+        attempts.push(olSearch.attempt);
+        if (olSearch.pageCount && !resolvedPageCount) {
+          resolvedPageCount = olSearch.pageCount;
+        }
+        collected.push(...olSearch.candidates);
+      }
+
+      // Hardcover (GraphQL, token só no servidor)
+      if (collected.length < COVER_MAX_CANDIDATES) {
+        if (hardcoverEnabled) {
+          await politeStep();
+        }
+        const hcTitle = await runProviderSafely(
+          "hardcover",
+          "hardcover",
+          `title="${cleanTitle}"`,
+          () =>
+            fetchHardcoverCovers({
+              title: cleanTitle,
+              author: cleanAuthor || undefined,
+              token: env.HARDCOVER_API_TOKEN,
+              maxResults: 6,
+              fetchImpl,
+              customProbe,
+              enableRetry,
+              bypassCooldown,
+              signal,
+            })
+        );
+        if (!(
+          normalizedIsbn &&
+          hcTitle.attempt.status === "skipped" &&
+          attempts.some(
+            (a) => a.provider === "hardcover" && a.status === "skipped"
+          )
+        )) {
+          attempts.push(hcTitle.attempt);
+        }
+        if (hcTitle.pageCount && !resolvedPageCount) {
+          resolvedPageCount = hcTitle.pageCount;
+        }
+        collected.push(...hcTitle.candidates);
+      }
+    }
+
+    // =========================================================================
+    // PROVEDOR OPCIONAL — APPLE (iTunes Search, country=br, ebook | audiobook)
+    // Atrás de feature flag (`ENABLE_APPLE_BOOKS_COVERS`), DESLIGADO por padrão
+    // =========================================================================
+    if (appleEnabled && collected.length < COVER_MAX_CANDIDATES) {
+      const cleanMainTitle = stripBookTitleSubtitle(cleanTitle);
+      const appleTerm = normalizedIsbn
+        ? cleanMainTitle
+          ? `${cleanMainTitle} ${cleanAuthor}`.trim()
+          : normalizedIsbn
+        : `${cleanMainTitle} ${cleanAuthor}`.trim();
+      if (appleTerm) {
+        await politeStep();
+        const appleEntity: "ebook" | "audiobook" =
+          format === "audiobook" ? "audiobook" : "ebook";
+        const appleRes = await runProviderSafely(
+          "apple",
+          "apple",
+          appleTerm,
+          () =>
+            fetchAppleItunesCovers({
+              term: appleTerm,
+              author: cleanAuthor || undefined,
+              entity: appleEntity,
+              maxResults: 6,
+              fetchImpl,
+              customProbe,
+              enableRetry,
+              bypassCooldown,
+              signal,
+            })
+        );
+        attempts.push(appleRes.attempt);
+        collected.push(...appleRes.candidates);
+      }
+    }
+  } finally {
+    timeoutCtx.cleanup();
   }
 
   // Propaga `pageCount` resolvido nas candidatas que vieram sem páginas

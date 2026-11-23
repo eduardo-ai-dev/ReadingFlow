@@ -37,15 +37,18 @@ function parseBooleanFlag(raw: string | undefined): boolean {
 
 export function getServerEnv(): ServerEnv {
   return serverEnvSchema.parse({
-    NODE_ENV: process.env.NODE_ENV,
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-    GOOGLE_BOOKS_API_KEY: process.env.GOOGLE_BOOKS_API_KEY || undefined,
-    HARDCOVER_API_TOKEN: process.env.HARDCOVER_API_TOKEN || undefined,
+    NODE_ENV: process.env.NODE_ENV || undefined,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL?.trim() || undefined,
+    GOOGLE_BOOKS_API_KEY: process.env.GOOGLE_BOOKS_API_KEY?.trim() || undefined,
+    HARDCOVER_API_TOKEN: process.env.HARDCOVER_API_TOKEN?.trim() || undefined,
     ENABLE_APPLE_BOOKS_COVERS: parseBooleanFlag(
       process.env.ENABLE_APPLE_BOOKS_COVERS
     ),
-    OPEN_LIBRARY_USER_AGENT: process.env.OPEN_LIBRARY_USER_AGENT,
-    CATALOG_LOOKUP_TIMEOUT_MS: process.env.CATALOG_LOOKUP_TIMEOUT_MS,
-    RATE_LIMIT_MAX_PER_MINUTE: process.env.RATE_LIMIT_MAX_PER_MINUTE,
+    OPEN_LIBRARY_USER_AGENT:
+      process.env.OPEN_LIBRARY_USER_AGENT?.trim() || undefined,
+    CATALOG_LOOKUP_TIMEOUT_MS:
+      process.env.CATALOG_LOOKUP_TIMEOUT_MS?.trim() || undefined,
+    RATE_LIMIT_MAX_PER_MINUTE:
+      process.env.RATE_LIMIT_MAX_PER_MINUTE?.trim() || undefined,
   });
 }

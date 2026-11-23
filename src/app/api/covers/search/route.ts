@@ -48,77 +48,91 @@ const importUrlBodySchema = z.object({
  *   Open Library (`search.json`) -> Hardcover -> [Apple se flag ligada] -> seletor + upload manual.
  * - `GOOGLE_BOOKS_API_KEY` e `HARDCOVER_API_TOKEN` ficam estritamente no servidor.
  */
+export const dynamic = "force-dynamic";
+
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" };
 
+function logCoversRouteError(method: "GET" | "POST", err: unknown): void {
+  const raw = err instanceof Error ? err.message : String(err);
+  const safeMessage = raw
+    .replace(/([?&]key=)[^&\s]+/gi, "$1[redacted]")
+    .replace(/(Bearer\s+)\S+/gi, "$1[redacted]")
+    .slice(0, 300);
+  console.error("[covers/search]", { method, message: safeMessage });
+}
+
 export async function GET(request: NextRequest) {
-  const ws = await getAuthenticatedWorkspace();
-  if (!ws) {
-    return NextResponse.json(
-      { error: "Sessão não autenticada." },
-      { status: 401, headers: PRIVATE_NO_STORE }
-    );
-  }
-  if (isDemoWorkspace(ws)) {
-    return NextResponse.json(
-      { error: DEMO_READONLY_ERROR, code: DEMO_READONLY_CODE },
-      { status: 403, headers: PRIVATE_NO_STORE }
-    );
-  }
-
-  const rawParams = {
-    title: request.nextUrl.searchParams.get("title") ?? undefined,
-    author: request.nextUrl.searchParams.get("author") ?? undefined,
-    isbn: request.nextUrl.searchParams.get("isbn") ?? undefined,
-    format: request.nextUrl.searchParams.get("format") ?? undefined,
-    nocache: request.nextUrl.searchParams.get("nocache") ?? undefined,
-  };
-
-  const parsed = querySchema.safeParse(rawParams);
-  if (!parsed.success) {
-    const empty: CoverSearchResponse = {
-      candidates: [],
-      degraded: false,
-      googleRateLimited: false,
-      apiUnavailable: false,
-      fallbackToManualUpload: true,
-    };
-    return NextResponse.json(empty, { status: 400, headers: PRIVATE_NO_STORE });
-  }
-
-  const env = getServerEnv();
-  const limit = checkSlidingRateLimit(
-    `cover-search:${ws.profile.id}`,
-    Math.max(120, env.RATE_LIMIT_MAX_PER_MINUTE * 2)
-  );
-  if (!limit.allowed) {
-    const rateLimitedPayload: CoverSearchResponse = {
-      candidates: [],
-      degraded: true,
-      googleRateLimited: false,
-      apiUnavailable: true,
-      fallbackToManualUpload: true,
-      notice: `Serviço indisponível, tentar de novo (aguarde ${limit.retryAfterSeconds}s).`,
-    };
-    return NextResponse.json(rateLimitedPayload, {
-      status: 429,
-      headers: {
-        ...PRIVATE_NO_STORE,
-        "Retry-After": String(limit.retryAfterSeconds),
-      },
-    });
-  }
-
-  const cleanTitle = parsed.data.title
-    ? sanitizePlainText(parsed.data.title, 300)
-    : undefined;
-  const cleanAuthor = parsed.data.author
-    ? sanitizePlainText(parsed.data.author, 200)
-    : undefined;
-  const cleanIsbn = parsed.data.isbn
-    ? sanitizePlainText(parsed.data.isbn, 24)
-    : undefined;
-
   try {
+    const ws = await getAuthenticatedWorkspace();
+    if (!ws) {
+      return NextResponse.json(
+        { error: "Sessão não autenticada." },
+        { status: 401, headers: PRIVATE_NO_STORE }
+      );
+    }
+    if (isDemoWorkspace(ws)) {
+      return NextResponse.json(
+        { error: DEMO_READONLY_ERROR, code: DEMO_READONLY_CODE },
+        { status: 403, headers: PRIVATE_NO_STORE }
+      );
+    }
+
+    const rawParams = {
+      title: request.nextUrl.searchParams.get("title") ?? undefined,
+      author: request.nextUrl.searchParams.get("author") ?? undefined,
+      isbn: request.nextUrl.searchParams.get("isbn") ?? undefined,
+      format: request.nextUrl.searchParams.get("format") ?? undefined,
+      nocache: request.nextUrl.searchParams.get("nocache") ?? undefined,
+    };
+
+    const parsed = querySchema.safeParse(rawParams);
+    if (!parsed.success) {
+      const empty: CoverSearchResponse = {
+        candidates: [],
+        degraded: false,
+        googleRateLimited: false,
+        apiUnavailable: false,
+        fallbackToManualUpload: true,
+      };
+      return NextResponse.json(empty, {
+        status: 400,
+        headers: PRIVATE_NO_STORE,
+      });
+    }
+
+    const env = getServerEnv();
+    const limit = checkSlidingRateLimit(
+      `cover-search:${ws.profile.id}`,
+      Math.max(120, env.RATE_LIMIT_MAX_PER_MINUTE * 2)
+    );
+    if (!limit.allowed) {
+      const rateLimitedPayload: CoverSearchResponse = {
+        candidates: [],
+        degraded: true,
+        googleRateLimited: false,
+        apiUnavailable: true,
+        fallbackToManualUpload: true,
+        notice: `Serviço indisponível, tentar de novo (aguarde ${limit.retryAfterSeconds}s).`,
+      };
+      return NextResponse.json(rateLimitedPayload, {
+        status: 429,
+        headers: {
+          ...PRIVATE_NO_STORE,
+          "Retry-After": String(limit.retryAfterSeconds),
+        },
+      });
+    }
+
+    const cleanTitle = parsed.data.title
+      ? sanitizePlainText(parsed.data.title, 300)
+      : undefined;
+    const cleanAuthor = parsed.data.author
+      ? sanitizePlainText(parsed.data.author, 200)
+      : undefined;
+    const cleanIsbn = parsed.data.isbn
+      ? sanitizePlainText(parsed.data.isbn, 24)
+      : undefined;
+
     const result = await searchBookCovers({
       title: cleanTitle,
       author: cleanAuthor,
@@ -138,7 +152,8 @@ export async function GET(request: NextRequest) {
             : "private, max-age=120, stale-while-revalidate=600",
       },
     });
-  } catch {
+  } catch (err) {
+    logCoversRouteError("GET", err);
     const fallback: CoverSearchResponse = {
       candidates: [],
       degraded: true,
@@ -157,75 +172,91 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/covers/search
  * Opção "Colar link da imagem":
- * - Baixa a imagem no servidor com proteção contra SSRF (só `https`, bloqueio de IPs privados,
- *   loopback e link-local após resolver o DNS, `content-type: image/*`, <= 5 MB, timeout 5 s),
- * - Re-encoda com `sharp` para WebP e salva no bucket do usuário.
+ * - Baixa a imagem no servidor com proteção contra SSRF (só `https`, allowlist estrita de hostnames,
+ *   bloqueio de IPs privados/loopback/link-local sem depender de `node:dns`, `content-type: image/*`,
+ *   <= 5 MB, timeout 5 s), valida magic bytes em TS puro e salva no bucket do usuário.
  */
 export async function POST(request: NextRequest) {
-  const ws = await getAuthenticatedWorkspace();
-  if (!ws) {
-    return NextResponse.json(
-      { ok: false, error: "Sessão não autenticada." },
-      { status: 401, headers: PRIVATE_NO_STORE }
-    );
-  }
-  if (isDemoWorkspace(ws)) {
-    return NextResponse.json(
-      { ok: false, error: DEMO_READONLY_ERROR, code: DEMO_READONLY_CODE },
-      { status: 403, headers: PRIVATE_NO_STORE }
-    );
-  }
-
-  const env = getServerEnv();
-  const limit = checkSlidingRateLimit(
-    `cover-import-url:${ws.profile.id}`,
-    Math.max(30, env.RATE_LIMIT_MAX_PER_MINUTE)
-  );
-  if (!limit.allowed) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: `Muitas requisições. Aguarde ${limit.retryAfterSeconds}s e tente novamente.`,
-      },
-      { status: 429, headers: PRIVATE_NO_STORE }
-    );
-  }
-
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "Payload JSON inválido." },
-      { status: 400, headers: PRIVATE_NO_STORE }
+    const ws = await getAuthenticatedWorkspace();
+    if (!ws) {
+      return NextResponse.json(
+        { ok: false, error: "Sessão não autenticada." },
+        { status: 401, headers: PRIVATE_NO_STORE }
+      );
+    }
+    if (isDemoWorkspace(ws)) {
+      return NextResponse.json(
+        { ok: false, error: DEMO_READONLY_ERROR, code: DEMO_READONLY_CODE },
+        { status: 403, headers: PRIVATE_NO_STORE }
+      );
+    }
+
+    const env = getServerEnv();
+    const limit = checkSlidingRateLimit(
+      `cover-import-url:${ws.profile.id}`,
+      Math.max(30, env.RATE_LIMIT_MAX_PER_MINUTE)
     );
-  }
+    if (!limit.allowed) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Muitas requisições. Aguarde ${limit.retryAfterSeconds}s e tente novamente.`,
+        },
+        { status: 429, headers: PRIVATE_NO_STORE }
+      );
+    }
 
-  const parsed = importUrlBodySchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error:
-          parsed.error.issues[0]?.message ??
-          "Informe um link HTTPS válido para a imagem.",
-      },
-      { status: 400, headers: PRIVATE_NO_STORE }
-    );
-  }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "Payload JSON inválido." },
+        { status: 400, headers: PRIVATE_NO_STORE }
+      );
+    }
 
-  const result = await importCoverFromExternalUrl({
-    url: parsed.data.url,
-    userId: ws.profile.id,
-    editionId: parsed.data.editionId,
-  });
+    const parsed = importUrlBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            parsed.error.issues[0]?.message ??
+            "Informe um link HTTPS válido para a imagem.",
+        },
+        { status: 400, headers: PRIVATE_NO_STORE }
+      );
+    }
 
-  if (!result.ok) {
+    const result = await importCoverFromExternalUrl({
+      url: parsed.data.url,
+      userId: ws.profile.id,
+      editionId: parsed.data.editionId,
+    });
+
+    if (!result.ok) {
+      return NextResponse.json(result, {
+        status: 422,
+        headers: PRIVATE_NO_STORE,
+      });
+    }
+
     return NextResponse.json(result, {
-      status: 422,
+      status: 200,
       headers: PRIVATE_NO_STORE,
     });
+  } catch (err) {
+    logCoversRouteError("POST", err);
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "http_error",
+        error:
+          "Não foi possível importar a imagem deste link agora. Tente novamente ou envie pelo seletor de arquivo.",
+      },
+      { status: 422, headers: PRIVATE_NO_STORE }
+    );
   }
-
-  return NextResponse.json(result, { status: 200, headers: PRIVATE_NO_STORE });
 }

@@ -151,6 +151,10 @@ export function CoverEditionPicker({
     Boolean(initialApiUnavailable)
   );
   const [retryCount, setRetryCount] = useState(0);
+  const [serverErrorLockedKey, setServerErrorLockedKey] = useState<
+    string | null
+  >(null);
+  const inFlightKeyRef = useRef<string | null>(null);
   const [diagnostic, setDiagnostic] = useState<CoverSearchDiagnostic | null>(
     initialDiagnostic ?? null
   );
@@ -185,6 +189,20 @@ export function CoverEditionPicker({
         return;
       }
 
+      const queryKey = `${cleanTitle.toLowerCase()}|${cleanAuthor.toLowerCase()}|${cleanIsbn}`;
+      // Impede retentativas repetidas em loop com `&nocache=1` quando o servidor retornou erro 5xx para a mesma consulta
+      if (serverErrorLockedKey === queryKey && opts?.bypassCache) {
+        setApiUnavailable(true);
+        setNotice(
+          "Serviço de capas temporariamente indisponível. Envie a imagem manualmente ou altere os termos da busca."
+        );
+        return;
+      }
+      if (inFlightKeyRef.current === queryKey) {
+        return;
+      }
+      inFlightKeyRef.current = queryKey;
+
       setIsLoading(true);
       setNotice(null);
       setApiUnavailable(false);
@@ -201,12 +219,32 @@ export function CoverEditionPicker({
       if (cleanTitle) params.set("title", cleanTitle);
       if (cleanAuthor) params.set("author", cleanAuthor);
       if (cleanIsbn) params.set("isbn", cleanIsbn);
-      if (opts?.bypassCache) params.set("nocache", "1");
+      if (opts?.bypassCache && serverErrorLockedKey !== queryKey) {
+        params.set("nocache", "1");
+      }
 
       try {
         const res = await fetch(`/api/covers/search?${params.toString()}`, {
           signal: opts?.signal,
         });
+
+        if (opts?.signal?.aborted) return;
+
+        // Trava retentativas repetidas com `&nocache=1` quando `/api/covers/search` retornar erro 5xx
+        if (res.status >= 500) {
+          setServerErrorLockedKey(queryKey);
+          setCandidates([]);
+          setApiUnavailable(true);
+          setNotice(
+            "Serviço de capas temporariamente indisponível. Envie a imagem manualmente ou tente novamente mais tarde."
+          );
+          setHasSearchedOnce(true);
+          return;
+        }
+
+        if (serverErrorLockedKey === queryKey) {
+          setServerErrorLockedKey(null);
+        }
 
         let payload: CoverSearchResponse | null = null;
         try {
@@ -294,6 +332,9 @@ export function CoverEditionPicker({
         setNotice("Serviço indisponível, tentar de novo.");
         setHasSearchedOnce(true);
       } finally {
+        if (inFlightKeyRef.current === queryKey) {
+          inFlightKeyRef.current = null;
+        }
         setIsLoading(false);
       }
     },
@@ -301,6 +342,7 @@ export function CoverEditionPicker({
       searchTitle,
       searchAuthor,
       searchIsbn,
+      serverErrorLockedKey,
       effectiveSeed,
       title,
       author,
@@ -596,7 +638,11 @@ export function CoverEditionPicker({
               </div>
               <button
                 type="button"
-                disabled={isLoading}
+                disabled={
+                  isLoading ||
+                  serverErrorLockedKey ===
+                    `${searchTitle.trim().toLowerCase()}|${searchAuthor.trim().toLowerCase()}|${searchIsbn.trim()}`
+                }
                 onClick={() => {
                   const nextRetry = retryCount + 1;
                   setRetryCount(nextRetry);
@@ -605,7 +651,7 @@ export function CoverEditionPicker({
                     attemptNumber: nextRetry,
                   });
                 }}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[6px] border border-[#78350F]/40 bg-[#FAF7F1] px-2.5 py-1 text-[11px] font-semibold text-[#78350F] hover:bg-[#FDE68A] lg:min-h-[30px]"
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[6px] border border-[#78350F]/40 bg-[#FAF7F1] px-2.5 py-1 text-[11px] font-semibold text-[#78350F] hover:bg-[#FDE68A] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-[30px]"
               >
                 <RefreshCw className="h-3 w-3" aria-hidden="true" />
                 Tentar de novo

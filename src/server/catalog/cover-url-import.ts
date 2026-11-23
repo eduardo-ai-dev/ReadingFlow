@@ -1,8 +1,6 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import dns from "node:dns/promises";
-import net from "node:net";
 import {
   inspectImageHeader,
   type SupportedRasterMime,
@@ -10,19 +8,20 @@ import {
 import { COVER_DATA_URL_MAX_BYTES } from "@/features/catalog/cover-rules";
 
 /**
- * Importação segura de capa por link externo ("Colar link da imagem"):
+ * Importação segura de capa por link externo ("Colar link da imagem"),
+ * 100% compatível com Cloudflare Workers (`workerd`), sem `node:dns`, `node:net`,
+ * `node:fs` ou binários nativos (`sharp`):
  * - Proteção estrita contra SSRF:
- *   1. Somente protocolo `https:` (sem credenciais embutidas, sem portas locais/administrativas bloqueadas)
- *   2. Resolução explícita de DNS (`dns.lookup(..., { all: true })`) ANTES da conexão
- *   3. Bloqueio de todos os IPs privados, loopback, link-local, CGNAT, multicast e IPv4-mapped IPv6
- *   4. Redirecionamentos manuais (`redirect: "manual"`, máx. 3 saltos) revalidando protocolo + DNS a cada salto
+ *   1. Somente protocolo `https:` (sem credenciais embutidas, apenas porta padrão 443)
+ *   2. Bloqueio de hostnames locais/internos e literais IPv4/IPv6 privados, loopback, link-local, CGNAT e multicast
+ *   3. Allowlist estrita de hostnames confiáveis de capas de livros (sem depender de `node:dns`)
+ *   4. Redirecionamentos manuais (`redirect: "manual"`, máx. 3 saltos) revalidando cada destino
  * - Validação de resposta:
  *   5. Timeout estrito de 5 segundos (`5000 ms`)
  *   6. `Content-Type: image/*` (exceto SVG)
  *   7. Leitura em stream limitada a `<= 5 MB` (`5 * 1024 * 1024` bytes)
- * - Re-encode e armazenamento:
- *   8. Re-encode com `sharp` para WebP limpo (`<= 512x768`, sem metadados EXIF)
- *   9. Salvamento no bucket do usuário (`covers/{userId}/{key}.webp`)
+ *   8. Validação de magic bytes e dimensões reais em TypeScript puro (`inspectImageHeader`)
+ *   9. Salvamento isolado no bucket do usuário (`covers/{userId}/{key}.{ext}`)
  */
 
 export const COVER_URL_IMPORT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -68,10 +67,37 @@ interface UserCoverBucketObject {
   userId: string;
   bucketPath: string;
   mimeType: SupportedRasterMime;
-  bytes: Buffer;
+  bytes: Uint8Array;
   width: number;
   height: number;
   createdAt: string;
+}
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  const CHUNK_SIZE = 0x8000;
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.byteLength; i += CHUNK_SIZE) {
+    const slice = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.byteLength));
+    let binary = "";
+    for (let j = 0; j < slice.byteLength; j += 1) {
+      binary += String.fromCharCode(slice[j]!);
+    }
+    parts.push(binary);
+  }
+  return btoa(parts.join(""));
+}
+
+function concatUint8Arrays(
+  chunks: Uint8Array[],
+  totalLength: number
+): Uint8Array {
+  const merged = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return merged;
 }
 
 declare global {
@@ -92,7 +118,7 @@ function getUserCoverBucketStore(): Map<string, UserCoverBucketObject> {
 export function saveToUserCoverBucket(params: {
   userId: string;
   editionId?: string | null;
-  webpBuffer: Buffer;
+  webpBuffer: Uint8Array;
   mimeType?: SupportedRasterMime;
   extension?: "webp" | "png" | "jpg" | "gif";
   width: number;
@@ -109,7 +135,7 @@ export function saveToUserCoverBucket(params: {
   const mimeType: SupportedRasterMime = params.mimeType ?? "image/webp";
   const extension = params.extension ?? "webp";
   const bucketPath = `covers/${safeUserId}/${safeEditionPart}-${digest}.${extension}`;
-  const dataUrl = `data:${mimeType};base64,${params.webpBuffer.toString("base64")}`;
+  const dataUrl = `data:${mimeType};base64,${uint8ArrayToBase64(params.webpBuffer)}`;
 
   getUserCoverBucketStore().set(bucketPath, {
     userId: params.userId,
@@ -228,6 +254,20 @@ function expandIpv6ToGroups(rawIpv6: string): number[] | null {
   return [...left, ...Array<number>(missing).fill(0), ...right];
 }
 
+function detectIpLiteralVersion(rawHost: string): 0 | 4 | 6 {
+  const withoutZone =
+    rawHost
+      .trim()
+      .replace(/^\[|\]$/g, "")
+      .split("%")[0] ?? "";
+  if (!withoutZone) return 0;
+  if (parseIpv4Octets(withoutZone) !== null) return 4;
+  if (withoutZone.includes(":") && expandIpv6ToGroups(withoutZone) !== null) {
+    return 6;
+  }
+  return 0;
+}
+
 /**
  * Verifica se um endereço IPv4 ou IPv6 é privado, loopback, link-local, CGNAT,
  * multicast, reservado ou inválido.
@@ -237,7 +277,7 @@ export function isPrivateOrReservedIp(rawIp: string): boolean {
   if (!cleaned) return true;
 
   const withoutZone = cleaned.split("%")[0] ?? cleaned;
-  const ipVersion = net.isIP(withoutZone);
+  const ipVersion = detectIpLiteralVersion(withoutZone);
 
   if (ipVersion === 4) {
     const octets = parseIpv4Octets(withoutZone);
@@ -337,14 +377,75 @@ const BLOCKED_HOSTNAME_SUFFIXES = [
   ".local",
   ".internal",
   ".home.arpa",
+  ".lan",
+  ".localdomain",
 ] as const;
 
-const defaultDnsLookup: DnsLookupFn = async (hostname: string) =>
-  dns.lookup(hostname, { all: true, verbatim: true });
+/**
+ * Allowlist estrita de hostnames públicos confiáveis para importação de capas
+ * via HTTPS em Cloudflare Workers (`workerd`), sem depender de `node:dns`.
+ */
+const ALLOWED_COVER_IMPORT_HOSTS = new Set([
+  "covers.openlibrary.org",
+  "archive.org",
+  "books.google.com",
+  "books.googleusercontent.com",
+  "lh3.googleusercontent.com",
+  "storage.googleapis.com",
+  "brasilapi.com.br",
+  "api.mercadoeditorial.org",
+  "mercadoeditorial.org",
+  "assets.hardcover.app",
+  "img.hardcover.app",
+  "hardcover.app",
+  "m.media-amazon.com",
+  "images-na.ssl-images-amazon.com",
+  "images-eu.ssl-images-amazon.com",
+  "images.gr-assets.com",
+  "i.gr-assets.com",
+  "s.gr-assets.com",
+  "http2.mlstatic.com",
+  "upload.wikimedia.org",
+  "cdn.kobo.com",
+  "images.isbndb.com",
+  "static.skoob.com.br",
+  "cache.skoob.com.br",
+  "cdn.shopify.com",
+  "res.cloudinary.com",
+]);
+
+const ALLOWED_COVER_IMPORT_HOST_SUFFIXES = [
+  ".archive.org",
+  ".hardcover.app",
+  ".mzstatic.com",
+  ".ssl-images-amazon.com",
+  ".media-amazon.com",
+  ".googleusercontent.com",
+  ".vtexassets.com",
+  ".vteximg.com.br",
+  ".cloudfront.net",
+  ".shopify.com",
+] as const;
+
+export function isAllowedCoverImportHostname(hostname: string): boolean {
+  const lower = hostname.toLowerCase();
+  if (ALLOWED_COVER_IMPORT_HOSTS.has(lower)) return true;
+  return ALLOWED_COVER_IMPORT_HOST_SUFFIXES.some(
+    (suffix) => lower.endsWith(suffix) && lower.length > suffix.length
+  );
+}
+
+/** Rejeita literais IP ofuscados (inteiro decimal, octal ou hexadecimal sem TLD alfabético). */
+function looksLikeObfuscatedIpLiteral(host: string): boolean {
+  if (/^\d+$/.test(host)) return true;
+  if (/^0x[0-9a-f]+$/i.test(host)) return true;
+  if (/^[0-9a-fx.]+$/i.test(host) && !/[g-z-]/i.test(host)) return true;
+  return false;
+}
 
 export async function validateAndResolveSsrfSafeUrl(
   rawUrl: string,
-  lookupImpl: DnsLookupFn = defaultDnsLookup
+  lookupImpl?: DnsLookupFn
 ): Promise<
   | { ok: true; url: URL; resolvedIps: string[] }
   | { ok: false; code: CoverUrlImportErrorCode; error: string }
@@ -407,61 +508,79 @@ export async function validateAndResolveSsrfSafeUrl(
     };
   }
 
-  // Se o host já for um literal IP (IPv4 ou IPv6), valida diretamente
-  if (net.isIP(host) !== 0) {
-    if (isPrivateOrReservedIp(host)) {
+  // Se o host for um literal IP (IPv4 ou IPv6), bloqueia sempre faixas privadas/reservadas
+  // e no modo estrito (sem lookupImpl) bloqueia literais IP diretos.
+  if (
+    detectIpLiteralVersion(host) !== 0 ||
+    looksLikeObfuscatedIpLiteral(host)
+  ) {
+    if (isPrivateOrReservedIp(host) || !lookupImpl) {
       return {
         ok: false,
         code: "ssrf_blocked",
         error:
-          "Endereços IP privados, loopback ou link-local são bloqueados pela proteção SSRF.",
+          "Endereços IP diretos, privados, loopback ou link-local são bloqueados pela proteção SSRF.",
       };
     }
     return { ok: true, url: parsed, resolvedIps: [host] };
   }
 
-  // Resolve o DNS e verifica TODOS os IPs retornados
-  let records: ReadonlyArray<{ address: string; family?: number }>;
-  try {
-    records = await lookupImpl(host);
-  } catch {
-    return {
-      ok: false,
-      code: "dns_failed",
-      error: "Não foi possível resolver o domínio informado.",
-    };
-  }
-
-  if (!records || records.length === 0) {
-    return {
-      ok: false,
-      code: "dns_failed",
-      error: "O domínio informado não possui endereço IP válido.",
-    };
-  }
-
-  const resolvedIps: string[] = [];
-  for (const rec of records) {
-    const addr = rec.address?.trim();
-    if (!addr || isPrivateOrReservedIp(addr)) {
+  // Quando um resolver DNS customizado é injetado (ex.: testes unitários), valida os IPs resolvidos
+  if (lookupImpl) {
+    let records: ReadonlyArray<{ address: string; family?: number }>;
+    try {
+      records = await lookupImpl(host);
+    } catch {
       return {
         ok: false,
-        code: "ssrf_blocked",
-        error:
-          "O domínio resolve para um IP privado, loopback ou link-local bloqueado pela proteção SSRF.",
+        code: "dns_failed",
+        error: "Não foi possível resolver o domínio informado.",
       };
     }
-    resolvedIps.push(addr);
+
+    if (!records || records.length === 0) {
+      return {
+        ok: false,
+        code: "dns_failed",
+        error: "O domínio informado não possui endereço IP válido.",
+      };
+    }
+
+    const resolvedIps: string[] = [];
+    for (const rec of records) {
+      const addr = rec.address?.trim();
+      if (!addr || isPrivateOrReservedIp(addr)) {
+        return {
+          ok: false,
+          code: "ssrf_blocked",
+          error:
+            "O domínio resolve para um IP privado, loopback ou link-local bloqueado pela proteção SSRF.",
+        };
+      }
+      resolvedIps.push(addr);
+    }
+
+    return { ok: true, url: parsed, resolvedIps };
   }
 
-  return { ok: true, url: parsed, resolvedIps };
+  // Runtime padrão (Cloudflare Workers / workerd): sem `node:dns`, valida por allowlist estrita de hostnames
+  if (!isAllowedCoverImportHostname(host)) {
+    return {
+      ok: false,
+      code: "ssrf_blocked",
+      error:
+        "Domínio não permitido para importação direta de imagem. Use um link de base/livraria suportada ou envie a capa pelo seletor de arquivo.",
+    };
+  }
+
+  return { ok: true, url: parsed, resolvedIps: [] };
 }
 
 async function readResponseStreamWithLimit(
   response: Response,
   maxBytes: number
 ): Promise<
-  | { ok: true; buffer: Buffer }
+  | { ok: true; buffer: Uint8Array }
   | { ok: false; code: "too_large" | "invalid_image"; error: string }
 > {
   const contentLengthHeader = response.headers.get("content-length");
@@ -485,7 +604,14 @@ async function readResponseStreamWithLimit(
         error: "A imagem excede o limite máximo de 5 MB.",
       };
     }
-    return { ok: true, buffer: Buffer.from(arr) };
+    if (arr.byteLength === 0) {
+      return {
+        ok: false,
+        code: "invalid_image",
+        error: "O link retornou um arquivo vazio.",
+      };
+    }
+    return { ok: true, buffer: new Uint8Array(arr) };
   }
 
   const reader = response.body.getReader();
@@ -521,12 +647,12 @@ async function readResponseStreamWithLimit(
     };
   }
 
-  return { ok: true, buffer: Buffer.concat(chunks, totalBytes) };
+  return { ok: true, buffer: concatUint8Arrays(chunks, totalBytes) };
 }
 
 /**
- * Baixa a imagem de um link HTTPS externo com proteção SSRF completa, re-encoda com `sharp`
- * e salva no bucket do usuário.
+ * Baixa a imagem de um link HTTPS externo com proteção SSRF (allowlist estrita + bloqueio de IPs privados,
+ * 100% compatível com Cloudflare Workers) e salva no bucket do usuário.
  */
 export async function importCoverFromExternalUrl(params: {
   url: string;
@@ -537,170 +663,206 @@ export async function importCoverFromExternalUrl(params: {
   timeoutMs?: number;
 }): Promise<CoverUrlImportResult> {
   const fetchImpl = params.fetchImpl ?? fetch;
-  const lookupImpl = params.lookupImpl ?? defaultDnsLookup;
+  const lookupImpl = params.lookupImpl;
   const timeoutMs = params.timeoutMs ?? COVER_URL_IMPORT_TIMEOUT_MS;
-  const signal = AbortSignal.timeout(timeoutMs);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const signal = controller.signal;
 
-  let currentUrlStr = params.url.trim();
-  let finalResponse: Response | null = null;
+  try {
+    let currentUrlStr = params.url.trim();
+    let finalResponse: Response | null = null;
 
-  for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop += 1) {
-    const validated = await validateAndResolveSsrfSafeUrl(
-      currentUrlStr,
-      lookupImpl
-    );
-    if (!validated.ok) {
-      return validated;
+    for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop += 1) {
+      const validated = await validateAndResolveSsrfSafeUrl(
+        currentUrlStr,
+        lookupImpl
+      );
+      if (!validated.ok) {
+        return validated;
+      }
+
+      let res: Response;
+      try {
+        res = await fetchImpl(validated.url.toString(), {
+          method: "GET",
+          signal,
+          redirect: "manual",
+          headers: {
+            Accept: "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8",
+            "User-Agent": "ReadingFlow-CoverImporter/1.0",
+          },
+        });
+      } catch (err) {
+        const isAbort =
+          err instanceof Error &&
+          (err.name === "TimeoutError" ||
+            err.name === "AbortError" ||
+            signal.aborted);
+        console.error("[covers/search]", {
+          stage: "import_url_fetch",
+          host: validated.url.hostname,
+          isAbort,
+          message: err instanceof Error ? err.message : String(err),
+        });
+        return {
+          ok: false,
+          code: isAbort ? "timeout" : "http_error",
+          error: isAbort
+            ? "O download da imagem excedeu o tempo limite de 5 segundos."
+            : "Não foi possível baixar a imagem deste link.",
+        };
+      }
+
+      // Trata redirecionamentos 301/302/303/307/308 revalidando o destino contra SSRF
+      if (
+        res.status === 301 ||
+        res.status === 302 ||
+        res.status === 303 ||
+        res.status === 307 ||
+        res.status === 308
+      ) {
+        const location = res.headers.get("location")?.trim();
+        if (!location) {
+          return {
+            ok: false,
+            code: "http_error",
+            error: "O link retornou um redirecionamento inválido.",
+          };
+        }
+        if (hop === MAX_REDIRECT_HOPS) {
+          return {
+            ok: false,
+            code: "http_error",
+            error: "O link excedeu o número máximo de redirecionamentos.",
+          };
+        }
+        try {
+          currentUrlStr = new URL(location, validated.url).toString();
+        } catch {
+          return {
+            ok: false,
+            code: "invalid_url",
+            error: "Endereço de redirecionamento inválido.",
+          };
+        }
+        continue;
+      }
+
+      finalResponse = res;
+      break;
     }
 
-    let res: Response;
-    try {
-      res = await fetchImpl(validated.url.toString(), {
-        method: "GET",
-        signal,
-        redirect: "manual",
-        headers: {
-          Accept: "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8",
-          "User-Agent": "ReadingFlow-CoverImporter/1.0",
-        },
-      });
-    } catch (err) {
-      const isAbort =
-        err instanceof Error &&
-        (err.name === "TimeoutError" ||
-          err.name === "AbortError" ||
-          signal.aborted);
+    if (!finalResponse) {
       return {
         ok: false,
-        code: isAbort ? "timeout" : "http_error",
-        error: isAbort
-          ? "O download da imagem excedeu o tempo limite de 5 segundos."
-          : "Não foi possível baixar a imagem deste link.",
+        code: "http_error",
+        error: "Não foi possível obter resposta do servidor de imagem.",
       };
     }
 
-    // Trata redirecionamentos 301/302/303/307/308 revalidando o destino contra SSRF
-    if (
-      res.status === 301 ||
-      res.status === 302 ||
-      res.status === 303 ||
-      res.status === 307 ||
-      res.status === 308
-    ) {
-      const location = res.headers.get("location")?.trim();
-      if (!location) {
-        return {
-          ok: false,
-          code: "http_error",
-          error: "O link retornou um redirecionamento inválido.",
-        };
-      }
-      if (hop === MAX_REDIRECT_HOPS) {
-        return {
-          ok: false,
-          code: "http_error",
-          error: "O link excedeu o número máximo de redirecionamentos.",
-        };
-      }
-      try {
-        currentUrlStr = new URL(location, validated.url).toString();
-      } catch {
-        return {
-          ok: false,
-          code: "invalid_url",
-          error: "Endereço de redirecionamento inválido.",
-        };
-      }
-      continue;
+    if (!finalResponse.ok) {
+      return {
+        ok: false,
+        code: "http_error",
+        error: `O servidor da imagem respondeu com erro HTTP ${finalResponse.status}.`,
+      };
     }
 
-    finalResponse = res;
-    break;
-  }
+    const contentType = (finalResponse.headers.get("content-type") ?? "")
+      .toLowerCase()
+      .split(";")[0]!
+      .trim();
 
-  if (!finalResponse) {
+    if (!contentType.startsWith("image/") || contentType === "image/svg+xml") {
+      return {
+        ok: false,
+        code: "invalid_content_type",
+        error:
+          "O link informado não aponta para uma imagem válida (content-type deve ser image/*).",
+      };
+    }
+
+    let streamResult:
+      | { ok: true; buffer: Uint8Array }
+      | { ok: false; code: "too_large" | "invalid_image"; error: string };
+    try {
+      streamResult = await readResponseStreamWithLimit(
+        finalResponse,
+        COVER_URL_IMPORT_MAX_BYTES
+      );
+    } catch (err) {
+      console.error("[covers/search]", {
+        stage: "import_url_stream",
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return {
+        ok: false,
+        code: "http_error",
+        error: "Não foi possível ler o corpo da imagem deste link.",
+      };
+    }
+    if (!streamResult.ok) {
+      return streamResult;
+    }
+
+    // Valida magic bytes e dimensões reais em TypeScript puro (sem binário nativo)
+    let header: ReturnType<typeof inspectImageHeader> = null;
+    try {
+      header = inspectImageHeader(streamResult.buffer);
+    } catch (err) {
+      console.error("[covers/search]", {
+        stage: "import_url_header",
+        message: err instanceof Error ? err.message : String(err),
+      });
+      header = null;
+    }
+    if (!header || header.width <= 10 || header.height <= 10) {
+      return {
+        ok: false,
+        code: "invalid_image",
+        error:
+          "A imagem baixada tem formato não suportado, dimensões inválidas ou é um placeholder 1×1.",
+      };
+    }
+
+    if (header.width * header.height > MAX_INPUT_PIXELS) {
+      return {
+        ok: false,
+        code: "too_large",
+        error:
+          "A imagem excede a resolução máxima permitida (4096×4096). Escolha outra imagem.",
+      };
+    }
+
+    if (streamResult.buffer.byteLength > COVER_DATA_URL_MAX_BYTES) {
+      return {
+        ok: false,
+        code: "too_large",
+        error:
+          "A imagem excede o tamanho máximo suportado. Envie pelo seletor de arquivo para otimizar no navegador.",
+      };
+    }
+
+    const saved = saveToUserCoverBucket({
+      userId: params.userId,
+      editionId: params.editionId,
+      webpBuffer: streamResult.buffer,
+      mimeType: header.mimeType,
+      extension: header.extension,
+      width: header.width,
+      height: header.height,
+    });
+
     return {
-      ok: false,
-      code: "http_error",
-      error: "Não foi possível obter resposta do servidor de imagem.",
+      ok: true,
+      dataUrl: saved.dataUrl,
+      bucketPath: saved.bucketPath,
+      width: header.width,
+      height: header.height,
+      byteLength: streamResult.buffer.byteLength,
     };
+  } finally {
+    clearTimeout(timer);
   }
-
-  if (!finalResponse.ok) {
-    return {
-      ok: false,
-      code: "http_error",
-      error: `O servidor da imagem respondeu com erro HTTP ${finalResponse.status}.`,
-    };
-  }
-
-  const contentType = (finalResponse.headers.get("content-type") ?? "")
-    .toLowerCase()
-    .split(";")[0]!
-    .trim();
-
-  if (!contentType.startsWith("image/") || contentType === "image/svg+xml") {
-    return {
-      ok: false,
-      code: "invalid_content_type",
-      error:
-        "O link informado não aponta para uma imagem válida (content-type deve ser image/*).",
-    };
-  }
-
-  const streamResult = await readResponseStreamWithLimit(
-    finalResponse,
-    COVER_URL_IMPORT_MAX_BYTES
-  );
-  if (!streamResult.ok) {
-    return streamResult;
-  }
-
-  // Valida magic bytes e dimensões reais em TypeScript puro (sem binário nativo)
-  const header = inspectImageHeader(streamResult.buffer);
-  if (!header || header.width <= 10 || header.height <= 10) {
-    return {
-      ok: false,
-      code: "invalid_image",
-      error:
-        "A imagem baixada tem formato não suportado, dimensões inválidas ou é um placeholder 1×1.",
-    };
-  }
-
-  if (header.width * header.height > MAX_INPUT_PIXELS) {
-    return {
-      ok: false,
-      code: "too_large",
-      error:
-        "A imagem excede a resolução máxima permitida (4096×4096). Escolha outra imagem.",
-    };
-  }
-
-  if (streamResult.buffer.byteLength > COVER_DATA_URL_MAX_BYTES) {
-    return {
-      ok: false,
-      code: "too_large",
-      error:
-        "A imagem excede o tamanho máximo suportado. Envie pelo seletor de arquivo para otimizar no navegador.",
-    };
-  }
-
-  const saved = saveToUserCoverBucket({
-    userId: params.userId,
-    editionId: params.editionId,
-    webpBuffer: streamResult.buffer,
-    mimeType: header.mimeType,
-    extension: header.extension,
-    width: header.width,
-    height: header.height,
-  });
-
-  return {
-    ok: true,
-    dataUrl: saved.dataUrl,
-    bucketPath: saved.bucketPath,
-    width: header.width,
-    height: header.height,
-    byteLength: streamResult.buffer.byteLength,
-  };
 }
