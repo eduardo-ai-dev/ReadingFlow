@@ -196,12 +196,9 @@ export function CoverEditionPicker({
       }
 
       const queryKey = `${cleanTitle.toLowerCase()}|${cleanAuthor.toLowerCase()}|${cleanIsbn}`;
-      // Impede retentativas repetidas em loop com `&nocache=1` quando o servidor retornou erro 5xx para a mesma consulta
-      if (serverErrorLockedKey === queryKey && opts?.bypassCache) {
+      // Impede retentativas repetidas/automáticas quando o servidor retornou 401, 403 ou 5xx para a mesma consulta
+      if (serverErrorLockedKey === queryKey) {
         setApiUnavailable(true);
-        setNotice(
-          "Serviço de capas temporariamente indisponível. Envie a imagem manualmente ou altere os termos da busca."
-        );
         return;
       }
       if (inFlightKeyRef.current === queryKey) {
@@ -240,13 +237,17 @@ export function CoverEditionPicker({
 
         if (opts?.signal?.aborted) return;
 
-        // Trava retentativas repetidas com `&nocache=1` quando `/api/covers/search` retornar erro 5xx
-        if (res.status >= 500) {
+        // Trava retentativas automáticas/em loop quando `/api/covers/search` retornar 401, 403 ou 5xx
+        if (res.status === 401 || res.status === 403 || res.status >= 500) {
           setServerErrorLockedKey(queryKey);
           setCandidates([]);
           setApiUnavailable(true);
           setNotice(
-            "Serviço de capas temporariamente indisponível. Envie a imagem manualmente ou tente novamente mais tarde."
+            res.status === 401
+              ? "Sessão expirada. Entre novamente para buscar capas."
+              : res.status === 403
+                ? "Busca de capas indisponível nesta sessão. Crie sua conta para personalizar e salvar capas."
+                : "Serviço de capas temporariamente indisponível. Envie a imagem manualmente ou tente novamente mais tarde."
           );
           setHasSearchedOnce(true);
           return;

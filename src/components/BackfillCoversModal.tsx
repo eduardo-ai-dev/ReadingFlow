@@ -155,10 +155,14 @@ export function BackfillCoversModal({
             signal: controller.signal,
             headers: { Accept: "application/json" },
           });
-          if (res.status >= 500) {
+          if (res.status === 401 || res.status === 403 || res.status >= 500) {
             abortedByServerError = true;
             setErrorMessage(
-              "O serviço de busca de capas está temporariamente indisponível. A varredura foi interrompida para evitar falhas repetidas."
+              res.status === 401
+                ? "Sessão expirada. Entre novamente para buscar capas."
+                : res.status === 403
+                  ? "Ação indisponível nesta sessão. Crie sua conta para buscar e salvar capas."
+                  : "O serviço de busca de capas está temporariamente indisponível. A varredura foi interrompida para evitar falhas repetidas."
             );
           } else {
             const data = (await res.json()) as {

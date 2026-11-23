@@ -98,6 +98,15 @@ describe("Demonstração segura somente leitura e stateless (zero D1)", () => {
     expect(ws?.profile.id).toBe(DEMO_USER_ID);
     expect(ws?.passwordHashSim).toBe("");
     expect(ws?.works.length).toBeGreaterThan(0);
+    // Todos os livros do seed demonstrativo já trazem capa válida preenchida,
+    // evitando rajadas desnecessárias em /api/covers/search ao abrir o /painel.
+    expect(ws?.editions.length).toBeGreaterThan(0);
+    for (const ed of ws?.editions ?? []) {
+      expect(ed.coverUrl).toMatch(
+        /^(https:\/\/covers\.openlibrary\.org\/|\/landing\/covers\/)/
+      );
+      expect(ed.coverLocked).toBe(true);
+    }
 
     // Todas as mutações são bloqueadas com mensagem amigável
     const mutations = await Promise.all([

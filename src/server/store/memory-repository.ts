@@ -270,6 +270,10 @@ function buildDemoWorkspace(): UserWorkspaceData {
       pages: 400,
       heightMm: 210,
       thicknessMm: 22,
+      coverUrl:
+        "https://covers.openlibrary.org/b/isbn/9788563560278-L.jpg?default=false",
+      coverSource: "openlibrary",
+      coverLocked: true,
       coverColor: "#141514",
       contributors: [{ name: "Machado de Assis", role: "author" }],
       source: "brasilapi",
@@ -287,6 +291,10 @@ function buildDemoWorkspace(): UserWorkspaceData {
       pages: 264,
       heightMm: 230,
       thicknessMm: 15,
+      coverUrl:
+        "https://covers.openlibrary.org/b/id/12369648-L.jpg?default=false",
+      coverSource: "openlibrary",
+      coverLocked: true,
       coverColor: "#2D6A4F",
       contributors: [{ name: "Itamar Vieira Junior", role: "author" }],
       source: "brasilapi",
@@ -304,6 +312,10 @@ function buildDemoWorkspace(): UserWorkspaceData {
       pages: 88,
       heightMm: 200,
       thicknessMm: 4,
+      coverUrl:
+        "https://covers.openlibrary.org/b/isbn/9788532530783-L.jpg?default=false",
+      coverSource: "openlibrary",
+      coverLocked: true,
       coverColor: "#65A30D",
       contributors: [{ name: "Clarice Lispector", role: "author" }],
       source: "brasilapi",
@@ -321,6 +333,10 @@ function buildDemoWorkspace(): UserWorkspaceData {
       pages: 560,
       heightMm: 230,
       thicknessMm: 30,
+      coverUrl:
+        "https://covers.openlibrary.org/b/isbn/9788535931983-L.jpg?default=false",
+      coverSource: "openlibrary",
+      coverLocked: true,
       coverColor: "#141514",
       contributors: [{ name: "João Guimarães Rosa", role: "author" }],
       source: "brasilapi",
@@ -337,6 +353,10 @@ function buildDemoWorkspace(): UserWorkspaceData {
       durationSeconds: 21600, // 6h
       heightMm: 200,
       thicknessMm: 4,
+      coverUrl:
+        "https://covers.openlibrary.org/b/id/12769862-L.jpg?default=false",
+      coverSource: "openlibrary",
+      coverLocked: true,
       coverColor: "#1E201E",
       contributors: [
         { name: "Jeferson Tenório", role: "author" },
@@ -357,6 +377,10 @@ function buildDemoWorkspace(): UserWorkspaceData {
       pages: 200,
       heightMm: 210,
       thicknessMm: 12,
+      coverUrl:
+        "https://covers.openlibrary.org/b/isbn/9788508171279-L.jpg?default=false",
+      coverSource: "openlibrary",
+      coverLocked: true,
       coverColor: "#B91C1C",
       contributors: [{ name: "Carolina Maria de Jesus", role: "author" }],
       source: "brasilapi",
@@ -374,6 +398,10 @@ function buildDemoWorkspace(): UserWorkspaceData {
       pages: 128,
       heightMm: 180,
       thicknessMm: 9,
+      coverUrl:
+        "https://covers.openlibrary.org/b/id/13135779-L.jpg?default=false",
+      coverSource: "openlibrary",
+      coverLocked: true,
       coverColor: "#141514",
       contributors: [{ name: "Álvares de Azevedo", role: "author" }],
       source: "brasilapi",
@@ -674,10 +702,57 @@ function buildDemoWorkspace(): UserWorkspaceData {
       },
     ];
 
+    const DEV_EXTRA_COVERS: Record<string, string> = {
+      principios:
+        "https://covers.openlibrary.org/b/id/8315355-L.jpg?default=false",
+      "48-leis-poder":
+        "https://covers.openlibrary.org/b/id/6424160-L.jpg?default=false",
+      "responsabilidade-extrema":
+        "https://covers.openlibrary.org/b/id/12835042-L.jpg?default=false",
+      "elon-musk":
+        "https://covers.openlibrary.org/b/id/14420016-L.jpg?default=false",
+      "capitalismo-atencao": "/landing/covers/dom-casmurro.webp",
+      "o-principe":
+        "https://covers.openlibrary.org/b/id/12726168-L.jpg?default=false",
+      "mulheres-correm-lobos":
+        "https://covers.openlibrary.org/b/id/207915-L.jpg?default=false",
+      "como-fazer-amigos":
+        "https://covers.openlibrary.org/b/id/13314878-L.jpg?default=false",
+      "empresas-feitas-vencer":
+        "https://covers.openlibrary.org/b/id/7431270-L.jpg?default=false",
+      "coragem-nao-agradar": "/landing/covers/iracema.webp",
+      freemium:
+        "https://covers.openlibrary.org/b/id/13839931-L.jpg?default=false",
+      "arte-fazer-acontecer":
+        "https://covers.openlibrary.org/b/id/109288-L.jpg?default=false",
+      "como-chegar-ao-sim":
+        "https://covers.openlibrary.org/b/id/96165-L.jpg?default=false",
+      "obstaculo-e-o-caminho":
+        "https://covers.openlibrary.org/b/id/14428233-L.jpg?default=false",
+      "diario-estoico":
+        "https://covers.openlibrary.org/b/id/13098570-L.jpg?default=false",
+      "psicologia-financeira":
+        "https://covers.openlibrary.org/b/id/10389354-L.jpg?default=false",
+      essencialismo:
+        "https://covers.openlibrary.org/b/id/7285986-L.jpg?default=false",
+      "disciplina-e-liberdade":
+        "https://covers.openlibrary.org/b/id/9261174-L.jpg?default=false",
+      storynomics:
+        "https://covers.openlibrary.org/b/id/14421850-L.jpg?default=false",
+      "marca-da-vitoria":
+        "https://covers.openlibrary.org/b/id/8858487-L.jpg?default=false",
+      "diario-de-um-ceo":
+        "https://covers.openlibrary.org/b/id/15208285-L.jpg?default=false",
+      "rapido-e-devagar":
+        "https://covers.openlibrary.org/b/id/13290711-L.jpg?default=false",
+    };
+
     devExtraBooks.forEach((b, idx) => {
       const workId = `work-dev-${b.slug}`;
       const editionId = `ed-dev-${b.slug}`;
       const itemId = `item-dev-${b.slug}`;
+      const seededCoverUrl =
+        DEV_EXTRA_COVERS[b.slug] ?? "/landing/covers/dom-casmurro.webp";
       works.push({
         id: workId,
         ownerId: null,
@@ -698,6 +773,9 @@ function buildDemoWorkspace(): UserWorkspaceData {
         language: "pt-BR",
         format: b.format ?? "paperback",
         pages: b.pages,
+        coverUrl: seededCoverUrl,
+        coverSource: "openlibrary",
+        coverLocked: true,
         coverColor: clampPaperHsl(b.color),
         coverAccentColor: deriveSpineAccentHex(
           clampPaperHsl(b.color),
