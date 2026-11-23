@@ -23,11 +23,14 @@ import {
   type PersistedShelfLayout,
 } from "@/features/shelves/arrange-shelves";
 import { saveShelfCustomizationAction } from "@/features/settings/actions";
+import { useIsDemoSession } from "@/components/DemoSessionContext";
 import { ShelfView, type ShelfRenderGroup } from "@/components/ShelfView";
 import {
   BookSlideOverDrawer,
   type BookDrawerData,
 } from "@/components/BookSlideOverDrawer";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
+import { handleServerActionError } from "@/lib/server-action-error";
 import { FilterChip, rfButtonClassName } from "@/components/ui/ActionControls";
 import styles from "./VirtualBookshelf.module.css";
 
@@ -73,6 +76,7 @@ export function VirtualBookshelf({
   const [drawerBookId, setDrawerBookId] = useState<string | number | null>(
     null
   );
+  const isDemoSession = useIsDemoSession();
   const [view3dMode, setView3dMode] = useState<"spines" | "covers">("spines");
   const [activeFilter, setActiveFilter] =
     useState<ShelfQuickFilter>(initialQuickFilter);
@@ -390,6 +394,11 @@ export function VirtualBookshelf({
         `${movedTitle} movido para a posição ${newIndex + 1} de ${nextBooks.length} na prateleira ${shelf.genre}.`
       );
 
+      if (isDemoSession) {
+        setReorderAnnouncement(DEMO_READONLY_ERROR);
+        return;
+      }
+
       const libraryItemIds = nextBooks
         .map((b) => b.libraryItemId)
         .filter((id): id is string => Boolean(id));
@@ -409,15 +418,17 @@ export function VirtualBookshelf({
             return;
           }
           setLayout(res.layout);
-        } catch {
+        } catch (err) {
           setLayout(prevLayout);
-          setReorderAnnouncement(
+          const handled = handleServerActionError(
+            err,
             `Falha ao salvar a nova ordem de ${movedTitle}. Ordem restaurada.`
           );
+          setReorderAnnouncement(handled.message);
         }
       });
     },
-    [layout, startTransition]
+    [isDemoSession, layout, startTransition]
   );
 
   const handleMoveBookAcrossShelves = useCallback(
@@ -481,6 +492,11 @@ export function VirtualBookshelf({
         `${movedBook.title} movido para a prateleira ${destShelf.genre}.`
       );
 
+      if (isDemoSession) {
+        setReorderAnnouncement(DEMO_READONLY_ERROR);
+        return;
+      }
+
       startTransition(async () => {
         try {
           const res = await saveShelfCustomizationAction({
@@ -494,15 +510,17 @@ export function VirtualBookshelf({
             return;
           }
           setLayout(res.layout);
-        } catch {
+        } catch (err) {
           setLayout(prevLayout);
-          setReorderAnnouncement(
+          const handled = handleServerActionError(
+            err,
             `Falha ao salvar a mudança de prateleira para ${movedBook.title}. Posição restaurada.`
           );
+          setReorderAnnouncement(handled.message);
         }
       });
     },
-    [layout, shelves, startTransition]
+    [isDemoSession, layout, shelves, startTransition]
   );
 
   const handleSelectBook = useCallback(

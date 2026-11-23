@@ -9,6 +9,9 @@ import type { BookSearchResult } from "@/features/catalog/search-types";
 import type { BookFormat } from "@/lib/domain";
 import type { VirtualBookItem } from "@/features/shelves/virtual-bookshelf";
 import { BookSearchAutocomplete } from "@/components/BookSearchAutocomplete";
+import { useIsDemoSession } from "@/components/DemoSessionContext";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
+import { handleServerActionError } from "@/lib/server-action-error";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 
 export interface ArrangeQuickAddModalProps {
@@ -37,6 +40,7 @@ export function ArrangeQuickAddModal({
   onClose,
   onBookAdded,
 }: ArrangeQuickAddModalProps) {
+  const isDemoSession = useIsDemoSession();
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [pages, setPages] = useState("240");
@@ -83,6 +87,10 @@ export function ArrangeQuickAddModal({
     e.preventDefault();
     if (submittingRef.current) return;
     setErrorMsg(null);
+    if (isDemoSession) {
+      setErrorMsg(DEMO_READONLY_ERROR);
+      return;
+    }
 
     const cleanTitle = title.trim();
     const cleanAuthor = author.trim();
@@ -158,10 +166,12 @@ export function ArrangeQuickAddModal({
         setCoverUrl("");
         setSpineColor("");
         onClose();
-      } catch {
-        setErrorMsg(
+      } catch (err) {
+        const handled = handleServerActionError(
+          err,
           "Não foi possível adicionar o livro agora. Tente novamente."
         );
+        setErrorMsg(handled.message);
       } finally {
         submittingRef.current = false;
       }

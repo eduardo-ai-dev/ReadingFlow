@@ -27,6 +27,8 @@ import {
   Trash2,
 } from "lucide-react";
 import type { BookFormat, ReadingStatus } from "@/lib/domain";
+import { useIsDemoSession } from "@/components/DemoSessionContext";
+import { handleServerActionError } from "@/lib/server-action-error";
 import {
   measureBookRenderLayout,
   packShelfBooksByWidth,
@@ -289,6 +291,7 @@ export function BookQuickPanel({
   book: NormalizedVirtualBook | null;
 }) {
   const router = useRouter();
+  const isDemoSession = useIsDemoSession();
   const [isStartingFocus, startFocusTransition] = useTransition();
   const [focusError, setFocusError] = useState<string | null>(null);
 
@@ -322,25 +325,33 @@ export function BookQuickPanel({
       router.push(directFocusHref);
       return;
     }
-    if (book.isWishlist || !book.workId) {
+    if (isDemoSession || book.isWishlist || !book.workId) {
       router.push("/leitura/foco");
       return;
     }
     startFocusTransition(async () => {
-      const res = await startReadingAction({
-        workId: book.workId!,
-        editionId: book.editionId,
-        libraryItemId: book.libraryItemId,
-        format: resolveCanonicalFormat(book.format ?? book.realisticFormat),
-        countsForGoals: true,
-      });
-      if (!res.ok) {
-        setFocusError(res.error);
-        return;
+      try {
+        const res = await startReadingAction({
+          workId: book.workId!,
+          editionId: book.editionId,
+          libraryItemId: book.libraryItemId,
+          format: resolveCanonicalFormat(book.format ?? book.realisticFormat),
+          countsForGoals: true,
+        });
+        if (!res.ok) {
+          setFocusError(res.error);
+          return;
+        }
+        router.push(
+          `/leitura/foco?readingId=${encodeURIComponent(res.readingId)}`
+        );
+      } catch (err) {
+        const handled = handleServerActionError(
+          err,
+          "Não foi possível iniciar a leitura agora. Tente novamente."
+        );
+        setFocusError(handled.message);
       }
-      router.push(
-        `/leitura/foco?readingId=${encodeURIComponent(res.readingId)}`
-      );
     });
   };
 

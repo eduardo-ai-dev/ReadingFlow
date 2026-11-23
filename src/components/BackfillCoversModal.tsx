@@ -24,6 +24,7 @@ import {
 import { useIsDemoSession } from "@/components/DemoSessionContext";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
 import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
+import { handleServerActionError } from "@/lib/server-action-error";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 
 export interface BackfillBookTarget {
@@ -316,6 +317,12 @@ export function BackfillCoversModal({
       }
       setManualAppliedCount((c) => c + 1);
       advanceReview();
+    } catch (err) {
+      const handled = handleServerActionError(
+        err,
+        "Não foi possível salvar a capa escolhida agora. Tente novamente."
+      );
+      setErrorMessage(handled.message);
     } finally {
       setSavingChoice(false);
     }

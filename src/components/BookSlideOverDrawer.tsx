@@ -13,6 +13,9 @@ import {
   updateReadingProgressAction,
 } from "@/features/reading/actions";
 import { BookCover } from "@/components/BookCover";
+import { useIsDemoSession } from "@/components/DemoSessionContext";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
+import { handleServerActionError } from "@/lib/server-action-error";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 
 export interface BookDrawerData {
@@ -120,6 +123,7 @@ function DrawerBody({
   const [currentReadingId, setCurrentReadingId] = useState<string | null>(
     book.readingId ?? null
   );
+  const isDemoSession = useIsDemoSession();
   const [currentStatus, setCurrentStatus] = useState<ReadingStatus>(
     book.readingStatus ?? "not_started"
   );
@@ -180,6 +184,11 @@ function DrawerBody({
     e.preventDefault();
     setErrorMsg(null);
     setFeedbackMsg(null);
+
+    if (isDemoSession) {
+      setErrorMsg(DEMO_READONLY_ERROR);
+      return;
+    }
 
     const trimmed = inputValue.trim();
     if (!trimmed) {
@@ -244,10 +253,12 @@ function DrawerBody({
         }
         setFeedbackMsg("Progresso atualizado.");
         router.refresh();
-      } catch {
-        setErrorMsg(
+      } catch (err) {
+        const handled = handleServerActionError(
+          err,
           "Não foi possível salvar o progresso agora. Tente novamente."
         );
+        setErrorMsg(handled.message);
       } finally {
         setBusyAction(null);
       }
@@ -258,6 +269,10 @@ function DrawerBody({
     if (currentStatus === "finished") return;
     setErrorMsg(null);
     setFeedbackMsg(null);
+    if (isDemoSession) {
+      setErrorMsg(DEMO_READONLY_ERROR);
+      return;
+    }
     setBusyAction("finish");
 
     startTransition(async () => {
@@ -292,10 +307,12 @@ function DrawerBody({
           })
         );
         router.refresh();
-      } catch {
-        setErrorMsg(
+      } catch (err) {
+        const handled = handleServerActionError(
+          err,
           "Não foi possível concluir a leitura agora. Tente novamente."
         );
+        setErrorMsg(handled.message);
       } finally {
         setBusyAction(null);
       }
@@ -305,6 +322,15 @@ function DrawerBody({
   function handleStartFocusSession() {
     setErrorMsg(null);
     setFeedbackMsg(null);
+    if (isDemoSession) {
+      onClose();
+      router.push(
+        currentReadingId
+          ? `/leitura/foco?readingId=${encodeURIComponent(currentReadingId)}`
+          : "/leitura/foco"
+      );
+      return;
+    }
     setBusyAction("focus");
 
     startTransition(async () => {
@@ -316,10 +342,12 @@ function DrawerBody({
         }
         onClose();
         router.push(`/leitura/foco?readingId=${encodeURIComponent(targetId)}`);
-      } catch {
-        setErrorMsg(
+      } catch (err) {
+        const handled = handleServerActionError(
+          err,
           "Não foi possível iniciar a sessão de foco agora. Tente novamente."
         );
+        setErrorMsg(handled.message);
       } finally {
         setBusyAction(null);
       }

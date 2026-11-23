@@ -17,6 +17,7 @@ import { GlobalSearchBar } from "@/components/GlobalSearchBar";
 import { Button } from "@/components/ui/Button";
 import { LibraryBackdrop } from "@/components/layout/LibraryBackdrop";
 import { DemoSessionProvider } from "@/components/DemoSessionContext";
+import { handleServerActionError } from "@/lib/server-action-error";
 import { Plus, User, Settings, LogOut, Menu, X } from "lucide-react";
 
 const MOBILE_BOTTOM_NAV = [
@@ -91,8 +92,18 @@ export function AppShell({
 
   const handleSignOut = () => {
     startSignOut(async () => {
-      await signOutAction();
-      router.push("/");
+      try {
+        await signOutAction();
+        router.push("/");
+      } catch (err) {
+        const handled = handleServerActionError(
+          err,
+          "Não foi possível encerrar a sessão agora."
+        );
+        if (!handled.isVersionSkew) {
+          router.push("/");
+        }
+      }
     });
   };
 

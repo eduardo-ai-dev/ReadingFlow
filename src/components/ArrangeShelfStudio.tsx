@@ -64,7 +64,10 @@ import {
 } from "@/components/ShelfView";
 import { BookCover } from "@/components/BookCover";
 import { ArrangeQuickAddModal } from "@/components/ArrangeQuickAddModal";
+import { useIsDemoSession } from "@/components/DemoSessionContext";
+import { DEMO_READONLY_ERROR } from "@/lib/auth-demo";
 import { dispatchFeedbackToast } from "@/lib/feedback";
+import { handleServerActionError } from "@/lib/server-action-error";
 import { rfButtonClassName } from "@/components/ui/ActionControls";
 import styles from "./VirtualBookshelf.module.css";
 
@@ -236,6 +239,7 @@ export function ArrangeShelfStudio({
   onSaved,
 }: ArrangeShelfStudioProps) {
   const router = useRouter();
+  const isDemoSession = useIsDemoSession();
   const [isSaving, startSave] = useTransition();
 
   const [booksPool, setBooksPool] = useState<VirtualBookItem[]>(() => [
@@ -906,6 +910,18 @@ export function ArrangeShelfStudio({
     setDraftTiltDirections(null);
     setDraftDecorByRow(null);
 
+    if (isDemoSession) {
+      setSavedLayout(previousLayout);
+      setDraft(prevDraft);
+      setDraftThemeConfig(prevThemeConfig);
+      setDraftColorOverrides(prevColorOverrides);
+      setDraftDisplayModes(prevDisplayModes);
+      setDraftTiltDirections(prevTiltDirections);
+      setDraftDecorByRow(prevDecorByRow);
+      showNotice(DEMO_READONLY_ERROR, "error");
+      return;
+    }
+
     startSave(async () => {
       try {
         const res = await saveShelfCustomizationAction({
@@ -947,7 +963,7 @@ export function ArrangeShelfStudio({
           message: "Estante salva",
         });
         onSaved?.();
-      } catch {
+      } catch (err) {
         setSavedLayout(previousLayout);
         setDraft(prevDraft);
         setDraftThemeConfig(prevThemeConfig);
@@ -955,21 +971,25 @@ export function ArrangeShelfStudio({
         setDraftDisplayModes(prevDisplayModes);
         setDraftTiltDirections(prevTiltDirections);
         setDraftDecorByRow(prevDecorByRow);
-        showNotice(
-          "Falha de conexão ao salvar na sua conta. As alterações foram revertidas — tente novamente.",
-          "error"
+        const handled = handleServerActionError(
+          err,
+          "Falha de conexão ao salvar na sua conta. As alterações foram revertidas — tente novamente."
         );
+        showNotice(handled.message, "error");
         dispatchFeedbackToast({
           tone: "error",
-          message:
-            "Falha de conexão ao salvar a estante. As alterações foram revertidas.",
-          onRetry: handleSave,
+          message: handled.message,
+          onRetry: handled.isVersionSkew ? undefined : handleSave,
         });
       }
     });
   };
 
   const handleReset = () => {
+    if (isDemoSession) {
+      showNotice(DEMO_READONLY_ERROR, "error");
+      return;
+    }
     const previousLayout = savedLayout;
     const prevDraft = draft;
     const prevThemeConfig = draftThemeConfig;
@@ -1014,7 +1034,7 @@ export function ArrangeShelfStudio({
         }
         router.refresh();
         showNotice("Configuração padrão restaurada na sua conta.");
-      } catch {
+      } catch (err) {
         setSavedLayout(previousLayout);
         setDraft(prevDraft);
         setDraftThemeConfig(prevThemeConfig);
@@ -1022,16 +1042,21 @@ export function ArrangeShelfStudio({
         setDraftDisplayModes(prevDisplayModes);
         setDraftTiltDirections(prevTiltDirections);
         setDraftDecorByRow(prevDecorByRow);
-        showNotice(
-          "Falha de conexão ao restaurar o padrão. Tente novamente.",
-          "error"
+        const handled = handleServerActionError(
+          err,
+          "Falha de conexão ao restaurar o padrão. Tente novamente."
         );
+        showNotice(handled.message, "error");
       }
     });
   };
 
   const handleImportLegacyLocal = () => {
     if (!legacyLayoutRaw) return;
+    if (isDemoSession) {
+      showNotice(DEMO_READONLY_ERROR, "error");
+      return;
+    }
     const rawToImport = legacyLayoutRaw;
     startSave(async () => {
       try {
@@ -1051,11 +1076,12 @@ export function ArrangeShelfStudio({
         }
         router.refresh();
         showNotice("Arrumação antiga importada para sua conta!");
-      } catch {
-        showNotice(
-          "Erro ao importar arrumação antiga. Tente novamente.",
-          "error"
+      } catch (err) {
+        const handled = handleServerActionError(
+          err,
+          "Erro ao importar arrumação antiga. Tente novamente."
         );
+        showNotice(handled.message, "error");
       }
     });
   };
