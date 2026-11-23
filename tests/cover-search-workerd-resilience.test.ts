@@ -164,4 +164,78 @@ describe("Resiliência Cloudflare Workers (workerd) em /api/covers/search", () =
       )
     ).toBeNull();
   });
+
+  it("descarta apenas o candidato com erro na sonda de imagem preservando os demais candidatos válidos", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("openlibrary.org/search.json")) {
+        return new Response(
+          JSON.stringify({
+            docs: [
+              {
+                key: "/works/OL1W",
+                title: "Dom Casmurro",
+                author_name: ["Machado de Assis"],
+                cover_i: 111111,
+                first_publish_year: 1899,
+              },
+              {
+                key: "/works/OL2W",
+                title: "Dom Casmurro",
+                author_name: ["Machado de Assis"],
+                cover_i: 222222,
+                first_publish_year: 1998,
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response(JSON.stringify({ items: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+
+    const result = await searchBookCovers({
+      title: "Dom Casmurro",
+      author: "Machado de Assis",
+      fetchImpl,
+      probeImpl: async (rawUrl) => {
+        if (rawUrl.includes("111111")) {
+          throw new Error("Simulated probe failure on first candidate");
+        }
+        return { ok: true, url: rawUrl, width: 400, height: 600 };
+      },
+      pauseBetweenCallsMs: 0,
+      envOverride: {
+        GOOGLE_BOOKS_API_KEY: undefined,
+        HARDCOVER_API_TOKEN: undefined,
+        ENABLE_APPLE_BOOKS_COVERS: false,
+      },
+    });
+
+    expect(result.candidates.length).toBe(1);
+    expect(result.candidates[0]?.coverUrl).toContain("222222");
+    expect(errSpy).toHaveBeenCalledWith(
+      "[covers/search]",
+      expect.objectContaining({ stage: "candidate_probe" })
+    );
+  });
+
+  it("removeu interest-cohort=() do Permissions-Policy em next.config.ts sem deixar vírgulas soltas", () => {
+    const nextConfigText = readFileSync(
+      path.join(process.cwd(), "next.config.ts"),
+      "utf8"
+    );
+    expect(nextConfigText).not.toContain("interest-cohort");
+    const match = nextConfigText.match(
+      /key:\s*"Permissions-Policy",\s*value:\s*"([^"]+)"/
+    );
+    expect(match?.[1]).toBeTruthy();
+    expect(match?.[1]).not.toMatch(/,\s*$/);
+    expect(match?.[1]).not.toMatch(/,\s*,/);
+  });
 });

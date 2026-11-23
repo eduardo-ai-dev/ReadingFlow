@@ -2385,14 +2385,41 @@ export async function searchBookCovers(
   const enableRetry = pauseMs > 0;
   const bypassCooldown = Boolean(params.bypassCache);
 
+  const wrapProbeSafely = (
+    fn: (
+      rawUrl: string,
+      signal: AbortSignal,
+      opts?: { allowSquare?: boolean }
+    ) => Promise<ProbeResult>
+  ) => {
+    return async (
+      rawUrl: string,
+      probeSignal: AbortSignal,
+      opts?: { allowSquare?: boolean }
+    ): Promise<ProbeResult> => {
+      try {
+        return await fn(rawUrl, probeSignal, opts);
+      } catch (err) {
+        logCoverSearchError({ stage: "candidate_probe" }, err);
+        return { ok: false, url: rawUrl, reason: "http_error" };
+      }
+    };
+  };
+
   // Sonda obrigatória para URL direta de ISBN da Open Library (que responde 404 com ?default=false)
-  const openLibraryIsbnProbe =
+  const openLibraryIsbnProbe = wrapProbeSafely(
     params.probeImpl ??
-    ((rawUrl: string, signal: AbortSignal, opts?: { allowSquare?: boolean }) =>
-      probeCoverImageDimensions(rawUrl, signal, fetchImpl, opts));
+      ((
+        rawUrl: string,
+        probeSignal: AbortSignal,
+        opts?: { allowSquare?: boolean }
+      ) => probeCoverImageDimensions(rawUrl, probeSignal, fetchImpl, opts))
+  );
 
   // Para candidatos que já trazem URL de capa nos metadados, só sondamos se o teste injetou `probeImpl`
-  const customProbe = params.probeImpl;
+  const customProbe = params.probeImpl
+    ? wrapProbeSafely(params.probeImpl)
+    : undefined;
 
   const cacheKey = buildCacheKey({
     title: cleanTitle,
